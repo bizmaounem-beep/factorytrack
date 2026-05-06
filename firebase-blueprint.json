@@ -1,0 +1,101 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with role-based access",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "pin": { "type": "string" },
+        "role": { "type": "string", "enum": ["OPERATOR", "PILOT", "ADMIN"] }
+      },
+      "required": ["name", "pin", "role"]
+    },
+    "Machine": {
+      "title": "Machine",
+      "description": "Production machine",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Line": {
+      "title": "Line",
+      "description": "Production line within a machine",
+      "type": "object",
+      "properties": {
+        "machineId": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["IDLE", "RUNNING", "STOPPED"] },
+        "currentProgrammeId": { "type": "string" },
+        "currentOperatorId": { "type": "string" },
+        "activeDowntimeId": { "type": "string" }
+      },
+      "required": ["machineId", "name", "status"]
+    },
+    "Programme": {
+      "title": "Programme",
+      "description": "Production programme assigned to a line",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "machineId": { "type": "string" },
+        "lineId": { "type": "string" },
+        "targetPallets": { "type": "number" },
+        "producedPallets": { "type": "number" },
+        "status": { "type": "string", "enum": ["ACTIVE", "FINISHED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "machineId", "lineId", "targetPallets", "producedPallets", "status"]
+    },
+    "ProductionLog": {
+      "title": "Production Log",
+      "description": "Record of pallets produced",
+      "type": "object",
+      "properties": {
+        "programmeId": { "type": "string" },
+        "operatorId": { "type": "string" },
+        "machineId": { "type": "string" },
+        "lineId": { "type": "string" },
+        "count": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["programmeId", "operatorId", "count", "timestamp"]
+    },
+    "DowntimeType": {
+      "title": "Downtime Type",
+      "description": "Reason for machine stoppage",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "icon": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "DowntimeLog": {
+      "title": "Downtime Log",
+      "description": "Record of downtime duration and type",
+      "type": "object",
+      "properties": {
+        "machineId": { "type": "string" },
+        "lineId": { "type": "string" },
+        "typeId": { "type": "string" },
+        "operatorId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "duration": { "type": "number" }
+      },
+      "required": ["machineId", "lineId", "typeId", "startTime"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "Collection of system users" },
+    "machines": { "schema": "Machine", "description": "Collection of machines" },
+    "lines": { "schema": "Line", "description": "Collection of lines" },
+    "programmes": { "schema": "Programme", "description": "Collection of production programmes" },
+    "production_logs": { "schema": "ProductionLog", "description": "Historical production data" },
+    "downtime_types": { "schema": "DowntimeType", "description": "Allowed downtime reasons" },
+    "downtime_logs": { "schema": "DowntimeLog", "description": "Historical downtime data" }
+  }
+}
