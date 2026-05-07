@@ -30,17 +30,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (pin: string) => {
     try {
-      // Assuming PIN is both username and password for simplicity in this offline environment
-      // Or you can configure your PocketBase users to have username='admin' password='pin'
+      // PocketBase authWithPassword(identity, password) 
+      // Identity can be either 'username' or 'email'
+      // We are treating the PIN as both the Username identity and the Password
       const authData = await pb.collection('users').authWithPassword(pin, pin);
       
       if (authData.record) {
+        // Successful login
         setUser(authData.record as unknown as User);
         return true;
       }
       return false;
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
+      // Detailed error logging for migration debugging
+      if (error?.status) {
+        console.log(`PocketBase Auth Error [${error.status}]:`, error.data || error.message);
+        
+        if (error.status === 400) {
+          console.error("Login Result: 400 Bad Request. (Usually Identity/Password mismatch or password too short)");
+        } else if (error.status === 404) {
+          console.error("Login Result: 404 Not Found. (Check if 'users' collection exists and is an auth type)");
+        }
+      } else {
+        console.error('Unexpected Login Error:', error);
+      }
       return false;
     }
   };
