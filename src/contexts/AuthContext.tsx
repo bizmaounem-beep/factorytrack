@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { pb } from '../lib/pocketbase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { User } from '../types';
 
 interface AuthContextType {
@@ -16,67 +17,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const mapUser = (model: any): User | null => {
-      if (!model) return null;
-      return {
-        id: model.id,
-        name: model.name || model.username || 'User',
-        pin: model.pin || '',
-        role: model.role || 'OPERATOR'
-      } as User;
-    };
-
     // Check for persisted user session
-    if (pb.authStore.isValid) {
-      setUser(mapUser(pb.authStore.model));
+    const savedUser = localStorage.getItem('factory_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
     }
     setLoading(false);
-
-    // Listen to auth changes
-    return pb.authStore.onChange((token, model) => {
-      setUser(mapUser(model));
-    });
   }, []);
 
   const login = async (pin: string) => {
-    console.log(`[Auth] Attempting login with identity: "${pin}" (treating PIN as Username)`);
     try {
-      // Identity can be either 'username' or 'email'
-      // password length must be at least 4 (as configured in PB)
-      const authData = await pb.collection('users').authWithPassword(pin, pin);
+      const q = query(collection(db, 'users'), where('pin', '==', pin));
+      const querySnapshot = await getDocs(q);
       
-      if (authData.record) {
-        console.log('[Auth] Login successful for user:', authData.record.username);
-        // User state will be updated via the onChange listener in useEffect
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data() as Omit<User, 'id'>;
+        const fullUser = { ...userData, id: querySnapshot.docs[0].id } as User;
+        setUser(fullUser);
+        localStorage.setItem('factory_user', JSON.stringify(fullUser));
         return true;
       }
       return false;
-    } catch (error: any) {
-      console.error('[Auth] Login failed error details:', error);
-      
-      if (error?.status) {
-        const errorMsg = error.data?.message || error.message || 'Unknown error';
-        console.error(`PocketBase Response Error [${error.status}]:`, errorMsg);
-        
-        if (error.status === 400) {
-          console.error("DEBUG TIP: 400 usually means password mismatch or identity not found. Verify you created a user in PocketBase with Username = Password = your PIN.");
-          if (error.data) console.error("Server validation data:", JSON.stringify(error.data, null, 2));
-        } else if (error.status === 404) {
-          console.error("DEBUG TIP: 404 means the 'users' collection or auth endpoint was not found.");
-        } else if (error.status === 403) {
-          console.error("DEBUG TIP: 403 Forbidden. Check your collection API rules.");
-        }
-      } else if (error?.originalError?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.isAbort) {
-        console.error(`CONNECTION ERROR: Cannot reach PocketBase at ${pb.baseUrl}. If PB is local, ensure it's running and check browser CORS console errors.`);
-      } else {
-        console.error('Unexpected Login Error:', error?.message || error);
-      }
+    } catch (error) {
+      console.error('Login error:', error);
       return false;
     }
   };
 
   const logout = () => {
-    pb.authStore.clear();
     setUser(null);
     localStorage.removeItem('factory_user');
   };

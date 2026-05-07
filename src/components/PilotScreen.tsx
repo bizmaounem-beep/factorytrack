@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { pb } from '../lib/pocketbase';
+import { collection, onSnapshot, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, orderBy, increment, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Machine, Line, Programme, User as AppUser, DowntimeType, DowntimeLog } from '../types';
-import { motion } from 'motion/react';
-import { Monitor, LayoutGrid, Plus, Activity } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { Machine, Line, Programme, User as AppUser, DowntimeType, DowntimeLog, ProductionLog } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2 } from 'lucide-react';
+import { cn, formatDuration } from '../lib/utils';
 
 export default function PilotScreen() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<'monitor' | 'history'>('monitor');
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
   const [lines, setLines] = useState<Line[]>([]);
@@ -15,115 +17,96 @@ export default function PilotScreen() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [downtimeTypes, setDowntimeTypes] = useState<DowntimeType[]>([]);
   const [activeDowntimes, setActiveDowntimes] = useState<Record<string, DowntimeLog>>({});
+  const [prodLogs, setProdLogs] = useState<ProductionLog[]>([]);
+  const [downLogs, setDownLogs] = useState<DowntimeLog[]>([]);
 
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
   const [showCreateNew, setShowCreateNew] = useState(false);
   const [newProgName, setNewProgName] = useState('');
   const [newProgTarget, setNewProgTarget] = useState('100');
 
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editModalType, setEditModalType] = useState<'prod' | 'down'>('prod');
+  const [editModalData, setEditModalData] = useState<any>({});
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
+
   useEffect(() => {
-    const fetchData = async () => {
-      const machineList = await pb.collection('machines').getFullList<Machine>();
-      const userList = await pb.collection('users').getFullList<AppUser>();
-      const typeList = await pb.collection('downtime_types').getFullList<DowntimeType>();
-      setMachines(machineList);
-      setUsers(userList);
-      setDowntimeTypes(typeList);
-    };
-    fetchData();
-
-    pb.collection('machines').subscribe<Machine>('*', (e) => {
-      if (e.action === 'create') setMachines(prev => [...prev, e.record]);
-      if (e.action === 'update') setMachines(prev => prev.map(m => m.id === e.record.id ? e.record : m));
-      if (e.action === 'delete') setMachines(prev => prev.filter(m => m.id !== e.record.id));
-    });
-
-    pb.collection('users').subscribe<AppUser>('*', (e) => {
-      if (e.action === 'create') setUsers(prev => [...prev, e.record]);
-      if (e.action === 'update') setUsers(prev => prev.map(u => u.id === e.record.id ? e.record : u));
-      if (e.action === 'delete') setUsers(prev => prev.filter(u => u.id !== e.record.id));
-    });
-
-    return () => {
-      pb.collection('machines').unsubscribe();
-      pb.collection('users').unsubscribe();
-    };
+    onSnapshot(collection(db, 'machines'), shot => setMachines(shot.docs.map(d => ({id: d.id, ...d.data()} as Machine))));
+    onSnapshot(collection(db, 'users'), shot => setUsers(shot.docs.map(d => ({id: d.id, ...d.data()} as AppUser))));
+    onSnapshot(collection(db, 'downtime_types'), shot => setDowntimeTypes(shot.docs.map(d => ({id: d.id, ...d.data()} as DowntimeType))));
+    onSnapshot(query(collection(db, 'production_logs'), orderBy('timestamp', 'desc')), shot => setProdLogs(shot.docs.map(d => ({id: d.id, ...d.data()} as ProductionLog))));
+    onSnapshot(query(collection(db, 'downtime_logs'), orderBy('startTime', 'desc')), shot => setDownLogs(shot.docs.map(d => ({id: d.id, ...d.data()} as DowntimeLog))));
   }, []);
+
+  // Auto-select machine if pilot is already assigned in DB
+  useEffect(() => {
+    if (!user || selectedMachineId) return;
+    const myMachine = machines.find(m => m.currentPilotId === user.id);
+    if (myMachine) {
+       setSelectedMachineId(myMachine.id);
+    }
+  }, [machines, user, selectedMachineId]);
+
+  const handleMachineSelect = async (machineId: string) => {
+    if (!user) return;
+    
+    try {
+      // Release current machine if selected
+      if (selectedMachineId && selectedMachineId !== machineId) {
+        await updateDoc(doc(db, 'machines', selectedMachineId), { currentPilotId: null });
+      }
+
+      // Assign new machine if machineId is provided
+      if (machineId) {
+        await updateDoc(doc(db, 'machines', machineId), { currentPilotId: user.id });
+      }
+      
+      setSelectedMachineId(machineId);
+    } catch (e) {
+      console.error("Error updating machine assignment:", e);
+      alert("Erreur lors de l'assignation de la machine");
+    }
+  };
+
+  const handleLogout = async () => {
+    if (selectedMachineId) {
+      try {
+        await updateDoc(doc(db, 'machines', selectedMachineId), { currentPilotId: null });
+      } catch (e) {
+        console.error("Error releasing machine on logout:", e);
+      }
+    }
+    logout();
+  };
 
   useEffect(() => {
     if (!selectedMachineId) return;
-
-    const fetchMachineData = async () => {
-      const lineList = await pb.collection('lines').getFullList<Line>({
-        filter: `machineId = "${selectedMachineId}"`
-      });
-      const progList = await pb.collection('programmes').getFullList<Programme>({
-        filter: `machineId = "${selectedMachineId}" && status = "ACTIVE"`
-      });
-      setLines(lineList);
-      setProgrammes(progList);
-    };
-    fetchMachineData();
-
-    pb.collection('lines').subscribe<Line>('*', (e) => {
-      if (e.record.machineId === selectedMachineId) {
-        if (e.action === 'create') setLines(prev => [...prev, e.record]);
-        if (e.action === 'update') setLines(prev => prev.map(l => l.id === e.record.id ? e.record : l));
-        if (e.action === 'delete') setLines(prev => prev.filter(l => l.id !== e.record.id));
-      }
+    const unsubLines = onSnapshot(query(collection(db, 'lines'), where('machineId', '==', selectedMachineId)), shot => {
+      setLines(shot.docs.map(d => ({id: d.id, ...d.data()} as Line)));
     });
-
-    pb.collection('programmes').subscribe<Programme>('*', (e) => {
-      if (e.record.machineId === selectedMachineId) {
-        if (e.action === 'create' && e.record.status === 'ACTIVE') setProgrammes(prev => [...prev, e.record]);
-        if (e.action === 'update') {
-          setProgrammes(prev => {
-            const exists = prev.some(p => p.id === e.record.id);
-            if (e.record.status === 'ACTIVE') {
-              return exists ? prev.map(p => p.id === e.record.id ? e.record : p) : [...prev, e.record];
-            }
-            return prev.filter(p => p.id !== e.record.id);
-          });
-        }
-        if (e.action === 'delete') setProgrammes(prev => prev.filter(p => p.id !== e.record.id));
-      }
+    const unsubProgs = onSnapshot(query(collection(db, 'programmes'), where('machineId', '==', selectedMachineId), where('status', '==', 'ACTIVE')), shot => {
+      setProgrammes(shot.docs.map(d => ({id: d.id, ...d.data()} as Programme)));
     });
-
     return () => {
-      pb.collection('lines').unsubscribe();
-      pb.collection('programmes').unsubscribe();
+      unsubLines();
+      unsubProgs();
     };
   }, [selectedMachineId]);
 
   // Sync active downtimes
   useEffect(() => {
-    const fetchDowntimes = async () => {
-      const records = await pb.collection('downtime_logs').getFullList<DowntimeLog>({
-        filter: 'endTime = ""'
-      });
+    const unsub = onSnapshot(collection(db, 'downtime_logs'), shot => {
       const active: Record<string, DowntimeLog> = {};
-      records.forEach(r => {
-        active[r.lineId] = r;
+      shot.docs.forEach(d => {
+        const data = d.data() as DowntimeLog;
+        if (!data.endTime) {
+          active[data.lineId] = { id: d.id, ...data };
+        }
       });
       setActiveDowntimes(active);
-    };
-    fetchDowntimes();
-
-    pb.collection('downtime_logs').subscribe<DowntimeLog>('*', (e) => {
-      if (e.action === 'create' || (e.action === 'update' && !e.record.endTime)) {
-        setActiveDowntimes(prev => ({ ...prev, [e.record.lineId]: e.record }));
-      } else if (e.action === 'delete' || (e.action === 'update' && e.record.endTime)) {
-        setActiveDowntimes(prev => {
-          const next = { ...prev };
-          if (next[e.record.lineId]?.id === e.record.id) {
-            delete next[e.record.lineId];
-          }
-          return next;
-        });
-      }
     });
-
-    return () => pb.collection('downtime_logs').unsubscribe();
+    return unsub;
   }, []);
 
   const handleAssignProgramme = async () => {
@@ -133,7 +116,7 @@ export default function PilotScreen() {
     if (isNaN(target)) return;
 
     // Create new programme
-    const record = await pb.collection('programmes').create({
+    const progRef = await addDoc(collection(db, 'programmes'), {
       name: newProgName,
       machineId: selectedMachineId,
       lineId: isAssigning,
@@ -144,8 +127,8 @@ export default function PilotScreen() {
     });
 
     // Update line
-    await pb.collection('lines').update(isAssigning, {
-      currentProgrammeId: record.id,
+    await updateDoc(doc(db, 'lines', isAssigning), {
+      currentProgrammeId: progRef.id,
       status: 'IDLE'
     });
 
@@ -157,12 +140,89 @@ export default function PilotScreen() {
 
   const handleSelectExistingProgramme = async (progId: string) => {
     if (!isAssigning) return;
-    await pb.collection('lines').update(isAssigning, {
+    await updateDoc(doc(db, 'lines', isAssigning), {
       currentProgrammeId: progId,
       status: 'IDLE'
     });
     setIsAssigning(null);
   };
+
+  const openEditModal = (type: 'prod' | 'down', log: any) => {
+    setEditModalType(type);
+    setEditModalData({ ...log });
+    setEditingLogId(log.id);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingLogId) return;
+    try {
+      const col = editModalType === 'prod' ? 'production_logs' : 'downtime_logs';
+      const data = { ...editModalData };
+      delete data.id;
+
+      if (editModalType === 'prod') {
+        const oldLog = prodLogs.find(l => l.id === editingLogId);
+        data.count = parseInt(data.count);
+        if (oldLog && oldLog.count !== data.count) {
+          const diff = data.count - oldLog.count;
+          await updateDoc(doc(db, 'programmes', oldLog.programmeId), {
+            producedPallets: increment(diff)
+          });
+        }
+      } else {
+        if (data.duration) data.duration = parseInt(data.duration);
+      }
+
+      await updateDoc(doc(db, col, editingLogId), data);
+      setIsEditModalOpen(false);
+      setEditingLogId(null);
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de la modification');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    try {
+      if (confirmDelete.col === 'production_logs') {
+        const logDoc = await getDoc(doc(db, confirmDelete.col, confirmDelete.id));
+        if (logDoc.exists()) {
+          const logData = logDoc.data() as ProductionLog;
+          await updateDoc(doc(db, 'programmes', logData.programmeId), {
+            producedPallets: increment(-logData.count)
+          });
+        }
+      }
+
+      if (confirmDelete.col === 'downtime_logs') {
+        const logDoc = await getDoc(doc(db, confirmDelete.col, confirmDelete.id));
+        if (logDoc.exists()) {
+          const logData = logDoc.data() as DowntimeLog;
+          if (!logData.endTime) {
+            await updateDoc(doc(db, 'lines', logData.lineId), {
+              activeDowntimeId: null,
+              status: 'IDLE'
+            });
+          }
+        }
+      }
+
+      await deleteDoc(doc(db, confirmDelete.col, confirmDelete.id));
+      setConfirmDelete(null);
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de la suppression');
+    }
+  };
+
+  // Filter logs for the selected machine
+  const filteredProdLogs = prodLogs.filter(log => log.machineId === selectedMachineId);
+  const filteredDownLogs = downLogs.filter(log => log.machineId === selectedMachineId);
+
+  // Filter machines available for this pilot (not assigned or assigned to them)
+  const availableMachines = machines.filter(m => !m.currentPilotId || m.currentPilotId === user?.id);
 
   // Filter programmes that are already assigned to other lines
   const assignedProgIds = lines.map(l => l.currentProgrammeId).filter(Boolean);
@@ -174,22 +234,37 @@ export default function PilotScreen() {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Monitor className="text-blue-600" size={24} />
-            <h1 className="font-black text-xl tracking-tighter">PILOT MONITOR</h1>
+            <h1 className="font-black text-xl tracking-tighter uppercase italic">Pilot Monitor</h1>
           </div>
-          <button onClick={logout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">Logout</button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setActiveTab(activeTab === 'monitor' ? 'history' : 'monitor')}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                activeTab === 'history' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              )}
+            >
+              {activeTab === 'monitor' ? <History size={14} /> : <Monitor size={14} />}
+              {activeTab === 'monitor' ? 'Historique' : 'Monitor'}
+            </button>
+            <button onClick={handleLogout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">Logout</button>
+          </div>
         </div>
         
-        <select 
-          value={selectedMachineId}
-          onChange={e => setSelectedMachineId(e.target.value)}
-          className="w-full p-3 bg-gray-50 rounded-xl font-bold border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700"
-        >
-          <option value="">Sélectionner une machine...</option>
-          {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+        {activeTab === 'monitor' && (
+          <select 
+            value={selectedMachineId}
+            onChange={e => handleMachineSelect(e.target.value)}
+            className="w-full p-3 bg-gray-50 rounded-xl font-bold border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700"
+          >
+            <option value="">Sélectionner une machine...</option>
+            {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        )}
       </div>
 
-      {!selectedMachineId ? (
+      {activeTab === 'monitor' ? (
+        !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
              <LayoutGrid size={32} />
@@ -296,14 +371,259 @@ export default function PilotScreen() {
                       <Activity size={14} className="animate-pulse" />
                       <span className="text-xs font-bold uppercase tracking-tighter">{downType?.name || 'Arrêt'}</span>
                     </div>
-                    <span className="text-[10px] font-mono font-bold text-orange-800 bg-white/40 px-2 py-0.5 rounded">
-                       Depuis {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-mono font-bold text-orange-800 bg-white/40 px-2 py-0.5 rounded">
+                          Depuis {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                       </span>
+                       <button 
+                         onClick={() => setConfirmDelete({col: 'downtime_logs', id: down.id, name: `Arrêt actif: ${downType?.name}`})}
+                         className="p-1.5 text-red-600 bg-white/40 rounded hover:bg-red-50 transition-colors"
+                         title="Supprimer cet arrêt"
+                       >
+                         <Trash2 size={12} />
+                       </button>
+                    </div>
                   </div>
                 )}
               </motion.div>
             );
           })}
+        </div>
+      )
+    ) : (
+        <div className="p-4 space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
+          <div className="flex justify-between items-end">
+            <div>
+              <h2 className="text-2xl font-black tracking-tight text-gray-900 uppercase">Historique Production & Arrêts</h2>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Gérez les données enregistrées</p>
+            </div>
+          </div>
+
+          <div className="space-y-12">
+            {/* Production History */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                <Package className="text-blue-600" size={18} />
+                PRODUCTION
+              </h3>
+              <div className="card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
+                      <tr>
+                        <th className="px-5 py-4">Horodatage</th>
+                        <th className="px-5 py-4">Ligne</th>
+                        <th className="px-5 py-4">Opérateur</th>
+                        <th className="px-5 py-4">Quantité</th>
+                        <th className="px-5 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 text-xs">
+                      <AnimatePresence mode="popLayout">
+                        {filteredProdLogs.slice(0, 50).map(log => (
+                          <motion.tr 
+                            key={log.id} 
+                            initial={{ opacity: 1 }}
+                            exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                            transition={{ duration: 0.2 }}
+                            className="hover:bg-gray-50/50"
+                          >
+                            <td className="px-5 py-4 font-bold text-gray-900">
+                              {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                            </td>
+                            <td className="px-5 py-4">
+                              <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                              <p className="text-[9px] font-bold text-gray-400 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                            </td>
+                            <td className="px-5 py-4 font-medium text-gray-600">
+                              {users.find(u => u.id === log.operatorId)?.name || '—'}
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-black">{log.count} pal</span>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <div className="flex justify-end gap-1">
+                                <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={16} /></button>
+                                <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={16} /></button>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Downtime History */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                <Timer className="text-orange-600" size={18} />
+                ARRÊTS (HISTORY)
+              </h3>
+              <div className="card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
+                      <tr>
+                        <th className="px-5 py-4">Début</th>
+                        <th className="px-5 py-4">Durée</th>
+                        <th className="px-5 py-4">Motif</th>
+                        <th className="px-5 py-4">Ligne</th>
+                        <th className="px-5 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 text-xs">
+                      <AnimatePresence mode="popLayout">
+                        {filteredDownLogs.slice(0, 50).map(log => (
+                          <motion.tr 
+                            key={log.id} 
+                            initial={{ opacity: 1 }}
+                            exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                            transition={{ duration: 0.2 }}
+                            className="hover:bg-gray-50/50"
+                          >
+                            <td className="px-5 py-4 font-bold text-gray-900">
+                              {new Date(log.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                            </td>
+                            <td className="px-5 py-4">
+                              {log.duration ? (
+                                <span className="font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                                  {formatDuration(log.duration)}
+                                </span>
+                              ) : <span className="text-orange-500 font-black uppercase">En cours</span>}
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
+                                <p className="font-bold text-gray-700">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <div className="flex justify-end gap-1">
+                                <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={16} /></button>
+                                <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={16} /></button>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full space-y-6 shadow-2xl">
+             <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto">
+               <Trash2 size={32} />
+             </div>
+             <div className="text-center space-y-2">
+               <h3 className="text-xl font-black text-gray-900">Confirmer la suppression</h3>
+               <p className="text-sm text-gray-500 font-medium leading-relaxed">Voulez-vous vraiment supprimer cet enregistrement ?<br/><span className="text-gray-900 font-bold">{confirmDelete.name}</span></p>
+             </div>
+             <div className="flex gap-3 mt-4">
+                <button onClick={() => setConfirmDelete(null)} className="flex-1 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-all uppercase text-[10px] tracking-widest">Annuler</button>
+                <button onClick={handleDelete} className="flex-1 py-3 bg-red-600 text-white font-black rounded-xl shadow-lg shadow-red-100 active:scale-95 transition-all text-[10px] tracking-widest uppercase">Supprimer</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MODAL */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-8 max-w-md w-full space-y-6 shadow-2xl border border-gray-100"
+          >
+            <h3 className="text-2xl font-black text-gray-900 uppercase italic">Corriger Enregistrement</h3>
+            
+            <div className="space-y-4">
+              {editModalType === 'prod' ? (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantité</label>
+                    <input 
+                      type="number"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={editModalData.count || ''}
+                      onChange={e => setEditModalData({...editModalData, count: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={editModalData.timestamp ? new Date(editModalData.timestamp).toISOString().slice(0, 16) : ''}
+                      onChange={e => setEditModalData({...editModalData, timestamp: new Date(e.target.value).toISOString()})}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Motif</label>
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={editModalData.typeId || ''}
+                      onChange={e => setEditModalData({...editModalData, typeId: e.target.value})}
+                    >
+                      {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Début</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={editModalData.startTime ? new Date(editModalData.startTime).toISOString().slice(0, 16) : ''}
+                      onChange={e => {
+                        const newStart = new Date(e.target.value).toISOString();
+                        const dur = editModalData.endTime ? (new Date(editModalData.endTime).getTime() - new Date(newStart).getTime()) : editModalData.duration;
+                        setEditModalData({...editModalData, startTime: newStart, duration: dur});
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fin</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={editModalData.endTime ? new Date(editModalData.endTime).toISOString().slice(0, 16) : ''}
+                      onChange={e => {
+                        const newEnd = new Date(e.target.value).toISOString();
+                        const dur = new Date(newEnd).getTime() - new Date(editModalData.startTime).getTime();
+                        setEditModalData({...editModalData, endTime: newEnd, duration: dur});
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-100 rounded-2xl transition-all uppercase text-[10px] tracking-widest">Annuler</button>
+              <button 
+                onClick={handleEditSubmit}
+                className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 transition-all uppercase text-[10px] tracking-widest"
+              >
+                Sauvegarder
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 

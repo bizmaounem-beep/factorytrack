@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { pb } from '../lib/pocketbase';
+import { useState, useEffect } from 'react';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, increment, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { User as AppUser, Machine, Line, Programme, DowntimeType, ProductionLog, DowntimeLog } from '../types';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, Factory, Package, Timer, History, 
   Download, Plus, Trash2, PieChart, LayoutDashboard,
@@ -17,7 +18,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [modalType, setModalType] = useState<'user' | 'machine' | 'line' | 'downtime' | 'programme'>('user');
+  const [modalType, setModalType] = useState<'user' | 'machine' | 'line' | 'downtime' | 'programme' | 'production_log' | 'downtime_log'>('user');
   const [modalData, setModalData] = useState<any>({});
   const [selectedMachineForLine, setSelectedMachineForLine] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
@@ -31,50 +32,16 @@ export default function AdminPanel() {
   const [downLogs, setDownLogs] = useState<DowntimeLog[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const u = await pb.collection('users').getFullList<AppUser>();
-      const m = await pb.collection('machines').getFullList<Machine>();
-      const l = await pb.collection('lines').getFullList<Line>();
-      const p = await pb.collection('programmes').getFullList<Programme>();
-      const t = await pb.collection('downtime_types').getFullList<DowntimeType>();
-      const pl = await pb.collection('production_logs').getFullList<ProductionLog>({ sort: '-timestamp' });
-      const dl = await pb.collection('downtime_logs').getFullList<DowntimeLog>({ sort: '-startTime' });
-
-      setUsers(u);
-      setMachines(m);
-      setLines(l);
-      setProgrammes(p);
-      setDowntimeTypes(t);
-      setProdLogs(pl);
-      setDownLogs(dl);
-    };
-    fetchData();
-
-    // Generic subscriber helper
-    const subscribe = (collection: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
-      pb.collection(collection).subscribe('*', (e) => {
-        if (e.action === 'create') setter(prev => [e.record as any, ...prev]);
-        if (e.action === 'update') setter(prev => prev.map(i => i.id === e.record.id ? e.record : i));
-        if (e.action === 'delete') setter(prev => prev.filter(i => i.id !== e.record.id));
-      });
-    };
-
-    subscribe('users', setUsers);
-    subscribe('machines', setMachines);
-    subscribe('lines', setLines);
-    subscribe('programmes', setProgrammes);
-    subscribe('downtime_types', setDowntimeTypes);
-    subscribe('production_logs', setProdLogs);
-    subscribe('downtime_logs', setDownLogs);
-
+    const unsubUsers = onSnapshot(collection(db, 'users'), s => setUsers(s.docs.map(d => ({id: d.id, ...d.data()} as AppUser))));
+    const unsubMachines = onSnapshot(collection(db, 'machines'), s => setMachines(s.docs.map(d => ({id: d.id, ...d.data()} as Machine))));
+    const unsubLines = onSnapshot(collection(db, 'lines'), s => setLines(s.docs.map(d => ({id: d.id, ...d.data()} as Line))));
+    const unsubProgs = onSnapshot(collection(db, 'programmes'), s => setProgrammes(s.docs.map(d => ({id: d.id, ...d.data()} as Programme))));
+    const unsubTypes = onSnapshot(collection(db, 'downtime_types'), s => setDowntimeTypes(s.docs.map(d => ({id: d.id, ...d.data()} as DowntimeType))));
+    const unsubProd = onSnapshot(query(collection(db, 'production_logs'), orderBy('timestamp', 'desc')), s => setProdLogs(s.docs.map(d => ({id: d.id, ...d.data()} as ProductionLog))));
+    const unsubDown = onSnapshot(query(collection(db, 'downtime_logs'), orderBy('startTime', 'desc')), s => setDownLogs(s.docs.map(d => ({id: d.id, ...d.data()} as DowntimeLog))));
+    
     return () => {
-      pb.collection('users').unsubscribe();
-      pb.collection('machines').unsubscribe();
-      pb.collection('lines').unsubscribe();
-      pb.collection('programmes').unsubscribe();
-      pb.collection('downtime_types').unsubscribe();
-      pb.collection('production_logs').unsubscribe();
-      pb.collection('downtime_logs').unsubscribe();
+      unsubUsers(); unsubMachines(); unsubLines(); unsubProgs(); unsubTypes(); unsubProd(); unsubDown();
     };
   }, []);
 
@@ -94,11 +61,19 @@ export default function AdminPanel() {
         modalType === 'user' ? 'users' : 
         modalType === 'machine' ? 'machines' : 
         modalType === 'line' ? 'lines' : 
-        modalType === 'programme' ? 'programmes' : 'downtime_types';
+        modalType === 'programme' ? 'programmes' : 
+        modalType === 'production_log' ? 'production_logs' :
+        modalType === 'downtime_log' ? 'downtime_logs' : 'downtime_types';
 
       let finalData = { ...modalData };
       if (modalType === 'programme' && finalData.targetPallets) {
         finalData.targetPallets = parseInt(finalData.targetPallets);
+      }
+      if (modalType === 'production_log' && finalData.count) {
+        finalData.count = parseInt(finalData.count);
+      }
+      if (modalType === 'downtime_log') {
+        if (finalData.duration) finalData.duration = parseInt(finalData.duration);
       }
       if (modalType === 'downtime' && !finalData.icon) {
         finalData.icon = '⚠️';
@@ -110,29 +85,41 @@ export default function AdminPanel() {
 
       if (editingId) {
         const { id, ...dataToSave } = finalData;
-        await pb.collection(collectionName).update(editingId, dataToSave);
+        
+        // Handle Production Log updates (integrity)
+        if (modalType === 'production_log') {
+          const oldLog = prodLogs.find(l => l.id === editingId);
+          if (oldLog && oldLog.count !== dataToSave.count) {
+            const diff = dataToSave.count - oldLog.count;
+            await updateDoc(doc(db, 'programmes', oldLog.programmeId), {
+              producedPallets: increment(diff)
+            });
+          }
+        }
+
+        await updateDoc(doc(db, collectionName, editingId), dataToSave);
         
         if (modalType === 'programme' && dataToSave.lineId) {
-          await pb.collection('lines').update(dataToSave.lineId, {
+          await updateDoc(doc(db, 'lines', dataToSave.lineId), {
             currentProgrammeId: editingId
           });
         }
       } else {
         if (modalType === 'programme') {
-          const record = await pb.collection('programmes').create({
+          const progRef = await addDoc(collection(db, 'programmes'), {
             ...finalData,
             producedPallets: 0,
             status: 'ACTIVE',
             createdAt: new Date().toISOString()
           });
           if (finalData.lineId) {
-            await pb.collection('lines').update(finalData.lineId, {
-              currentProgrammeId: record.id,
+            await updateDoc(doc(db, 'lines', finalData.lineId), {
+              currentProgrammeId: progRef.id,
               status: 'IDLE'
             });
           }
         } else {
-          await pb.collection(collectionName).create(finalData);
+          await addDoc(collection(db, collectionName), finalData);
         }
       }
       setIsModalOpen(false);
@@ -148,7 +135,30 @@ export default function AdminPanel() {
     const { col, id } = confirmDelete;
 
     try {
-      await pb.collection(col).delete(id);
+      if (col === 'production_logs') {
+        const logDoc = await getDoc(doc(db, col, id));
+        if (logDoc.exists()) {
+          const logData = logDoc.data() as ProductionLog;
+          await updateDoc(doc(db, 'programmes', logData.programmeId), {
+            producedPallets: increment(-logData.count)
+          });
+        }
+      }
+
+      if (col === 'downtime_logs') {
+        const logDoc = await getDoc(doc(db, col, id));
+        if (logDoc.exists()) {
+          const logData = logDoc.data() as DowntimeLog;
+          if (!logData.endTime) {
+            await updateDoc(doc(db, 'lines', logData.lineId), {
+              activeDowntimeId: null,
+              status: 'IDLE'
+            });
+          }
+        }
+      }
+
+      await deleteDoc(doc(db, col, id));
       setConfirmDelete(null);
     } catch (error) {
       console.error('Error deleting document:', error);
@@ -394,6 +404,7 @@ export default function AdminPanel() {
     { id: 'programmes', label: 'Programmes', icon: Package },
     { id: 'types', label: 'Downtime', icon: Timer },
     { id: 'reports', label: 'Reports', icon: Download },
+    { id: 'history', label: 'Historique', icon: History },
   ];
 
   return (
@@ -613,6 +624,22 @@ export default function AdminPanel() {
                            <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-400 hover:text-red-500 p-1 transition-colors"><Trash2 size={18} /></button>
                         </div>
                       </div>
+
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Pilote actuel</p>
+                        <div className="flex items-center justify-between bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                          <span className="text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || 'Libre'}</span>
+                          {m.currentPilotId && (
+                            <button 
+                              onClick={() => updateDoc(doc(db, 'machines', m.id), { currentPilotId: null })}
+                              className="text-[10px] font-black text-red-500 hover:underline uppercase"
+                            >
+                              Libérer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="space-y-2">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Lignes rattachées</p>
                         <div className="flex flex-wrap gap-2">
@@ -724,6 +751,146 @@ export default function AdminPanel() {
             </div>
           )}
 
+          {activeTab === 'history' && (
+            <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter text-gray-900">Historique complet</h2>
+                  <p className="text-sm text-gray-500 font-medium">Modifiez ou supprimez les enregistrements passés</p>
+                </div>
+              </div>
+
+              <div className="space-y-12">
+                {/* Production Logs History */}
+                <div className="space-y-4">
+                  <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                    <Package className="text-blue-600" size={20} />
+                    Production
+                  </h3>
+                  <div className="card overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                          <tr>
+                            <th className="px-6 py-4">Date & Heure</th>
+                            <th className="px-6 py-4">Machine / Ligne</th>
+                            <th className="px-6 py-4">Programme</th>
+                            <th className="px-6 py-4">Opérateur</th>
+                            <th className="px-6 py-4">Quantité</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 text-sm">
+                          <AnimatePresence mode="popLayout">
+                            {prodLogs.map(log => (
+                              <motion.tr 
+                                key={log.id} 
+                                initial={{ opacity: 1 }}
+                                exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                                transition={{ duration: 0.2 }}
+                                className="hover:bg-gray-50/50"
+                              >
+                                <td className="px-6 py-4 font-medium text-gray-900">
+                                  {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                </td>
+                                <td className="px-6 py-4 text-blue-600 font-bold">
+                                  {programmes.find(p => p.id === log.programmeId)?.name || '—'}
+                                </td>
+                                <td className="px-6 py-4 font-medium">
+                                  {users.find(u => u.id === log.operatorId)?.name || '—'}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-black">{log.count} pal</span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <button onClick={() => openModal('production_log', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={18} /></button>
+                                    <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={18} /></button>
+                                  </div>
+                                </td>
+                              </motion.tr>
+                            ))}
+                          </AnimatePresence>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Downtime Logs History */}
+                <div className="space-y-4">
+                  <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                    <Timer className="text-orange-600" size={20} />
+                    Arrêts (Downtime)
+                  </h3>
+                  <div className="card overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                          <tr>
+                            <th className="px-6 py-4">Début</th>
+                            <th className="px-6 py-4">Fin</th>
+                            <th className="px-6 py-4">Durée</th>
+                            <th className="px-6 py-4">Type / Motif</th>
+                            <th className="px-6 py-4">Machine / Ligne</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 text-sm">
+                          <AnimatePresence mode="popLayout">
+                            {downLogs.map(log => (
+                              <motion.tr 
+                                key={log.id} 
+                                initial={{ opacity: 1 }}
+                                exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                                transition={{ duration: 0.2 }}
+                                className="hover:bg-gray-50/50"
+                              >
+                                <td className="px-6 py-4 font-medium text-gray-900">
+                                  {new Date(log.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                </td>
+                                <td className="px-6 py-4 font-medium text-gray-600">
+                                  {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[10px]">En cours</span>}
+                                </td>
+                                <td className="px-6 py-4">
+                                  {log.duration ? (
+                                    <span className="font-mono font-bold bg-gray-100 px-2 py-1 rounded text-gray-700">
+                                      {formatDuration(log.duration)}
+                                    </span>
+                                  ) : '—'}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
+                                    <p className="font-bold text-gray-800">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                  </div>
+                                  {log.description && <p className="text-[10px] text-gray-400 italic mt-0.5">{log.description}</p>}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <button onClick={() => openModal('downtime_log', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={18} /></button>
+                                    <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={18} /></button>
+                                  </div>
+                                </td>
+                              </motion.tr>
+                            ))}
+                          </AnimatePresence>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {activeTab === 'reports' && (
             <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
               <div className="space-y-1">
@@ -796,6 +963,79 @@ export default function AdminPanel() {
             </div>
 
             <div className="space-y-4">
+              {modalType === 'production_log' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantité (Palettes)</label>
+                    <input 
+                      type="number"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={modalData.count || ''}
+                      onChange={e => setModalData({...modalData, count: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date & Heure</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={modalData.timestamp ? new Date(modalData.timestamp).toISOString().slice(0, 16) : ''}
+                      onChange={e => setModalData({...modalData, timestamp: new Date(e.target.value).toISOString()})}
+                    />
+                  </div>
+                </>
+              )}
+
+              {modalType === 'downtime_log' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Motif d'arrêt</label>
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      value={modalData.typeId || ''}
+                      onChange={e => setModalData({...modalData, typeId: e.target.value})}
+                    >
+                      <option value="">Sélectionner un motif</option>
+                      {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Début</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={modalData.startTime ? new Date(modalData.startTime).toISOString().slice(0, 16) : ''}
+                      onChange={e => {
+                        const newStart = new Date(e.target.value).toISOString();
+                        const duration = modalData.endTime ? (new Date(modalData.endTime).getTime() - new Date(newStart).getTime()) : modalData.duration;
+                        setModalData({...modalData, startTime: newStart, duration});
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fin</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={modalData.endTime ? new Date(modalData.endTime).toISOString().slice(0, 16) : ''}
+                      onChange={e => {
+                        const newEnd = new Date(e.target.value).toISOString();
+                        const duration = new Date(newEnd).getTime() - new Date(modalData.startTime).getTime();
+                        setModalData({...modalData, endTime: newEnd, duration});
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description / Commentaire</label>
+                    <textarea 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={modalData.description || ''}
+                      onChange={e => setModalData({...modalData, description: e.target.value})}
+                    />
+                  </div>
+                </>
+              )}
+
               {modalType === 'programme' && (
                 <>
                   <input 

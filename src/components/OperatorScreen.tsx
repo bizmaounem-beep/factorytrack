@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { pb } from '../lib/pocketbase';
+import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, DowntimeType, DowntimeLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Square, Settings, Timer, Package, AlertCircle } from 'lucide-react';
+import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
 
 export default function OperatorScreen() {
@@ -26,56 +27,25 @@ export default function OperatorScreen() {
 
   // Initialize data
   useEffect(() => {
-    // Fetch initial data
-    const initData = async () => {
-      const machineList = await pb.collection('machines').getFullList<Machine>();
-      setMachines(machineList);
-      
-      const typeList = await pb.collection('downtime_types').getFullList<DowntimeType>();
-      setDowntimeTypes(typeList);
-    };
-    initData();
-
-    // Subscribe to changes
-    pb.collection('machines').subscribe<Machine>('*', (e) => {
-      if (e.action === 'create') setMachines(prev => [...prev, e.record]);
-      if (e.action === 'update') setMachines(prev => prev.map(m => m.id === e.record.id ? e.record : m));
-      if (e.action === 'delete') setMachines(prev => prev.filter(m => m.id !== e.record.id));
+    const unsubMachines = onSnapshot(collection(db, 'machines'), (shot) => {
+      setMachines(shot.docs.map(d => ({ id: d.id, ...d.data() } as Machine)));
     });
-
-    pb.collection('downtime_types').subscribe<DowntimeType>('*', (e) => {
-      if (e.action === 'create') setDowntimeTypes(prev => [...prev, e.record]);
-      if (e.action === 'update') setDowntimeTypes(prev => prev.map(t => t.id === e.record.id ? e.record : t));
-      if (e.action === 'delete') setDowntimeTypes(prev => prev.filter(t => t.id !== e.record.id));
+    const unsubDowntimeTypes = onSnapshot(collection(db, 'downtime_types'), (shot) => {
+      setDowntimeTypes(shot.docs.map(d => ({ id: d.id, ...d.data() } as DowntimeType)));
     });
-
     return () => {
-      pb.collection('machines').unsubscribe();
-      pb.collection('downtime_types').unsubscribe();
+      unsubMachines();
+      unsubDowntimeTypes();
     };
   }, []);
 
   // Listen to lines based on selected machine
   useEffect(() => {
     if (!selectedMachineId) return;
-    
-    const fetchLines = async () => {
-      const records = await pb.collection('lines').getFullList<Line>({
-        filter: `machineId = "${selectedMachineId}"`
-      });
-      setLines(records);
-    };
-    fetchLines();
-
-    pb.collection('lines').subscribe<Line>('*', (e) => {
-      if (e.record.machineId === selectedMachineId) {
-        if (e.action === 'create') setLines(prev => [...prev, e.record]);
-        if (e.action === 'update') setLines(prev => prev.map(l => l.id === e.record.id ? e.record : l));
-        if (e.action === 'delete') setLines(prev => prev.filter(l => l.id !== e.record.id));
-      }
-    }, { filter: `machineId = "${selectedMachineId}"` });
-
-    return () => pb.collection('lines').unsubscribe();
+    const q = query(collection(db, 'lines'), where('machineId', '==', selectedMachineId));
+    return onSnapshot(q, (shot) => {
+      setLines(shot.docs.map(d => ({ id: d.id, ...d.data() } as Line)));
+    });
   }, [selectedMachineId]);
 
   // Listen to available programmes for the selected line
@@ -84,32 +54,14 @@ export default function OperatorScreen() {
       setAvailableProgrammes([]);
       return;
     }
-    
-    const fetchProgs = async () => {
-      const records = await pb.collection('programmes').getFullList<Programme>({
-        filter: `lineId = "${selectedLineId}" && status = "ACTIVE"`
-      });
-      setAvailableProgrammes(records);
-    };
-    fetchProgs();
-
-    pb.collection('programmes').subscribe<Programme>('*', (e) => {
-      if (e.record.lineId === selectedLineId) {
-        if (e.action === 'create' && e.record.status === 'ACTIVE') setAvailableProgrammes(prev => [...prev, e.record]);
-        if (e.action === 'update') {
-          setAvailableProgrammes(prev => {
-            const exists = prev.some(p => p.id === e.record.id);
-            if (e.record.status === 'ACTIVE') {
-              return exists ? prev.map(p => p.id === e.record.id ? e.record : p) : [...prev, e.record];
-            }
-            return prev.filter(p => p.id !== e.record.id);
-          });
-        }
-        if (e.action === 'delete') setAvailableProgrammes(prev => prev.filter(p => p.id !== e.record.id));
-      }
+    const q = query(
+      collection(db, 'programmes'), 
+      where('lineId', '==', selectedLineId),
+      where('status', '==', 'ACTIVE')
+    );
+    return onSnapshot(q, (shot) => {
+      setAvailableProgrammes(shot.docs.map(d => ({ id: d.id, ...d.data() } as Programme)));
     });
-
-    return () => pb.collection('programmes').unsubscribe();
   }, [selectedLineId]);
 
   // Listen to active line details and related records
@@ -123,32 +75,30 @@ export default function OperatorScreen() {
 
     let currentProgId: string | null = null;
     let currentDownId: string | null = null;
+    let unsubProg: (() => void) | null = null;
+    let unsubDown: (() => void) | null = null;
 
-    const fetchActiveLine = async () => {
-      try {
-        const record = await pb.collection('lines').getOne<Line>(selectedLineId);
-        handleLineUpdate(record);
-      } catch (err) {
-        console.error('Line not found');
-      }
-    };
-
-    const handleLineUpdate = async (lineData: Line) => {
+    const unsubLine = onSnapshot(doc(db, 'lines', selectedLineId), (lineShot) => {
+      if (!lineShot.exists()) return;
+      const lineData = { id: lineShot.id, ...lineShot.data() } as Line;
       setActiveLine(lineData);
 
       // Handle Programme Subscription
       if (lineData.currentProgrammeId) {
         if (lineData.currentProgrammeId !== currentProgId) {
+          if (unsubProg) unsubProg();
           currentProgId = lineData.currentProgrammeId;
-          const prog = await pb.collection('programmes').getOne<Programme>(lineData.currentProgrammeId);
-          setActiveProgramme(prog);
-          
-          pb.collection('programmes').subscribe<Programme>(lineData.currentProgrammeId, (e) => {
-            setActiveProgramme(e.record);
+          unsubProg = onSnapshot(doc(db, 'programmes', lineData.currentProgrammeId), (progShot) => {
+            if (progShot.exists()) {
+              setActiveProgramme({ id: progShot.id, ...progShot.data() } as Programme);
+            } else {
+              setActiveProgramme(null);
+            }
           });
         }
       } else {
-        if (currentProgId) pb.collection('programmes').unsubscribe(currentProgId);
+        if (unsubProg) unsubProg();
+        unsubProg = null;
         currentProgId = null;
         setActiveProgramme(null);
       }
@@ -156,30 +106,28 @@ export default function OperatorScreen() {
       // Handle Downtime Subscription
       if (lineData.activeDowntimeId) {
         if (lineData.activeDowntimeId !== currentDownId) {
+          if (unsubDown) unsubDown();
           currentDownId = lineData.activeDowntimeId;
-          const down = await pb.collection('downtime_logs').getOne<DowntimeLog>(lineData.activeDowntimeId);
-          setActiveDowntime(down);
-          
-          pb.collection('downtime_logs').subscribe<DowntimeLog>(lineData.activeDowntimeId, (e) => {
-            setActiveDowntime(e.record);
+          unsubDown = onSnapshot(doc(db, 'downtime_logs', lineData.activeDowntimeId), (downShot) => {
+            if (downShot.exists()) {
+              setActiveDowntime({ id: downShot.id, ...downShot.data() } as DowntimeLog);
+            } else {
+              setActiveDowntime(null);
+            }
           });
         }
       } else {
-        if (currentDownId) pb.collection('downtime_logs').unsubscribe(currentDownId);
+        if (unsubDown) unsubDown();
+        unsubDown = null;
         currentDownId = null;
         setActiveDowntime(null);
       }
-    };
-
-    fetchActiveLine();
-    pb.collection('lines').subscribe<Line>(selectedLineId, (e) => {
-      handleLineUpdate(e.record);
     });
 
     return () => {
-      pb.collection('lines').unsubscribe(selectedLineId);
-      if (currentProgId) pb.collection('programmes').unsubscribe(currentProgId);
-      if (currentDownId) pb.collection('downtime_logs').unsubscribe(currentDownId);
+      unsubLine();
+      if (unsubProg) unsubProg();
+      if (unsubDown) unsubDown();
     };
   }, [selectedLineId]);
 
@@ -199,7 +147,7 @@ export default function OperatorScreen() {
 
   const handleStartProduction = async () => {
     if (!selectedLineId || !activeProgramme) return;
-    await pb.collection('lines').update(selectedLineId, {
+    await updateDoc(doc(db, 'lines', selectedLineId), {
       status: 'RUNNING',
       currentOperatorId: user?.id
     });
@@ -218,7 +166,7 @@ export default function OperatorScreen() {
     await handleAddPallets();
 
     // Stop production
-    await pb.collection('lines').update(selectedLineId, {
+    await updateDoc(doc(db, 'lines', selectedLineId), {
       status: 'IDLE'
     });
   };
@@ -228,7 +176,7 @@ export default function OperatorScreen() {
     if (isNaN(count) || count <= 0 || !activeProgramme || !user) return;
 
     // Log production
-    await pb.collection('production_logs').create({
+    await addDoc(collection(db, 'production_logs'), {
       programmeId: activeProgramme.id,
       operatorId: user.id,
       machineId: activeLine?.machineId,
@@ -238,7 +186,7 @@ export default function OperatorScreen() {
     });
 
     // Update programme total
-    await pb.collection('programmes').update(activeProgramme.id, {
+    await updateDoc(doc(db, 'programmes', activeProgramme.id), {
       producedPallets: activeProgramme.producedPallets + count
     });
 
@@ -246,11 +194,20 @@ export default function OperatorScreen() {
   };
 
   const handleStartDowntime = async (typeId: string) => {
-    if (!selectedLineId || !user || !activeLine) return;
+    console.log('Attempting to start downtime:', { typeId, selectedLineId, userId: user?.id, activeLine });
+    if (!selectedLineId || !user || !activeLine) {
+      console.warn('Cannot start downtime: Missing dependencies');
+      return;
+    }
+
+    if (activeLine.status !== 'RUNNING') {
+      alert('La production doit être lancée (RUNNING) pour déclarer un arrêt.');
+      return;
+    }
 
     try {
       // Create log
-      const log = await pb.collection('downtime_logs').create({
+      const docRef = await addDoc(collection(db, 'downtime_logs'), {
         machineId: activeLine.machineId,
         lineId: activeLine.id,
         typeId,
@@ -259,13 +216,16 @@ export default function OperatorScreen() {
         startTime: new Date().toISOString()
       });
 
+      console.log('Downtime log created:', docRef.id);
+
       // Update line
-      await pb.collection('lines').update(selectedLineId, {
+      await updateDoc(doc(db, 'lines', selectedLineId), {
         status: 'STOPPED',
-        activeDowntimeId: log.id
+        activeDowntimeId: docRef.id
       });
       
       setDowntimeDescription('');
+      console.log('Line status updated to STOPPED');
     } catch (error) {
       console.error('Error starting downtime:', error);
       alert('Erreur: Impossible de démarrer l\'arrêt. Vérifiez votre connexion.');
@@ -280,13 +240,13 @@ export default function OperatorScreen() {
     const duration = Date.now() - startTime;
 
     // Update log
-    await pb.collection('downtime_logs').update(activeDowntime.id, {
+    await updateDoc(doc(db, 'downtime_logs', activeDowntime.id), {
       endTime,
       duration
     });
 
     // Update line
-    await pb.collection('lines').update(selectedLineId, {
+    await updateDoc(doc(db, 'lines', selectedLineId), {
       activeDowntimeId: null,
       status: 'IDLE'
     });
@@ -297,10 +257,11 @@ export default function OperatorScreen() {
     const updates: any = {
       currentProgrammeId: progId
     };
+    // If we're clearing the programme, stop production
     if (!progId) {
       updates.status = 'IDLE';
     }
-    await pb.collection('lines').update(selectedLineId, updates);
+    await updateDoc(doc(db, 'lines', selectedLineId), updates);
   };
 
   if (!selectedMachineId) {
@@ -529,6 +490,15 @@ export default function OperatorScreen() {
             <div className="lg:col-span-5 flex flex-col gap-6">
               <div className="card p-5 flex-1 flex flex-col min-h-[300px]">
                 <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Déclarer un Arrêt (Downtime)</h2>
+                {activeLine?.status !== 'RUNNING' && !activeDowntime && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-3 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100 mb-4">
+                    <AlertCircle className="text-gray-300" size={32} />
+                    <div className="space-y-1">
+                      <p className="text-gray-400 font-bold text-sm uppercase tracking-tight">Production non lancée</p>
+                      <p className="text-[10px] text-gray-300 font-medium uppercase leading-tight">Vous ne pouvez pas déclarer d'arrêt tant que la production n'est pas "RUNNING"</p>
+                    </div>
+                  </div>
+                )}
                 {activeDowntime ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-6 bg-orange-50/30 rounded-2xl border border-orange-100/50">
                     <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 animate-pulse">
@@ -552,7 +522,7 @@ export default function OperatorScreen() {
                           defaultValue={activeDowntime.description || ''}
                           onBlur={async (e) => {
                             if (e.target.value !== activeDowntime.description) {
-                              await pb.collection('downtime_logs').update(activeDowntime.id, {
+                              await updateDoc(doc(db, 'downtime_logs', activeDowntime.id), {
                                 description: e.target.value
                               });
                             }
@@ -578,8 +548,12 @@ export default function OperatorScreen() {
                         {downtimeTypes.map((type) => (
                           <button
                             key={type.id}
+                            disabled={activeLine?.status !== 'RUNNING'}
                             onClick={() => handleStartDowntime(type.id)}
-                            className="border border-orange-100 rounded-xl p-4 text-left hover:bg-orange-50 transition-all flex flex-col gap-2 active:scale-95 shadow-sm bg-white"
+                            className={cn(
+                              "border border-orange-100 rounded-xl p-4 text-left transition-all flex flex-col gap-2 active:scale-95 shadow-sm bg-white",
+                              activeLine?.status !== 'RUNNING' ? "opacity-40 cursor-not-allowed grayscale" : "hover:bg-orange-50"
+                            )}
                           >
                             <span className="text-2xl">{type.icon || '⚠️'}</span>
                             <span className="text-[10px] font-bold text-gray-700 leading-tight uppercase tracking-widest">{type.name}</span>

@@ -11,6 +11,7 @@ export interface User {
 export interface Machine {
   id: string;
   name: string;
+  currentPilotId?: string;
 }
 
 export interface Line {
