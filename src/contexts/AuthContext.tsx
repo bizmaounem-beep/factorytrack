@@ -17,12 +17,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check for persisted user session
-    try {
-      if (pb.authStore.isValid) {
-        setUser(pb.authStore.model as unknown as User);
-      }
-    } catch (err) {
-      console.error('Auth initialization failed:', err);
+    if (pb.authStore.isValid) {
+      setUser(pb.authStore.model as unknown as User);
     }
     setLoading(false);
 
@@ -34,29 +30,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (pin: string) => {
     try {
-      // In PocketBase, we'll use a custom auth with password where username/email is the PIN
-      // or we can query the users collection if we are using a simplified PIN-only auth
-      // Since the user requested "pb.collection('users').authWithPassword()", 
-      // I'll assume they set up email/username as the PIN for simplicity in this migration
-      // or I'll just query the user by PIN as per existing logic if they aren't using standard PB Auth
+      // Assuming PIN is both username and password for simplicity in this offline environment
+      // Or you can configure your PocketBase users to have username='admin' password='pin'
+      const authData = await pb.collection('users').authWithPassword(pin, pin);
       
-      // Traditional search if not using standard Auth (matches previous logic)
-      const records = await pb.collection('users').getList(1, 1, {
-        filter: `pin = "${pin}"`
-      });
-      
-      if (records.items.length > 0) {
-        const userData = records.items[0];
-        const fullUser = { 
-          id: userData.id, 
-          name: userData.name, 
-          pin: userData.pin, 
-          role: userData.role 
-        } as User;
-        
-        // Manual login simulation if not using PB auth features
-        setUser(fullUser);
-        localStorage.setItem('factory_user', JSON.stringify(fullUser));
+      if (authData.record) {
+        setUser(authData.record as unknown as User);
         return true;
       }
       return false;
