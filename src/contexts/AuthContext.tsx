@@ -39,44 +39,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (pin: string) => {
+    console.log(`[Auth] Attempting login with identity: "${pin}" (treating PIN as Username)`);
     try {
-      // PocketBase authWithPassword(identity, password) 
       // Identity can be either 'username' or 'email'
-      // We are treating the PIN as both the Username identity and the Password
+      // password length must be at least 4 (as configured in PB)
       const authData = await pb.collection('users').authWithPassword(pin, pin);
       
       if (authData.record) {
-        // Successful login
-        const record = authData.record;
-        const fullUser = {
-          id: record.id,
-          name: record.name || record.username || 'User',
-          pin: (record as any).pin || '',
-          role: (record as any).role || 'OPERATOR'
-        } as User;
-        
-        setUser(fullUser);
+        console.log('[Auth] Login successful for user:', authData.record.username);
+        // User state will be updated via the onChange listener in useEffect
         return true;
       }
       return false;
     } catch (error: any) {
-      // Detailed error logging for migration debugging
-      console.error('Full PocketBase Error Object:', error);
+      console.error('[Auth] Login failed error details:', error);
       
       if (error?.status) {
         const errorMsg = error.data?.message || error.message || 'Unknown error';
-        console.log(`PocketBase Auth Error [${error.status}]:`, errorMsg);
+        console.error(`PocketBase Response Error [${error.status}]:`, errorMsg);
         
         if (error.status === 400) {
-          console.error("Login Result: 400 Bad Request. (Usually Identity/Password mismatch, password too short, or 'Username' not allowed as identity). Check if your User in PocketBase has username == password == PIN.");
-          if (error.data) console.error("Validation details:", JSON.stringify(error.data, null, 2));
+          console.error("DEBUG TIP: 400 usually means password mismatch or identity not found. Verify you created a user in PocketBase with Username = Password = your PIN.");
+          if (error.data) console.error("Server validation data:", JSON.stringify(error.data, null, 2));
         } else if (error.status === 404) {
-          console.error("Login Result: 404 Not Found. (Check if 'users' collection exists and is an auth type)");
+          console.error("DEBUG TIP: 404 means the 'users' collection or auth endpoint was not found.");
         } else if (error.status === 403) {
-          console.error("Login Result: 403 Forbidden. (Check collection API rules)");
+          console.error("DEBUG TIP: 403 Forbidden. Check your collection API rules.");
         }
       } else if (error?.originalError?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch') || error?.isAbort) {
-        console.error('CONNECTION ERROR: Could not reach PocketBase server at ' + pb.baseUrl + '. \n1. Check if PocketBase is running.\n2. Ensure your firewall allows port 8090.\n3. Make sure you are on the same local network.');
+        console.error(`CONNECTION ERROR: Cannot reach PocketBase at ${pb.baseUrl}. If PB is local, ensure it's running and check browser CORS console errors.`);
       } else {
         console.error('Unexpected Login Error:', error?.message || error);
       }
