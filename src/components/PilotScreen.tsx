@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, User as AppUser, DowntimeType, DowntimeLog } from '../types';
 import { motion } from 'motion/react';
-import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus } from 'lucide-react';
-import { cn, formatDuration } from '../lib/utils';
+import { Monitor, LayoutGrid, Plus, Activity } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 export default function PilotScreen() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
   const [lines, setLines] = useState<Line[]>([]);
@@ -23,38 +22,108 @@ export default function PilotScreen() {
   const [newProgTarget, setNewProgTarget] = useState('100');
 
   useEffect(() => {
-    onSnapshot(collection(db, 'machines'), shot => setMachines(shot.docs.map(d => ({id: d.id, ...d.data()} as Machine))));
-    onSnapshot(collection(db, 'users'), shot => setUsers(shot.docs.map(d => ({id: d.id, ...d.data()} as AppUser))));
-    onSnapshot(collection(db, 'downtime_types'), shot => setDowntimeTypes(shot.docs.map(d => ({id: d.id, ...d.data()} as DowntimeType))));
+    const fetchData = async () => {
+      const machineList = await pb.collection('machines').getFullList<Machine>();
+      const userList = await pb.collection('users').getFullList<AppUser>();
+      const typeList = await pb.collection('downtime_types').getFullList<DowntimeType>();
+      setMachines(machineList);
+      setUsers(userList);
+      setDowntimeTypes(typeList);
+    };
+    fetchData();
+
+    pb.collection('machines').subscribe<Machine>('*', (e) => {
+      if (e.action === 'create') setMachines(prev => [...prev, e.record]);
+      if (e.action === 'update') setMachines(prev => prev.map(m => m.id === e.record.id ? e.record : m));
+      if (e.action === 'delete') setMachines(prev => prev.filter(m => m.id !== e.record.id));
+    });
+
+    pb.collection('users').subscribe<AppUser>('*', (e) => {
+      if (e.action === 'create') setUsers(prev => [...prev, e.record]);
+      if (e.action === 'update') setUsers(prev => prev.map(u => u.id === e.record.id ? e.record : u));
+      if (e.action === 'delete') setUsers(prev => prev.filter(u => u.id !== e.record.id));
+    });
+
+    return () => {
+      pb.collection('machines').unsubscribe();
+      pb.collection('users').unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (!selectedMachineId) return;
-    const unsubLines = onSnapshot(query(collection(db, 'lines'), where('machineId', '==', selectedMachineId)), shot => {
-      setLines(shot.docs.map(d => ({id: d.id, ...d.data()} as Line)));
+
+    const fetchMachineData = async () => {
+      const lineList = await pb.collection('lines').getFullList<Line>({
+        filter: `machineId = "${selectedMachineId}"`
+      });
+      const progList = await pb.collection('programmes').getFullList<Programme>({
+        filter: `machineId = "${selectedMachineId}" && status = "ACTIVE"`
+      });
+      setLines(lineList);
+      setProgrammes(progList);
+    };
+    fetchMachineData();
+
+    pb.collection('lines').subscribe<Line>('*', (e) => {
+      if (e.record.machineId === selectedMachineId) {
+        if (e.action === 'create') setLines(prev => [...prev, e.record]);
+        if (e.action === 'update') setLines(prev => prev.map(l => l.id === e.record.id ? e.record : l));
+        if (e.action === 'delete') setLines(prev => prev.filter(l => l.id !== e.record.id));
+      }
     });
-    const unsubProgs = onSnapshot(query(collection(db, 'programmes'), where('machineId', '==', selectedMachineId), where('status', '==', 'ACTIVE')), shot => {
-      setProgrammes(shot.docs.map(d => ({id: d.id, ...d.data()} as Programme)));
+
+    pb.collection('programmes').subscribe<Programme>('*', (e) => {
+      if (e.record.machineId === selectedMachineId) {
+        if (e.action === 'create' && e.record.status === 'ACTIVE') setProgrammes(prev => [...prev, e.record]);
+        if (e.action === 'update') {
+          setProgrammes(prev => {
+            const exists = prev.some(p => p.id === e.record.id);
+            if (e.record.status === 'ACTIVE') {
+              return exists ? prev.map(p => p.id === e.record.id ? e.record : p) : [...prev, e.record];
+            }
+            return prev.filter(p => p.id !== e.record.id);
+          });
+        }
+        if (e.action === 'delete') setProgrammes(prev => prev.filter(p => p.id !== e.record.id));
+      }
     });
+
     return () => {
-      unsubLines();
-      unsubProgs();
+      pb.collection('lines').unsubscribe();
+      pb.collection('programmes').unsubscribe();
     };
   }, [selectedMachineId]);
 
   // Sync active downtimes
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'downtime_logs'), shot => {
+    const fetchDowntimes = async () => {
+      const records = await pb.collection('downtime_logs').getFullList<DowntimeLog>({
+        filter: 'endTime = ""'
+      });
       const active: Record<string, DowntimeLog> = {};
-      shot.docs.forEach(d => {
-        const data = d.data() as DowntimeLog;
-        if (!data.endTime) {
-          active[data.lineId] = { id: d.id, ...data };
-        }
+      records.forEach(r => {
+        active[r.lineId] = r;
       });
       setActiveDowntimes(active);
+    };
+    fetchDowntimes();
+
+    pb.collection('downtime_logs').subscribe<DowntimeLog>('*', (e) => {
+      if (e.action === 'create' || (e.action === 'update' && !e.record.endTime)) {
+        setActiveDowntimes(prev => ({ ...prev, [e.record.lineId]: e.record }));
+      } else if (e.action === 'delete' || (e.action === 'update' && e.record.endTime)) {
+        setActiveDowntimes(prev => {
+          const next = { ...prev };
+          if (next[e.record.lineId]?.id === e.record.id) {
+            delete next[e.record.lineId];
+          }
+          return next;
+        });
+      }
     });
-    return unsub;
+
+    return () => pb.collection('downtime_logs').unsubscribe();
   }, []);
 
   const handleAssignProgramme = async () => {
@@ -64,7 +133,7 @@ export default function PilotScreen() {
     if (isNaN(target)) return;
 
     // Create new programme
-    const progRef = await addDoc(collection(db, 'programmes'), {
+    const record = await pb.collection('programmes').create({
       name: newProgName,
       machineId: selectedMachineId,
       lineId: isAssigning,
@@ -75,8 +144,8 @@ export default function PilotScreen() {
     });
 
     // Update line
-    await updateDoc(doc(db, 'lines', isAssigning), {
-      currentProgrammeId: progRef.id,
+    await pb.collection('lines').update(isAssigning, {
+      currentProgrammeId: record.id,
       status: 'IDLE'
     });
 
@@ -88,7 +157,7 @@ export default function PilotScreen() {
 
   const handleSelectExistingProgramme = async (progId: string) => {
     if (!isAssigning) return;
-    await updateDoc(doc(db, 'lines', isAssigning), {
+    await pb.collection('lines').update(isAssigning, {
       currentProgrammeId: progId,
       status: 'IDLE'
     });

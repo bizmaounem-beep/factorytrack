@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import React, { useState, useEffect } from 'react';
+import { pb } from '../lib/pocketbase';
 import { useAuth } from '../contexts/AuthContext';
 import { User as AppUser, Machine, Line, Programme, DowntimeType, ProductionLog, DowntimeLog } from '../types';
 import { motion } from 'motion/react';
@@ -32,16 +31,50 @@ export default function AdminPanel() {
   const [downLogs, setDownLogs] = useState<DowntimeLog[]>([]);
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, 'users'), s => setUsers(s.docs.map(d => ({id: d.id, ...d.data()} as AppUser))));
-    const unsubMachines = onSnapshot(collection(db, 'machines'), s => setMachines(s.docs.map(d => ({id: d.id, ...d.data()} as Machine))));
-    const unsubLines = onSnapshot(collection(db, 'lines'), s => setLines(s.docs.map(d => ({id: d.id, ...d.data()} as Line))));
-    const unsubProgs = onSnapshot(collection(db, 'programmes'), s => setProgrammes(s.docs.map(d => ({id: d.id, ...d.data()} as Programme))));
-    const unsubTypes = onSnapshot(collection(db, 'downtime_types'), s => setDowntimeTypes(s.docs.map(d => ({id: d.id, ...d.data()} as DowntimeType))));
-    const unsubProd = onSnapshot(query(collection(db, 'production_logs'), orderBy('timestamp', 'desc')), s => setProdLogs(s.docs.map(d => ({id: d.id, ...d.data()} as ProductionLog))));
-    const unsubDown = onSnapshot(query(collection(db, 'downtime_logs'), orderBy('startTime', 'desc')), s => setDownLogs(s.docs.map(d => ({id: d.id, ...d.data()} as DowntimeLog))));
-    
+    const fetchData = async () => {
+      const u = await pb.collection('users').getFullList<AppUser>();
+      const m = await pb.collection('machines').getFullList<Machine>();
+      const l = await pb.collection('lines').getFullList<Line>();
+      const p = await pb.collection('programmes').getFullList<Programme>();
+      const t = await pb.collection('downtime_types').getFullList<DowntimeType>();
+      const pl = await pb.collection('production_logs').getFullList<ProductionLog>({ sort: '-timestamp' });
+      const dl = await pb.collection('downtime_logs').getFullList<DowntimeLog>({ sort: '-startTime' });
+
+      setUsers(u);
+      setMachines(m);
+      setLines(l);
+      setProgrammes(p);
+      setDowntimeTypes(t);
+      setProdLogs(pl);
+      setDownLogs(dl);
+    };
+    fetchData();
+
+    // Generic subscriber helper
+    const subscribe = (collection: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
+      pb.collection(collection).subscribe('*', (e) => {
+        if (e.action === 'create') setter(prev => [e.record as any, ...prev]);
+        if (e.action === 'update') setter(prev => prev.map(i => i.id === e.record.id ? e.record : i));
+        if (e.action === 'delete') setter(prev => prev.filter(i => i.id !== e.record.id));
+      });
+    };
+
+    subscribe('users', setUsers);
+    subscribe('machines', setMachines);
+    subscribe('lines', setLines);
+    subscribe('programmes', setProgrammes);
+    subscribe('downtime_types', setDowntimeTypes);
+    subscribe('production_logs', setProdLogs);
+    subscribe('downtime_logs', setDownLogs);
+
     return () => {
-      unsubUsers(); unsubMachines(); unsubLines(); unsubProgs(); unsubTypes(); unsubProd(); unsubDown();
+      pb.collection('users').unsubscribe();
+      pb.collection('machines').unsubscribe();
+      pb.collection('lines').unsubscribe();
+      pb.collection('programmes').unsubscribe();
+      pb.collection('downtime_types').unsubscribe();
+      pb.collection('production_logs').unsubscribe();
+      pb.collection('downtime_logs').unsubscribe();
     };
   }, []);
 
@@ -77,29 +110,29 @@ export default function AdminPanel() {
 
       if (editingId) {
         const { id, ...dataToSave } = finalData;
-        await updateDoc(doc(db, collectionName, editingId), dataToSave);
+        await pb.collection(collectionName).update(editingId, dataToSave);
         
         if (modalType === 'programme' && dataToSave.lineId) {
-          await updateDoc(doc(db, 'lines', dataToSave.lineId), {
+          await pb.collection('lines').update(dataToSave.lineId, {
             currentProgrammeId: editingId
           });
         }
       } else {
         if (modalType === 'programme') {
-          const progRef = await addDoc(collection(db, 'programmes'), {
+          const record = await pb.collection('programmes').create({
             ...finalData,
             producedPallets: 0,
             status: 'ACTIVE',
             createdAt: new Date().toISOString()
           });
           if (finalData.lineId) {
-            await updateDoc(doc(db, 'lines', finalData.lineId), {
-              currentProgrammeId: progRef.id,
+            await pb.collection('lines').update(finalData.lineId, {
+              currentProgrammeId: record.id,
               status: 'IDLE'
             });
           }
         } else {
-          await addDoc(collection(db, collectionName), finalData);
+          await pb.collection(collectionName).create(finalData);
         }
       }
       setIsModalOpen(false);
@@ -115,8 +148,7 @@ export default function AdminPanel() {
     const { col, id } = confirmDelete;
 
     try {
-      await deleteDoc(doc(db, col, id));
-      console.log(`Document ${id} successfully deleted from ${col}`);
+      await pb.collection(col).delete(id);
       setConfirmDelete(null);
     } catch (error) {
       console.error('Error deleting document:', error);
