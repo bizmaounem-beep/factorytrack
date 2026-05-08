@@ -103,35 +103,47 @@ export default function PilotScreen() {
   const handleAssignProgramme = async () => {
     if (!isAssigning || !newProgName) return;
 
-    // Create new programme
-    const newProg = {
-      name: newProgName,
-      machineId: selectedMachineId,
-      lineId: isAssigning,
-      producedPallets: 0,
-      status: 'ACTIVE' as const,
-      createdAt: new Date().toISOString()
-    };
-    const progRef = await localApi.addDoc('programmes', newProg);
+    try {
+      // Create new programme
+      const newProg = {
+        name: newProgName,
+        machineId: selectedMachineId,
+        lineId: isAssigning,
+        producedPallets: 0,
+        status: 'ACTIVE' as const,
+        createdAt: new Date().toISOString()
+      };
+      const progRef = await localApi.addDoc('programmes', newProg);
 
-    // Update line
-    await localApi.updateDoc('lines', isAssigning, {
-      currentProgrammeId: progRef.id,
-      status: 'IDLE'
-    });
+      // Update line
+      await localApi.updateDoc('lines', isAssigning, {
+        currentProgrammeId: progRef.id,
+        status: 'IDLE',
+        currentOperatorId: null
+      });
 
-    setIsAssigning(null);
-    setShowCreateNew(false);
-    setNewProgName('');
+      setIsAssigning(null);
+      setShowCreateNew(false);
+      setNewProgName('');
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de l\'assignation du programme');
+    }
   };
 
   const handleSelectExistingProgramme = async (progId: string) => {
     if (!isAssigning) return;
-    await localApi.updateDoc('lines', isAssigning, {
-      currentProgrammeId: progId,
-      status: 'IDLE'
-    });
-    setIsAssigning(null);
+    try {
+      await localApi.updateDoc('lines', isAssigning, {
+        currentProgrammeId: progId,
+        status: 'IDLE',
+        currentOperatorId: null
+      });
+      setIsAssigning(null);
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de la sélection du programme');
+    }
   };
 
   const handleReleaseLine = async (lineId: string) => {
@@ -567,14 +579,14 @@ export default function PilotScreen() {
                         className="p-1 sm:p-2 text-red-600 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all shadow-sm flex items-center gap-1 border border-red-100 shrink-0 h-6 sm:h-auto"
                         title="Libérer la ligne"
                       >
-                        <X size={10} sm:size={16} strokeWidth={3} />
+                        <X className="w-2.5 h-2.5 sm:w-4 sm:h-4" strokeWidth={3} />
                       </button>
                     )}
                     <button 
                       onClick={() => setIsAssigning(line.id)}
                       className="p-1 sm:p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100 shrink-0 h-6 sm:h-auto"
                     >
-                      <Plus size={10} sm:size={16} strokeWidth={3} />
+                      <Plus className="w-2.5 h-2.5 sm:w-4 sm:h-4" strokeWidth={3} />
                       <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight">
                         {prog ? 'CHG.' : 'ASS.'}
                       </span>
@@ -695,8 +707,8 @@ export default function PilotScreen() {
                               </td>
                               <td className="px-2 md:px-5 py-2 md:py-3 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={16} /></button>
-                                  <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={16} /></button>
+                                  <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                  <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                                 </div>
                               </td>
                             </motion.tr>
@@ -757,8 +769,8 @@ export default function PilotScreen() {
                             </td>
                             <td className="px-2 md:px-5 py-2 md:py-3 text-right">
                               <div className="flex justify-end gap-1">
-                                <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={16} /></button>
-                                <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={16} /></button>
+                                <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                               </div>
                             </td>
                           </motion.tr>

@@ -114,10 +114,15 @@ export default function OperatorScreen() {
 
   const handleStartProduction = async () => {
     if (!selectedLineId || !activeProgramme) return;
-    await localApi.updateDoc('lines', selectedLineId, {
-      status: 'RUNNING',
-      currentOperatorId: user?.id
-    });
+    try {
+      await localApi.updateDoc('lines', selectedLineId, {
+        status: 'RUNNING',
+        currentOperatorId: user?.id
+      });
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors du lancement de la production. Réessayez.');
+    }
   };
 
   const handleStopProduction = async () => {
@@ -129,31 +134,45 @@ export default function OperatorScreen() {
       return;
     }
 
-    // Declare the final pellets
-    await handleAddPallets();
+    try {
+      // Declare the final pellets
+      await handleAddPallets();
 
-    // Stop production
-    await localApi.updateDoc('lines', selectedLineId, {
-      status: 'IDLE',
-      currentOperatorId: null
-    });
+      // Stop production
+      await localApi.updateDoc('lines', selectedLineId, {
+        status: 'IDLE',
+        currentOperatorId: null
+      });
+      
+      setSelectedLineId(null);
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de l\'arrêt de la production. Vérifiez votre connexion.');
+    }
   };
 
   const handleFinishProgramme = async () => {
     if (!selectedLineId || !activeProgramme) return;
     
     if (window.confirm('Voulez-vous vraiment clôturer ce programme ? Il ne sera plus modifiable par les opérateurs.')) {
-      // Mark programme as FINISHED
-      await localApi.updateDoc('programmes', activeProgramme.id, {
-        status: 'FINISHED'
-      });
-      
-      // Clear line
-      await localApi.updateDoc('lines', selectedLineId, {
-        currentProgrammeId: null,
-        status: 'IDLE',
-        currentOperatorId: null // Clear operator as well
-      });
+      try {
+        // Mark programme as FINISHED
+        await localApi.updateDoc('programmes', activeProgramme.id, {
+          status: 'FINISHED'
+        });
+        
+        // Clear line
+        await localApi.updateDoc('lines', selectedLineId, {
+          currentProgrammeId: null,
+          status: 'IDLE',
+          currentOperatorId: null // Clear operator as well
+        });
+
+        setSelectedLineId(null);
+      } catch (e) {
+        console.error(e);
+        alert('Erreur lors de la clôture du programme.');
+      }
     }
   };
 
@@ -304,7 +323,7 @@ export default function OperatorScreen() {
                 className="p-5 sm:p-8 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center gap-2 sm:gap-3 transition-all active:scale-[0.98] hover:shadow-md hover:border-blue-200 group"
               >
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                  <Factory size={20} sm:size={24} />
+                  <Factory className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <span className="font-bold text-slate-800 text-base sm:text-lg uppercase tracking-tight">{m.name}</span>
               </motion.button>
@@ -405,7 +424,7 @@ export default function OperatorScreen() {
                     "w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center transition-colors",
                     isBusy ? "bg-red-50 text-red-300" : "bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600"
                   )}>
-                     <Activity size={20} sm:size={24} />
+                     <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
                   <div className="text-center">
                     <span className="font-bold text-slate-800 text-base sm:text-lg uppercase tracking-tight block">{l.name}</span>
@@ -508,7 +527,7 @@ export default function OperatorScreen() {
 
                 {activeLine?.status !== 'RUNNING' && !activeDowntime && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-1.5 sm:p-6 space-y-0.5 sm:space-y-2 bg-gray-50 rounded-lg border-2 border-dashed border-gray-100 mb-1 sm:mb-4">
-                    <AlertCircle className="text-gray-300" size={16} sm:size={32} />
+                    <AlertCircle className="text-gray-300 w-4 h-4 sm:w-8 sm:h-8" />
                     <div className="space-y-0">
                       <p className="text-gray-400 font-bold text-[8px] sm:text-sm uppercase tracking-tight leading-none mb-0.5">Production non lancée</p>
                     </div>
@@ -519,7 +538,7 @@ export default function OperatorScreen() {
                     <div className="grid grid-cols-2 md:grid-cols-2 gap-1.5 sm:gap-6 w-full items-center">
                       <div className="flex items-center justify-center gap-1.5 sm:gap-4">
                         <div className="w-8 h-8 sm:w-20 sm:h-20 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 animate-pulse shadow-inner">
-                          <Timer size={16} sm:size={40} />
+                          <Timer className="w-4 h-4 sm:w-10 sm:h-10" />
                         </div>
                         <div className="text-left">
                            <p className="text-[7px] sm:text-[10px] uppercase font-bold text-gray-400">Motif</p>
@@ -555,7 +574,7 @@ export default function OperatorScreen() {
                         onClick={handleStopDowntime}
                         className="w-full bg-orange-600 text-white py-2 sm:py-5 rounded-lg sm:rounded-2xl font-black text-sm sm:text-xl shadow-lg shadow-orange-200 active:scale-95 transition-all uppercase tracking-widest flex items-center justify-center gap-1.5"
                       >
-                        <Play size={16} sm:size={24} fill="currentColor" /> REPRENDRE
+                        <Play className="w-4 h-4 sm:w-6 sm:h-6" fill="currentColor" /> REPRENDRE
                       </button>
                     </div>
                   </div>
@@ -620,7 +639,7 @@ export default function OperatorScreen() {
                           >
                             <div className="flex justify-between items-center">
                               <p className="text-[9px] sm:text-base font-black text-gray-900 truncate group-hover:text-blue-700 leading-none">{p.name}</p>
-                              <Play size={10} sm:size={16} className="text-gray-300 group-hover:text-blue-500" fill="currentColor" />
+                              <Play className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-gray-300 group-hover:text-blue-500" fill="currentColor" />
                             </div>
                           </button>
                         ))}
@@ -677,7 +696,7 @@ export default function OperatorScreen() {
                       }}
                       className="px-1.5 sm:px-4 bg-gray-50 hover:bg-gray-100 text-gray-400 transition-colors border-r border-gray-100 disabled:opacity-30"
                     >
-                      <Minus size={10} sm:size={20} />
+                      <Minus className="w-2.5 h-2.5 sm:w-5 sm:h-5" />
                     </button>
                     <input 
                       type="number"
@@ -694,7 +713,7 @@ export default function OperatorScreen() {
                       }}
                       className="px-1.5 sm:px-4 bg-gray-50 hover:bg-gray-100 text-gray-400 transition-colors border-l border-gray-100 disabled:opacity-30"
                     >
-                      <Plus size={10} sm:size={20} />
+                      <Plus className="w-2.5 h-2.5 sm:w-5 sm:h-5" />
                     </button>
                   </div>
 
@@ -719,14 +738,14 @@ export default function OperatorScreen() {
                       onClick={handleStartProduction}
                       className="flex-[3] border-2 border-[#22C55E] text-[#15803D] bg-green-50/50 rounded-lg sm:rounded-2xl flex items-center justify-center gap-1.5 font-black text-xs sm:text-2xl hover:bg-green-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-sm uppercase italic tracking-tighter"
                     >
-                      <Play size={16} sm:size={24} fill="currentColor" /> LANCER PROD
+                      <Play className="w-4 h-4 sm:w-6 sm:h-6" fill="currentColor" /> LANCER PROD
                     </button>
                     {activeProgramme && !activeDowntime && (
                       <button 
                         onClick={handleFinishProgramme}
                         className="flex-1 border border-gray-400 text-gray-600 bg-gray-50 rounded-lg sm:rounded-2xl flex flex-col items-center justify-center gap-0 font-black px-1 shadow-sm uppercase tracking-tighter hover:bg-white hover:border-blue-400 hover:text-blue-600 transition-all group shrink-0"
                       >
-                        <CheckCircle size={10} sm:size={18} className="text-gray-400 group-hover:text-blue-500" />
+                        <CheckCircle className="w-2.5 h-2.5 sm:w-4.5 sm:h-4.5 text-gray-400 group-hover:text-blue-500" />
                         <span className="text-[6px] sm:text-[10px]">Clôturer</span>
                       </button>
                     )}
@@ -736,7 +755,7 @@ export default function OperatorScreen() {
                     onClick={handleStopProduction}
                     className="flex-1 border-2 border-[#EF4444] text-[#B91C1C] bg-red-50 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 font-black text-xs sm:text-2xl hover:bg-red-100 transition-colors shadow-sm uppercase italic tracking-tighter"
                   >
-                    <Square size={16} sm:size={24} fill="currentColor" /> TERMINER MISSION
+                    <Square className="w-4 h-4 sm:w-6 sm:h-6" fill="currentColor" /> TERMINER MISSION
                   </button>
                 )}
               </div>

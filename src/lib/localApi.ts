@@ -53,14 +53,35 @@ export const localApi = {
 
   // Real-time updates with Socket.io
   onSnapshot(collection: string, callback: (docs: any[]) => void) {
+    let timeout: any = null;
+    let isFetching = false;
+    let pendingUpdate = false;
+    
     const fetchAndCallback = async () => {
+      if (isFetching) {
+        pendingUpdate = true;
+        return;
+      }
+      
+      isFetching = true;
       try {
-        const docs = await this.getCollection(collection);
+        const docs = await localApi.getCollection(collection);
         callback(docs);
       } catch (e) {
         console.error(`Fetch error for ${collection}:`, e);
+      } finally {
+        isFetching = false;
+        if (pendingUpdate) {
+          pendingUpdate = false;
+          debouncedFetch();
+        }
       }
     };
+
+    function debouncedFetch() {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(fetchAndCallback, 300);
+    }
 
     // Initial fetch
     fetchAndCallback();
@@ -68,7 +89,7 @@ export const localApi = {
     // Listen for changes
     const handler = (data: { collection: string }) => {
       if (data.collection === collection) {
-        fetchAndCallback();
+        debouncedFetch();
       }
     };
 
@@ -76,6 +97,7 @@ export const localApi = {
     
     // Return unsubscribe function
     return () => {
+      if (timeout) clearTimeout(timeout);
       socket.off('db_change', handler);
     };
   }

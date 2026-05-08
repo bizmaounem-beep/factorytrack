@@ -563,7 +563,7 @@ export default function AdminPanel() {
                 variants={container}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 md:gap-4"
+                className="grid grid-cols-2 lg:grid-cols-4 gap-1 md:gap-4"
               >
                  {[
                    { label: 'Palettes / Jour', val: prodLogs.reduce((acc, l) => acc + l.count, 0), icon: Box, color: 'blue' },
@@ -574,7 +574,7 @@ export default function AdminPanel() {
                    <motion.div 
                     variants={item}
                     key={stat.label} 
-                    className="card p-1.5 md:p-3 flex items-center gap-2 md:gap-4 hover:shadow-md transition-shadow group cursor-default"
+                    className="card p-1 md:p-3 flex items-center gap-1.5 md:gap-4 hover:shadow-md transition-shadow group cursor-default"
                    >
                      <div className={cn(
                        "w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm border border-black/5 shrink-0",
@@ -582,7 +582,7 @@ export default function AdminPanel() {
                        stat.color === 'green' ? "bg-green-600 text-white" :
                        stat.color === 'orange' ? "bg-orange-600 text-white" : "bg-slate-600 text-white"
                      )}>
-                       <stat.icon size={12} md:size={20} strokeWidth={2.5} />
+                       <stat.icon className="w-3 h-3 md:w-5 md:h-5" strokeWidth={2.5} />
                      </div>
                      <div>
                        <p className="text-[6px] md:text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5 leading-none">{stat.label}</p>
@@ -604,10 +604,10 @@ export default function AdminPanel() {
                    <table className="w-full text-left">
                      <thead className="bg-white text-[7px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider md:tracking-[0.2em] border-b border-gray-100">
                        <tr>
-                         <th className="px-1.5 md:px-6 py-2 md:py-5">Ligne</th>
-                         <th className="px-1.5 md:px-6 py-2 md:py-5">Stat.</th>
-                         <th className="px-1.5 md:px-6 py-2 md:py-5">Pal.</th>
-                         <th className="px-1.5 md:px-6 py-2 md:py-5">Op.</th>
+                         <th className="px-1 md:px-6 py-2 md:py-5">Ligne</th>
+                         <th className="px-1 md:px-6 py-2 md:py-5">Stat.</th>
+                         <th className="px-1 md:px-6 py-2 md:py-5">Pal.</th>
+                         <th className="px-1 md:px-6 py-2 md:py-5 text-right md:text-left">Op.</th>
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-50">
@@ -617,26 +617,26 @@ export default function AdminPanel() {
                           const mach = machines.find(m => m.id === l.machineId);
                           return (
                             <tr key={l.id} className="text-[9px] md:text-sm hover:bg-gray-50/50 transition-colors">
-                              <td className="px-2 md:px-6 py-2 md:py-5">
-                                <p className="font-black text-gray-900 leading-none mb-0.5">{l.name}</p>
-                                <p className="text-[8px] font-bold text-blue-500 uppercase tracking-tight">{mach?.name}</p>
+                              <td className="px-1 md:px-6 py-2 md:py-5">
+                                <p className="font-black text-gray-900 leading-none mb-0.5 whitespace-nowrap">{l.name}</p>
+                                <p className="text-[7.5px] font-bold text-blue-500 uppercase tracking-tight truncate max-w-[40px] md:max-w-none">{mach?.name}</p>
                               </td>
-                              <td className="px-1.5 md:px-6 py-2 md:py-5">
+                              <td className="px-1 md:px-6 py-2 md:py-5">
                                  <span className={cn(
-                                   "px-1 md:px-2 py-0.5 md:py-1 rounded-md text-[6.5px] md:text-[9px] font-black uppercase tracking-tight",
+                                   "px-0.5 md:px-2 py-0.5 md:py-1 rounded text-[6.5px] md:text-[9px] font-black uppercase tracking-tight",
                                    l.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
                                    l.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : "bg-status-idle-bg text-status-idle-text"
                                  )}>{l.status === 'RUNNING' ? 'OK' : l.status?.substring(0, 4)}</span>
                               </td>
-                              <td className="px-1.5 md:px-6 py-2 md:py-5">
+                              <td className="px-1 md:px-6 py-2 md:py-5">
                                 <p className="text-[10px] md:text-sm font-black text-blue-600 italic leading-none">{prog?.producedPallets || 0}</p>
                               </td>
-                              <td className="px-1.5 md:px-6 py-2 md:py-5">
-                                <div className="flex items-center gap-1">
-                                  <div className="w-4 h-4 md:w-6 md:h-6 bg-gray-100 rounded flex items-center justify-center text-[7px] md:text-[10px] font-bold text-gray-500 shrink-0">
+                              <td className="px-1 md:px-6 py-2 md:py-5">
+                                <div className="flex items-center justify-end md:justify-start gap-1">
+                                  <div className="w-3.5 h-3.5 md:w-6 md:h-6 bg-gray-100 rounded flex items-center justify-center text-[7px] md:text-[10px] font-bold text-gray-500 shrink-0">
                                     {op?.name?.substring(0, 1).toUpperCase() || '—'}
                                   </div>
-                                  <span className="text-gray-600 font-bold truncate max-w-[40px] md:max-w-none text-[8px] md:text-xs">{(op?.name || '—').split(' ')[0]}</span>
+                                  <span className="text-gray-600 font-bold truncate max-w-[30px] md:max-w-none text-[8px] md:text-xs">{(op?.name || '—').split(' ')[0]}</span>
                                 </div>
                               </td>
                             </tr>
@@ -888,8 +888,8 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <button onClick={() => openModal('production_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil size={12} md:size={14} /></button>
-                                  <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} md:size={14} /></button>
+                                  <button onClick={() => openModal('production_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                  <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                 </div>
                               </td>
                               </motion.tr>
@@ -947,8 +947,8 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil size={12} md:size={14} /></button>
-                                  <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} md:size={14} /></button>
+                                  <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                  <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                 </div>
                               </td>
                               </motion.tr>
