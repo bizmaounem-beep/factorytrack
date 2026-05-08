@@ -186,7 +186,7 @@ export default function OperatorScreen() {
     // Update line
     await localApi.updateDoc('lines', selectedLineId, {
       activeDowntimeId: null,
-      status: 'IDLE'
+      status: 'RUNNING'
     });
   };
 
