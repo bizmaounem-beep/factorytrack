@@ -3,7 +3,7 @@ import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, User as AppUser, DowntimeType, DowntimeLog, ProductionLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X } from 'lucide-react';
+import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft } from 'lucide-react';
 import { cn, formatDuration } from '../lib/utils';
 
 export default function PilotScreen() {
@@ -208,6 +208,30 @@ export default function PilotScreen() {
     }
   };
 
+  const handleResumeMachine = async () => {
+    if (!selectedMachineId) return;
+    try {
+      const machineLines = lines.filter(l => l.machineId === selectedMachineId);
+      for (const line of machineLines) {
+        if (line.activeDowntimeId) {
+          const log = downLogs.find(l => l.id === line.activeDowntimeId);
+          if (log && !log.endTime) {
+            const endTime = new Date().toISOString();
+            const duration = Math.floor((new Date(endTime).getTime() - new Date(log.startTime).getTime()) / 1000);
+            await localApi.updateDoc('downtime_logs', log.id, { endTime, duration });
+          }
+          await localApi.updateDoc('lines', line.id, {
+            activeDowntimeId: null,
+            status: 'IDLE'
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors du redémarrage de la machine');
+    }
+  };
+
   const handleStartDowntime = async (lineId: string | null, typeId: string) => {
     if (!user || !selectedMachineId) return;
     try {
@@ -266,17 +290,28 @@ export default function PilotScreen() {
     <div className="min-h-screen bg-[#F8FAFC] pb-20">
       {/* MOBILE HEADER */}
       <header className="sm:hidden bg-white border-b border-gray-100 px-4 py-2 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
         <div className="flex items-center gap-1.5">
-          <div className="bg-blue-600 p-1 rounded-md text-white">
-            <Monitor size={14} />
+          {selectedMachineId ? (
+            <button 
+              onClick={() => handleMachineSelect('')}
+              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors mr-1"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          ) : (
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          )}
+          <div className="flex items-center gap-1.5">
+            <div className="bg-blue-600 p-1 rounded-md text-white">
+              <Monitor size={14} />
+            </div>
+            <h1 className="font-black text-base tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
           </div>
-          <h1 className="font-black text-base tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
         </div>
       </header>
 
@@ -374,10 +409,18 @@ export default function PilotScreen() {
               </div>
               <div>
                 <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest leading-none mb-1">Status Machine</p>
-                <p className="text-sm font-black text-gray-800">{machines.find(m => m.id === selectedMachineId)?.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-black text-gray-800">{machines.find(m => m.id === selectedMachineId)?.name}</p>
+                  <button 
+                    onClick={() => handleMachineSelect('')}
+                    className="text-[8px] font-bold text-blue-600 uppercase hover:underline"
+                  >
+                    (Changer)
+                  </button>
+                </div>
               </div>
             </div>
-            {lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') && (
+            {lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') ? (
               <button 
                 onClick={() => setDeclaringDowntimeLineId('global')}
                 className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all animate-in fade-in zoom-in"
@@ -385,7 +428,15 @@ export default function PilotScreen() {
                 <Activity size={16} className="animate-pulse" />
                 Arrêt Machine
               </button>
-            )}
+            ) : lines.filter(l => l.machineId === selectedMachineId).some(l => l.activeDowntimeId) ? (
+              <button 
+                onClick={handleResumeMachine}
+                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-700 active:scale-95 transition-all animate-in fade-in zoom-in"
+              >
+                <Activity size={16} />
+                Lancer Machine
+              </button>
+            ) : null}
           </div>
         )}
 
@@ -404,15 +455,33 @@ export default function PilotScreen() {
       {/* Mobile-only machine selector when in monitor tab */}
       {activeTab === 'monitor' && (
         <div className="p-3 sm:hidden bg-white border-b border-gray-100 space-y-3">
-           {selectedMachineId && lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') && (
-              <button 
-                onClick={() => setDeclaringDowntimeLineId('global')}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 active:scale-95 transition-all"
-              >
-                <Activity size={16} className="animate-pulse" />
-                ARRÊT GÉNÉRAL
-              </button>
-            )}
+           {selectedMachineId && (
+             <div className="flex gap-2">
+                {lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') ? (
+                  <button 
+                    onClick={() => setDeclaringDowntimeLineId('global')}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 active:scale-95 transition-all"
+                  >
+                    <Activity size={16} className="animate-pulse" />
+                    ARRÊT GÉNÉRAL
+                  </button>
+                ) : lines.filter(l => l.machineId === selectedMachineId).some(l => l.activeDowntimeId) ? (
+                  <button 
+                    onClick={handleResumeMachine}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 active:scale-95 transition-all"
+                  >
+                    <Activity size={16} />
+                    RELANCER TOUT
+                  </button>
+                ) : null}
+                <button 
+                  onClick={() => handleMachineSelect('')}
+                  className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-[9px] uppercase tracking-widest"
+                >
+                  CHANGER
+                </button>
+             </div>
+           )}
            <select 
             value={selectedMachineId}
             onChange={e => handleMachineSelect(e.target.value)}
@@ -795,65 +864,54 @@ export default function PilotScreen() {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6">
-              {!showCreateNew ? (
-                <>
-                  <div className="space-y-3">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Programmes Disponibles</h3>
-                    {availableProgs.length > 0 ? (
-                      <div className="grid gap-2">
-                        {availableProgs.map(p => (
-                          <button
-                            key={p.id}
-                            onClick={() => handleSelectExistingProgramme(p.id)}
-                            className="w-full p-4 bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-2xl text-left transition-all group flex justify-between items-center"
-                          >
-                            <div>
-                              <p className="font-bold text-gray-900 group-hover:text-blue-700">{p.name}</p>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">Programme Actif</p>
-                            </div>
-                            <div className="w-8 h-8 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-300 group-hover:text-blue-500 group-hover:border-blue-200 transition-all">
-                              <Plus size={16} />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center bg-gray-50 border-2 border-dashed border-gray-100 rounded-3xl">
-                        <p className="text-gray-400 font-medium italic">Aucun programme disponible</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-2">
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                  <h3 className="text-[10px] font-black text-gray-700 uppercase tracking-widest mb-3">Nouveau Programme</h3>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      value={newProgName}
+                      onChange={e => setNewProgName(e.target.value)}
+                      placeholder="Nom du nouveau programme..."
+                      className="flex-1 p-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm"
+                    />
                     <button 
-                      onClick={() => setShowCreateNew(true)}
-                      className="w-full p-4 bg-blue-50 text-blue-700 rounded-2xl font-black text-xs uppercase tracking-widest border border-blue-100 hover:bg-blue-100 transition-colors shadow-sm"
+                      disabled={!newProgName}
+                      onClick={handleAssignProgramme}
+                      className="px-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
                     >
-                      + Créer un nouveau programme
+                      CRÉER
                     </button>
                   </div>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[10px] font-black text-gray-700 uppercase tracking-widest ml-1">Nouveau Programme</h3>
-                    <button onClick={() => setShowCreateNew(false)} className="text-[10px] font-bold text-blue-600 hover:underline">Retour à la liste</button>
-                  </div>
-                  
-                  <div className="space-y-4 pt-1">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nom du programme</label>
-                      <input 
-                        type="text"
-                        value={newProgName}
-                        onChange={e => setNewProgName(e.target.value)}
-                        placeholder="ex: PAL-2026-X"
-                        className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold"
-                      />
-                    </div>
-                  </div>
                 </div>
-              )}
+
+                <div className="space-y-3">
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ou choisir parmi les programmes actifs</h3>
+                  {availableProgs.length > 0 ? (
+                    <div className="grid gap-2">
+                      {availableProgs.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => handleSelectExistingProgramme(p.id)}
+                          className="w-full p-4 bg-white hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-2xl text-left transition-all group flex justify-between items-center shadow-sm"
+                        >
+                          <div>
+                            <p className="font-bold text-gray-900 group-hover:text-blue-700">{p.name}</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">Programme prêt</p>
+                          </div>
+                          <div className="w-8 h-8 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-300 group-hover:text-blue-500 group-hover:border-blue-200 transition-all">
+                            <Plus size={16} />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl italic text-gray-400 text-xs">
+                      Aucun autre programme disponible.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">

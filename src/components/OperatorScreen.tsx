@@ -3,7 +3,7 @@ import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, DowntimeType, DowntimeLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus } from 'lucide-react';
+import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
 
 export default function OperatorScreen() {
@@ -305,9 +305,9 @@ export default function OperatorScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             onClick={() => { setSelectedMachineId(null); setSelectedLineId(null); }} 
-            className="text-[10px] font-black text-blue-600 mb-6 flex items-center gap-1 mx-auto hover:bg-blue-50 px-4 py-2 rounded-full transition-all uppercase tracking-widest"
+            className="text-[10px] font-black text-blue-600 mb-6 flex items-center gap-1.5 mx-auto hover:bg-blue-50 px-4 py-2 rounded-full transition-all uppercase tracking-widest group"
           >
-            ← Retour aux machines
+            <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Retour aux machines
           </motion.button>
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
@@ -350,6 +350,15 @@ export default function OperatorScreen() {
       {/* HEADER */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm shrink-0">
         <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
+          <button 
+            onClick={() => {
+              if (selectedLineId) setSelectedLineId('');
+              else setSelectedMachineId('');
+            }}
+            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors shrink-0"
+          >
+            <ArrowLeft size={20} />
+          </button>
           <div className="shrink-0">
             <p className="text-[9px] text-gray-500 uppercase tracking-wider font-semibold leading-none">Opérateur</p>
             <p className="text-xs font-bold text-gray-900 truncate max-w-[120px]">{user?.name}</p>
@@ -455,6 +464,18 @@ export default function OperatorScreen() {
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden">
+                    {activeLine?.status === 'RUNNING' && (
+                      <div className="bg-orange-50/50 p-2 sm:p-3 rounded-xl border border-orange-100 mb-1">
+                        <p className="text-[8px] font-bold text-orange-600 uppercase mb-1 ml-1 tracking-widest">Note de l'arrêt (Optionnel)</p>
+                        <input 
+                          type="text"
+                          placeholder="Décrivez le problème ici AVANT de cliquer sur un motif..."
+                          className="w-full text-xs p-2.5 sm:p-3 bg-white border border-orange-100 rounded-lg outline-none focus:border-orange-500 font-bold shadow-sm"
+                          value={downtimeDescription}
+                          onChange={e => setDowntimeDescription(e.target.value)}
+                        />
+                      </div>
+                    )}
                     <div className="flex-1 overflow-y-auto pr-1">
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 pb-3 sm:pb-4">
                         {downtimeTypes.map((type) => (
@@ -475,17 +496,6 @@ export default function OperatorScreen() {
                         ))}
                       </div>
                     </div>
-                    {activeLine?.status === 'RUNNING' && (
-                      <div className="pt-3 sm:pt-4 border-t border-gray-100 max-w-md mx-auto w-full">
-                        <input 
-                          type="text"
-                          placeholder="Note de panne..."
-                          className="w-full text-xs sm:text-sm p-3 sm:p-4 bg-gray-50 border-2 border-gray-100 rounded-xl sm:rounded-2xl outline-none focus:border-orange-500 focus:bg-white font-bold transition-all shadow-inner"
-                          value={downtimeDescription}
-                          onChange={e => setDowntimeDescription(e.target.value)}
-                        />
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
