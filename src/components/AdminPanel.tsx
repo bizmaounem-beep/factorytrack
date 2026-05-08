@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, increment, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { User as AppUser, Machine, Line, Programme, DowntimeType, ProductionLog, DowntimeLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -32,13 +31,13 @@ export default function AdminPanel() {
   const [downLogs, setDownLogs] = useState<DowntimeLog[]>([]);
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, 'users'), s => setUsers(s.docs.map(d => ({id: d.id, ...d.data()} as AppUser))));
-    const unsubMachines = onSnapshot(collection(db, 'machines'), s => setMachines(s.docs.map(d => ({id: d.id, ...d.data()} as Machine))));
-    const unsubLines = onSnapshot(collection(db, 'lines'), s => setLines(s.docs.map(d => ({id: d.id, ...d.data()} as Line))));
-    const unsubProgs = onSnapshot(collection(db, 'programmes'), s => setProgrammes(s.docs.map(d => ({id: d.id, ...d.data()} as Programme))));
-    const unsubTypes = onSnapshot(collection(db, 'downtime_types'), s => setDowntimeTypes(s.docs.map(d => ({id: d.id, ...d.data()} as DowntimeType))));
-    const unsubProd = onSnapshot(query(collection(db, 'production_logs'), orderBy('timestamp', 'desc')), s => setProdLogs(s.docs.map(d => ({id: d.id, ...d.data()} as ProductionLog))));
-    const unsubDown = onSnapshot(query(collection(db, 'downtime_logs'), orderBy('startTime', 'desc')), s => setDownLogs(s.docs.map(d => ({id: d.id, ...d.data()} as DowntimeLog))));
+    const unsubUsers = localApi.onSnapshot('users', setUsers);
+    const unsubMachines = localApi.onSnapshot('machines', setMachines);
+    const unsubLines = localApi.onSnapshot('lines', setLines);
+    const unsubProgs = localApi.onSnapshot('programmes', setProgrammes);
+    const unsubTypes = localApi.onSnapshot('downtime_types', setDowntimeTypes);
+    const unsubProd = localApi.onSnapshot('production_logs', setProdLogs);
+    const unsubDown = localApi.onSnapshot('downtime_logs', setDownLogs);
     
     return () => {
       unsubUsers(); unsubMachines(); unsubLines(); unsubProgs(); unsubTypes(); unsubProd(); unsubDown();
@@ -91,35 +90,39 @@ export default function AdminPanel() {
           const oldLog = prodLogs.find(l => l.id === editingId);
           if (oldLog && oldLog.count !== dataToSave.count) {
             const diff = dataToSave.count - oldLog.count;
-            await updateDoc(doc(db, 'programmes', oldLog.programmeId), {
-              producedPallets: increment(diff)
-            });
+            const prog = programmes.find(p => p.id === oldLog.programmeId);
+            if (prog) {
+              await localApi.updateDoc('programmes', oldLog.programmeId, {
+                producedPallets: (prog.producedPallets || 0) + diff
+              });
+            }
           }
         }
 
-        await updateDoc(doc(db, collectionName, editingId), dataToSave);
+        await localApi.updateDoc(collectionName, editingId, dataToSave);
         
         if (modalType === 'programme' && dataToSave.lineId) {
-          await updateDoc(doc(db, 'lines', dataToSave.lineId), {
+          await localApi.updateDoc('lines', dataToSave.lineId, {
             currentProgrammeId: editingId
           });
         }
       } else {
         if (modalType === 'programme') {
-          const progRef = await addDoc(collection(db, 'programmes'), {
+          const newProg = {
             ...finalData,
             producedPallets: 0,
-            status: 'ACTIVE',
+            status: 'ACTIVE' as const,
             createdAt: new Date().toISOString()
-          });
+          };
+          const progRef = await localApi.addDoc('programmes', newProg);
           if (finalData.lineId) {
-            await updateDoc(doc(db, 'lines', finalData.lineId), {
+            await localApi.updateDoc('lines', finalData.lineId, {
               currentProgrammeId: progRef.id,
               status: 'IDLE'
             });
           }
         } else {
-          await addDoc(collection(db, collectionName), finalData);
+          await localApi.addDoc(collectionName, finalData);
         }
       }
       setIsModalOpen(false);
@@ -136,21 +139,22 @@ export default function AdminPanel() {
 
     try {
       if (col === 'production_logs') {
-        const logDoc = await getDoc(doc(db, col, id));
-        if (logDoc.exists()) {
-          const logData = logDoc.data() as ProductionLog;
-          await updateDoc(doc(db, 'programmes', logData.programmeId), {
-            producedPallets: increment(-logData.count)
-          });
+        const logData = prodLogs.find(l => l.id === id);
+        if (logData) {
+          const prog = programmes.find(p => p.id === logData.programmeId);
+          if (prog) {
+            await localApi.updateDoc('programmes', logData.programmeId, {
+              producedPallets: (prog.producedPallets || 0) - logData.count
+            });
+          }
         }
       }
 
       if (col === 'downtime_logs') {
-        const logDoc = await getDoc(doc(db, col, id));
-        if (logDoc.exists()) {
-          const logData = logDoc.data() as DowntimeLog;
+        const logData = downLogs.find(l => l.id === id);
+        if (logData) {
           if (!logData.endTime) {
-            await updateDoc(doc(db, 'lines', logData.lineId), {
+            await localApi.updateDoc('lines', logData.lineId, {
               activeDowntimeId: null,
               status: 'IDLE'
             });
@@ -158,7 +162,7 @@ export default function AdminPanel() {
         }
       }
 
-      await deleteDoc(doc(db, col, id));
+      await localApi.deleteDoc(col, id);
       setConfirmDelete(null);
     } catch (error) {
       console.error('Error deleting document:', error);
@@ -631,7 +635,7 @@ export default function AdminPanel() {
                           <span className="text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || 'Libre'}</span>
                           {m.currentPilotId && (
                             <button 
-                              onClick={() => updateDoc(doc(db, 'machines', m.id), { currentPilotId: null })}
+                              onClick={() => localApi.updateDoc('machines', m.id, { currentPilotId: null })}
                               className="text-[10px] font-black text-red-500 hover:underline uppercase"
                             >
                               Libérer

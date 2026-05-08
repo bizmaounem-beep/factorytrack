@@ -3,10 +3,9 @@ import Login from './components/Login';
 import OperatorScreen from './components/OperatorScreen';
 import PilotScreen from './components/PilotScreen';
 import AdminPanel from './components/AdminPanel';
-import { db } from './lib/firebase';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { localApi } from './lib/localApi';
 import { useEffect, useState } from 'react';
-import { Terminal, Database } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -15,39 +14,44 @@ export default function App() {
   // Auto-bootstrap empty DB
   useEffect(() => {
     const bootstrap = async () => {
-      const snap = await getDocs(collection(db, 'users'));
-      if (snap.empty) {
-        setInitializing(true);
-        // Add default admin
-        const adminRef = await addDoc(collection(db, 'users'), {
-          name: 'Super Admin',
-          pin: '0000',
-          role: 'ADMIN'
-        });
-        
-        // Add some types
-        const types = [
-          { name: 'Panne technique', icon: '🛠️' },
-          { name: 'Changement programme', icon: '📦' },
-          { name: 'Manque matière', icon: '🏗️' },
-          { name: 'Pause repas', icon: '☕' },
-          { name: 'Attente produit', icon: '⏳' },
-          { name: 'Bourrage ligne', icon: '🛑' },
-          { name: 'Problème traçabilité', icon: '🔎' }
-        ];
-        for (const t of types) {
-          await addDoc(collection(db, 'downtime_types'), t);
+      try {
+        const users = await localApi.getCollection('users');
+        if (users.length === 0) {
+          setInitializing(true);
+          // Add default admin
+          const adminRef = await localApi.addDoc('users', {
+            name: 'Super Admin',
+            pin: '0000',
+            role: 'ADMIN'
+          });
+          
+          // Add some types
+          const types = [
+            { id: '1', name: 'Panne technique', icon: '🛠️' },
+            { id: '2', name: 'Changement programme', icon: '📦' },
+            { id: '3', name: 'Manque matière', icon: '🏗️' },
+            { id: '4', name: 'Pause repas', icon: '☕' },
+            { id: '5', name: 'Attente produit', icon: '⏳' },
+            { id: '6', name: 'Bourrage ligne', icon: '🛑' },
+            { id: '7', name: 'Problème traçabilité', icon: '🔎' }
+          ];
+          for (const t of types) {
+            await localApi.addDoc('downtime_types', t);
+          }
+
+          // Add a default machine/line
+          const machRef = await localApi.addDoc('machines', { id: 'm1', name: 'Machine Central' });
+          await localApi.addDoc('lines', { 
+            id: 'l1',
+            name: 'Ligne Alpha', 
+            machineId: machRef.id, 
+            status: 'IDLE' 
+          });
+
+          window.location.reload();
         }
-
-        // Add a default machine/line
-        const machRef = await addDoc(collection(db, 'machines'), { name: 'Machine Central' });
-        await addDoc(collection(db, 'lines'), { 
-          name: 'Ligne Alpha', 
-          machineId: machRef.id, 
-          status: 'IDLE' 
-        });
-
-        window.location.reload();
+      } catch (e) {
+        console.error('Bootstrap error:', e);
       }
     };
     bootstrap();

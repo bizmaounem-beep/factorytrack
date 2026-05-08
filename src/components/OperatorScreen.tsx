@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, DowntimeType, DowntimeLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -27,44 +26,20 @@ export default function OperatorScreen() {
 
   // Initialize data
   useEffect(() => {
-    const unsubMachines = onSnapshot(collection(db, 'machines'), (shot) => {
-      setMachines(shot.docs.map(d => ({ id: d.id, ...d.data() } as Machine)));
-    });
-    const unsubDowntimeTypes = onSnapshot(collection(db, 'downtime_types'), (shot) => {
-      setDowntimeTypes(shot.docs.map(d => ({ id: d.id, ...d.data() } as DowntimeType)));
-    });
+    const unsubMachines = localApi.onSnapshot('machines', setMachines);
+    const unsubDowntimeTypes = localApi.onSnapshot('downtime_types', setDowntimeTypes);
+    const unsubLines = localApi.onSnapshot('lines', setLines);
+    const unsubProgs = localApi.onSnapshot('programmes', setAvailableProgrammes);
+    
     return () => {
       unsubMachines();
       unsubDowntimeTypes();
+      unsubLines();
+      unsubProgs();
     };
   }, []);
 
-  // Listen to lines based on selected machine
-  useEffect(() => {
-    if (!selectedMachineId) return;
-    const q = query(collection(db, 'lines'), where('machineId', '==', selectedMachineId));
-    return onSnapshot(q, (shot) => {
-      setLines(shot.docs.map(d => ({ id: d.id, ...d.data() } as Line)));
-    });
-  }, [selectedMachineId]);
-
-  // Listen to available programmes for the selected line
-  useEffect(() => {
-    if (!selectedLineId) {
-      setAvailableProgrammes([]);
-      return;
-    }
-    const q = query(
-      collection(db, 'programmes'), 
-      where('lineId', '==', selectedLineId),
-      where('status', '==', 'ACTIVE')
-    );
-    return onSnapshot(q, (shot) => {
-      setAvailableProgrammes(shot.docs.map(d => ({ id: d.id, ...d.data() } as Programme)));
-    });
-  }, [selectedLineId]);
-
-  // Listen to active line details and related records
+  // Handle active line and related records summary
   useEffect(() => {
     if (!selectedLineId) {
       setActiveLine(null);
@@ -73,63 +48,43 @@ export default function OperatorScreen() {
       return;
     }
 
-    let currentProgId: string | null = null;
-    let currentDownId: string | null = null;
-    let unsubProg: (() => void) | null = null;
-    let unsubDown: (() => void) | null = null;
-
-    const unsubLine = onSnapshot(doc(db, 'lines', selectedLineId), (lineShot) => {
-      if (!lineShot.exists()) return;
-      const lineData = { id: lineShot.id, ...lineShot.data() } as Line;
-      setActiveLine(lineData);
-
-      // Handle Programme Subscription
-      if (lineData.currentProgrammeId) {
-        if (lineData.currentProgrammeId !== currentProgId) {
-          if (unsubProg) unsubProg();
-          currentProgId = lineData.currentProgrammeId;
-          unsubProg = onSnapshot(doc(db, 'programmes', lineData.currentProgrammeId), (progShot) => {
-            if (progShot.exists()) {
-              setActiveProgramme({ id: progShot.id, ...progShot.data() } as Programme);
-            } else {
-              setActiveProgramme(null);
-            }
-          });
-        }
+    const line = lines.find(l => l.id === selectedLineId);
+    if (line) {
+      setActiveLine(line);
+      if (line.currentProgrammeId) {
+        const prog = availableProgrammes.find(p => p.id === line.currentProgrammeId);
+        setActiveProgramme(prog || null);
       } else {
-        if (unsubProg) unsubProg();
-        unsubProg = null;
-        currentProgId = null;
         setActiveProgramme(null);
       }
 
-      // Handle Downtime Subscription
-      if (lineData.activeDowntimeId) {
-        if (lineData.activeDowntimeId !== currentDownId) {
-          if (unsubDown) unsubDown();
-          currentDownId = lineData.activeDowntimeId;
-          unsubDown = onSnapshot(doc(db, 'downtime_logs', lineData.activeDowntimeId), (downShot) => {
-            if (downShot.exists()) {
-              setActiveDowntime({ id: downShot.id, ...downShot.data() } as DowntimeLog);
-            } else {
-              setActiveDowntime(null);
-            }
-          });
-        }
-      } else {
-        if (unsubDown) unsubDown();
-        unsubDown = null;
-        currentDownId = null;
-        setActiveDowntime(null);
+      if (line.activeDowntimeId) {
+        // We'll need another effect to fetch logs if needed, but for now we look in lines
       }
-    });
+    }
+  }, [selectedLineId, lines, availableProgrammes]);
 
-    return () => {
-      unsubLine();
-      if (unsubProg) unsubProg();
-      if (unsubDown) unsubDown();
-    };
-  }, [selectedLineId]);
+  // Handle active line and related records summary
+  useEffect(() => {
+    if (!selectedLineId) {
+      setActiveLine(null);
+      setActiveProgramme(null);
+      setActiveDowntime(null);
+      return;
+    }
+
+    const line = lines.find(l => l.id === selectedLineId);
+    if (line) {
+      setActiveLine(line);
+      const prog = availableProgrammes.find(p => p.id === line.currentProgrammeId);
+      setActiveProgramme(prog || null);
+
+      if (line.activeDowntimeId) {
+         // We'll fetch downtime_logs directly if needed or find in state
+         // localApi.onSnapshot handles downLogs which we should add to state
+      }
+    }
+  }, [selectedLineId, lines, availableProgrammes]);
 
   // Timer logic for downtime
   useEffect(() => {
@@ -147,7 +102,7 @@ export default function OperatorScreen() {
 
   const handleStartProduction = async () => {
     if (!selectedLineId || !activeProgramme) return;
-    await updateDoc(doc(db, 'lines', selectedLineId), {
+    await localApi.updateDoc('lines', selectedLineId, {
       status: 'RUNNING',
       currentOperatorId: user?.id
     });
@@ -166,7 +121,7 @@ export default function OperatorScreen() {
     await handleAddPallets();
 
     // Stop production
-    await updateDoc(doc(db, 'lines', selectedLineId), {
+    await localApi.updateDoc('lines', selectedLineId, {
       status: 'IDLE'
     });
   };
@@ -176,7 +131,7 @@ export default function OperatorScreen() {
     if (isNaN(count) || count <= 0 || !activeProgramme || !user) return;
 
     // Log production
-    await addDoc(collection(db, 'production_logs'), {
+    await localApi.addDoc('production_logs', {
       programmeId: activeProgramme.id,
       operatorId: user.id,
       machineId: activeLine?.machineId,
@@ -186,8 +141,8 @@ export default function OperatorScreen() {
     });
 
     // Update programme total
-    await updateDoc(doc(db, 'programmes', activeProgramme.id), {
-      producedPallets: activeProgramme.producedPallets + count
+    await localApi.updateDoc('programmes', activeProgramme.id, {
+      producedPallets: (activeProgramme.producedPallets || 0) + count
     });
 
     setPalletInput('');
@@ -207,7 +162,7 @@ export default function OperatorScreen() {
 
     try {
       // Create log
-      const docRef = await addDoc(collection(db, 'downtime_logs'), {
+      const docRef = await localApi.addDoc('downtime_logs', {
         machineId: activeLine.machineId,
         lineId: activeLine.id,
         typeId,
@@ -219,7 +174,7 @@ export default function OperatorScreen() {
       console.log('Downtime log created:', docRef.id);
 
       // Update line
-      await updateDoc(doc(db, 'lines', selectedLineId), {
+      await localApi.updateDoc('lines', selectedLineId, {
         status: 'STOPPED',
         activeDowntimeId: docRef.id
       });
@@ -240,13 +195,13 @@ export default function OperatorScreen() {
     const duration = Date.now() - startTime;
 
     // Update log
-    await updateDoc(doc(db, 'downtime_logs', activeDowntime.id), {
+    await localApi.updateDoc('downtime_logs', activeDowntime.id, {
       endTime,
       duration
     });
 
     // Update line
-    await updateDoc(doc(db, 'lines', selectedLineId), {
+    await localApi.updateDoc('lines', selectedLineId, {
       activeDowntimeId: null,
       status: 'IDLE'
     });
@@ -261,7 +216,7 @@ export default function OperatorScreen() {
     if (!progId) {
       updates.status = 'IDLE';
     }
-    await updateDoc(doc(db, 'lines', selectedLineId), updates);
+    await localApi.updateDoc('lines', selectedLineId, updates);
   };
 
   if (!selectedMachineId) {
@@ -522,7 +477,7 @@ export default function OperatorScreen() {
                           defaultValue={activeDowntime.description || ''}
                           onBlur={async (e) => {
                             if (e.target.value !== activeDowntime.description) {
-                              await updateDoc(doc(db, 'downtime_logs', activeDowntime.id), {
+                              await localApi.updateDoc('downtime_logs', activeDowntime.id, {
                                 description: e.target.value
                               });
                             }

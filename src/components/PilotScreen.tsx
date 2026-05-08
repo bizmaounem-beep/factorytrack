@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, orderBy, increment, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, User as AppUser, DowntimeType, DowntimeLog, ProductionLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -32,11 +31,17 @@ export default function PilotScreen() {
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
 
   useEffect(() => {
-    onSnapshot(collection(db, 'machines'), shot => setMachines(shot.docs.map(d => ({id: d.id, ...d.data()} as Machine))));
-    onSnapshot(collection(db, 'users'), shot => setUsers(shot.docs.map(d => ({id: d.id, ...d.data()} as AppUser))));
-    onSnapshot(collection(db, 'downtime_types'), shot => setDowntimeTypes(shot.docs.map(d => ({id: d.id, ...d.data()} as DowntimeType))));
-    onSnapshot(query(collection(db, 'production_logs'), orderBy('timestamp', 'desc')), shot => setProdLogs(shot.docs.map(d => ({id: d.id, ...d.data()} as ProductionLog))));
-    onSnapshot(query(collection(db, 'downtime_logs'), orderBy('startTime', 'desc')), shot => setDownLogs(shot.docs.map(d => ({id: d.id, ...d.data()} as DowntimeLog))));
+    const u1 = localApi.onSnapshot('machines', setMachines);
+    const u2 = localApi.onSnapshot('users', setUsers);
+    const u3 = localApi.onSnapshot('downtime_types', setDowntimeTypes);
+    const u4 = localApi.onSnapshot('production_logs', setProdLogs);
+    const u5 = localApi.onSnapshot('downtime_logs', setDownLogs);
+    const u6 = localApi.onSnapshot('lines', setLines);
+    const u7 = localApi.onSnapshot('programmes', setProgrammes);
+    
+    return () => {
+      u1(); u2(); u3(); u4(); u5(); u6(); u7();
+    };
   }, []);
 
   // Auto-select machine if pilot is already assigned in DB
@@ -54,12 +59,12 @@ export default function PilotScreen() {
     try {
       // Release current machine if selected
       if (selectedMachineId && selectedMachineId !== machineId) {
-        await updateDoc(doc(db, 'machines', selectedMachineId), { currentPilotId: null });
+        await localApi.updateDoc('machines', selectedMachineId, { currentPilotId: null });
       }
 
       // Assign new machine if machineId is provided
       if (machineId) {
-        await updateDoc(doc(db, 'machines', machineId), { currentPilotId: user.id });
+        await localApi.updateDoc('machines', machineId, { currentPilotId: user.id });
       }
       
       setSelectedMachineId(machineId);
@@ -72,7 +77,7 @@ export default function PilotScreen() {
   const handleLogout = async () => {
     if (selectedMachineId) {
       try {
-        await updateDoc(doc(db, 'machines', selectedMachineId), { currentPilotId: null });
+        await localApi.updateDoc('machines', selectedMachineId, { currentPilotId: null });
       } catch (e) {
         console.error("Error releasing machine on logout:", e);
       }
@@ -82,32 +87,17 @@ export default function PilotScreen() {
 
   useEffect(() => {
     if (!selectedMachineId) return;
-    const unsubLines = onSnapshot(query(collection(db, 'lines'), where('machineId', '==', selectedMachineId)), shot => {
-      setLines(shot.docs.map(d => ({id: d.id, ...d.data()} as Line)));
-    });
-    const unsubProgs = onSnapshot(query(collection(db, 'programmes'), where('machineId', '==', selectedMachineId), where('status', '==', 'ACTIVE')), shot => {
-      setProgrammes(shot.docs.map(d => ({id: d.id, ...d.data()} as Programme)));
-    });
-    return () => {
-      unsubLines();
-      unsubProgs();
-    };
+    // Data is already handled by the global onSnapshot polling in the main effect
   }, [selectedMachineId]);
 
   // Sync active downtimes
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'downtime_logs'), shot => {
-      const active: Record<string, DowntimeLog> = {};
-      shot.docs.forEach(d => {
-        const data = d.data() as DowntimeLog;
-        if (!data.endTime) {
-          active[data.lineId] = { id: d.id, ...data };
-        }
-      });
-      setActiveDowntimes(active);
+    const active: Record<string, DowntimeLog> = {};
+    downLogs.forEach(log => {
+      if (!log.endTime) active[log.lineId] = log;
     });
-    return unsub;
-  }, []);
+    setActiveDowntimes(active);
+  }, [downLogs]);
 
   const handleAssignProgramme = async () => {
     if (!isAssigning || !newProgName || !newProgTarget) return;
@@ -116,18 +106,19 @@ export default function PilotScreen() {
     if (isNaN(target)) return;
 
     // Create new programme
-    const progRef = await addDoc(collection(db, 'programmes'), {
+    const newProg = {
       name: newProgName,
       machineId: selectedMachineId,
       lineId: isAssigning,
       targetPallets: target,
       producedPallets: 0,
-      status: 'ACTIVE',
+      status: 'ACTIVE' as const,
       createdAt: new Date().toISOString()
-    });
+    };
+    const progRef = await localApi.addDoc('programmes', newProg);
 
     // Update line
-    await updateDoc(doc(db, 'lines', isAssigning), {
+    await localApi.updateDoc('lines', isAssigning, {
       currentProgrammeId: progRef.id,
       status: 'IDLE'
     });
@@ -140,7 +131,7 @@ export default function PilotScreen() {
 
   const handleSelectExistingProgramme = async (progId: string) => {
     if (!isAssigning) return;
-    await updateDoc(doc(db, 'lines', isAssigning), {
+    await localApi.updateDoc('lines', isAssigning, {
       currentProgrammeId: progId,
       status: 'IDLE'
     });
@@ -166,15 +157,18 @@ export default function PilotScreen() {
         data.count = parseInt(data.count);
         if (oldLog && oldLog.count !== data.count) {
           const diff = data.count - oldLog.count;
-          await updateDoc(doc(db, 'programmes', oldLog.programmeId), {
-            producedPallets: increment(diff)
-          });
+          const prog = programmes.find(p => p.id === oldLog.programmeId);
+          if (prog) {
+            await localApi.updateDoc('programmes', oldLog.programmeId, {
+              producedPallets: (prog.producedPallets || 0) + diff
+            });
+          }
         }
       } else {
         if (data.duration) data.duration = parseInt(data.duration);
       }
 
-      await updateDoc(doc(db, col, editingLogId), data);
+      await localApi.updateDoc(col, editingLogId, data);
       setIsEditModalOpen(false);
       setEditingLogId(null);
     } catch (e) {
@@ -187,21 +181,22 @@ export default function PilotScreen() {
     if (!confirmDelete) return;
     try {
       if (confirmDelete.col === 'production_logs') {
-        const logDoc = await getDoc(doc(db, confirmDelete.col, confirmDelete.id));
-        if (logDoc.exists()) {
-          const logData = logDoc.data() as ProductionLog;
-          await updateDoc(doc(db, 'programmes', logData.programmeId), {
-            producedPallets: increment(-logData.count)
-          });
+        const logData = prodLogs.find(l => l.id === confirmDelete.id);
+        if (logData) {
+          const prog = programmes.find(p => p.id === logData.programmeId);
+          if (prog) {
+            await localApi.updateDoc('programmes', logData.programmeId, {
+              producedPallets: (prog.producedPallets || 0) - logData.count
+            });
+          }
         }
       }
 
       if (confirmDelete.col === 'downtime_logs') {
-        const logDoc = await getDoc(doc(db, confirmDelete.col, confirmDelete.id));
-        if (logDoc.exists()) {
-          const logData = logDoc.data() as DowntimeLog;
+        const logData = downLogs.find(l => l.id === confirmDelete.id);
+        if (logData) {
           if (!logData.endTime) {
-            await updateDoc(doc(db, 'lines', logData.lineId), {
+            await localApi.updateDoc('lines', logData.lineId, {
               activeDowntimeId: null,
               status: 'IDLE'
             });
@@ -209,7 +204,7 @@ export default function PilotScreen() {
         }
       }
 
-      await deleteDoc(doc(db, confirmDelete.col, confirmDelete.id));
+      await localApi.deleteDoc(confirmDelete.col, confirmDelete.id);
       setConfirmDelete(null);
     } catch (e) {
       console.error(e);

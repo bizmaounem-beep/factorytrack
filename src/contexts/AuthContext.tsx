@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 import { User } from '../types';
+import { localApi } from '../lib/localApi';
 
 interface AuthContextType {
   user: User | null;
@@ -27,14 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (pin: string) => {
     try {
-      const q = query(collection(db, 'users'), where('pin', '==', pin));
-      const querySnapshot = await getDocs(q);
+      const users = await localApi.getCollection('users');
+      const foundUser = users.find((u: User) => u.pin === pin);
       
-      if (!querySnapshot.empty) {
-        const userData = querySnapshot.docs[0].data() as Omit<User, 'id'>;
-        const fullUser = { ...userData, id: querySnapshot.docs[0].id } as User;
-        setUser(fullUser);
-        localStorage.setItem('factory_user', JSON.stringify(fullUser));
+      if (foundUser) {
+        setUser(foundUser);
+        localStorage.setItem('factory_user', JSON.stringify(foundUser));
         return true;
       }
       return false;
