@@ -221,7 +221,7 @@ export default function PilotScreen() {
 
   // Filter programmes that are already assigned to other lines
   const assignedProgIds = lines.map(l => l.currentProgrammeId).filter(Boolean);
-  const availableProgs = programmes.filter(p => !assignedProgIds.includes(p.id));
+  const availableProgs = programmes.filter(p => p.machineId === selectedMachineId && !assignedProgIds.includes(p.id));
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] pb-20">
@@ -268,7 +268,7 @@ export default function PilotScreen() {
         </div>
       ) : (
         <div className="p-4 space-y-4 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-          {lines.map(line => {
+          {lines.filter(l => l.machineId === selectedMachineId).map(line => {
             const prog = programmes.find(p => p.id === line.currentProgrammeId);
             const op = users.find(u => u.id === line.currentOperatorId);
             const down = activeDowntimes[line.id];

@@ -246,7 +246,7 @@ export default function OperatorScreen() {
           <h2 className="text-xl font-bold">Sélectionner Ligne</h2>
         </div>
         <div className="grid gap-3">
-          {lines.map(l => (
+          {lines.filter(l => l.machineId === selectedMachineId).map(l => (
             <button
               key={l.id}
               onClick={() => setSelectedLineId(l.id)}
@@ -309,9 +309,9 @@ export default function OperatorScreen() {
                       <Package size={20} />
                       <h2 className="text-xs font-bold uppercase tracking-widest">Choisir un Programme</h2>
                     </div>
-                    {availableProgrammes.length > 0 ? (
+                    {availableProgrammes.filter(p => p.lineId === selectedLineId && p.status === 'ACTIVE').length > 0 ? (
                       <div className="grid gap-2">
-                        {availableProgrammes.map(p => (
+                        {availableProgrammes.filter(p => p.lineId === selectedLineId && p.status === 'ACTIVE').map(p => (
                           <button
                             key={p.id}
                             disabled={activeLine?.status === 'RUNNING'}
