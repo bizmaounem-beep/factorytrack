@@ -105,10 +105,21 @@ export default function AdminPanel() {
 
         await localApi.updateDoc(collectionName, editingId, dataToSave);
         
-        if (modalType === 'programme' && dataToSave.lineId) {
-          await localApi.updateDoc('lines', dataToSave.lineId, {
-            currentProgrammeId: editingId
-          });
+        if (modalType === 'programme') {
+          if (dataToSave.status === 'FINISHED') {
+            const targetLine = lines.find(l => l.currentProgrammeId === editingId);
+            if (targetLine) {
+              await localApi.updateDoc('lines', targetLine.id, {
+                currentProgrammeId: null,
+                status: 'IDLE',
+                currentOperatorId: null
+              });
+            }
+          } else if (dataToSave.lineId) {
+            await localApi.updateDoc('lines', dataToSave.lineId, {
+              currentProgrammeId: editingId
+            });
+          }
         }
       } else {
         if (modalType === 'programme') {
@@ -163,6 +174,17 @@ export default function AdminPanel() {
               status: 'IDLE'
             });
           }
+        }
+      }
+
+      if (col === 'programmes') {
+        const line = lines.find(l => l.currentProgrammeId === id);
+        if (line) {
+          await localApi.updateDoc('lines', line.id, {
+            currentProgrammeId: null,
+            status: 'IDLE',
+            currentOperatorId: null
+          });
         }
       }
 
@@ -430,24 +452,24 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row">
       {/* MOBILE HEADER */}
-      <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-        <div className="flex items-center gap-3">
+      <header className="md:hidden bg-white border-b border-gray-200 px-3 py-1 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+        <div className="flex items-center gap-1.5">
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-              <Terminal size={18} />
+          <div className="flex items-center gap-1">
+            <div className="bg-blue-600 p-1 rounded-md text-white">
+              <Terminal size={12} />
             </div>
-            <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
+            <h1 className="font-black text-sm tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
         <button 
           onClick={logout}
-          className="p-2 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[10px] uppercase px-3 border border-red-100"
+          className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50"
         >
           LOGOUT
         </button>
@@ -469,24 +491,24 @@ export default function AdminPanel() {
             )}
             
             <motion.aside 
-              initial={window.innerWidth < 768 ? { x: -300 } : false}
+              initial={window.innerWidth < 768 ? { x: -280 } : false}
               animate={{ x: 0 }}
-              exit={{ x: -300 }}
+              exit={{ x: -280 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               className={cn(
-                "bg-white w-72 md:w-64 min-h-screen border-r border-gray-200 p-6 shrink-0 flex flex-col gap-8 z-50 transition-all overflow-y-auto",
+                "bg-white w-64 md:w-56 min-h-screen border-r border-gray-200 p-4 shrink-0 flex flex-col gap-6 z-50 transition-all overflow-y-auto",
                 "fixed inset-y-0 left-0 md:sticky md:top-0",
                 !isMobileMenuOpen && "hidden md:flex"
               )}
             >
-              <div className="flex items-center gap-3 px-2">
-                <div className="bg-blue-600 p-2 rounded-lg text-white">
-                  <Terminal size={20} />
+              <div className="flex items-center gap-2 px-1">
+                <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+                  <Terminal size={16} />
                 </div>
-                <h1 className="font-black text-xl tracking-tighter text-gray-900 leading-none capitalize italic">FACTORY<br/><span className="text-blue-600">CLOUD</span></h1>
+                <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none capitalize italic">FACTORY<br/><span className="text-blue-600">CLOUD</span></h1>
               </div>
               
-              <nav className="flex flex-col gap-1.5 flex-1">
+              <nav className="flex flex-col gap-1 flex-1">
                 {tabs.map(tab => (
                   <button
                     key={tab.id}
@@ -495,23 +517,23 @@ export default function AdminPanel() {
                       setIsMobileMenuOpen(false);
                     }}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all",
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
                       activeTab === tab.id 
-                        ? "bg-blue-600 text-white shadow-xl shadow-blue-100 translate-x-1" 
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-50" 
                         : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
                     )}
                   >
-                    <tab.icon size={18} strokeWidth={2.5} />
+                    <tab.icon size={16} strokeWidth={2.5} />
                     {tab.label}
                   </button>
                 ))}
                 
-                <div className="mt-auto pt-8 border-t border-gray-100">
+                <div className="mt-auto pt-4 border-t border-gray-100">
                   <button 
                     onClick={logout}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
                   >
-                    <Trash2 size={16} strokeWidth={2.5} />
+                    <Trash2 size={14} strokeWidth={2.5} />
                     Quitter
                   </button>
                 </div>
@@ -522,19 +544,18 @@ export default function AdminPanel() {
       </AnimatePresence>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-        <div className="max-w-6xl mx-auto space-y-10">
+      <main className="flex-1 p-2 md:p-6 overflow-y-auto">
+        <div className="max-w-6xl mx-auto space-y-3 md:space-y-6">
           
           {activeTab === 'dashboard' && (
-            <div className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-black tracking-tighter text-gray-900">Dashboard <span className="text-blue-600 uppercase">Live</span></h2>
+            <div className="space-y-3 md:space-y-6 animate-in fade-in duration-300">
+              <div className="flex justify-between items-center px-1">
+                <h2 className="text-base md:text-lg font-black tracking-tighter text-gray-900 leading-none">Dashboard <span className="text-blue-600 uppercase text-[10px] md:text-xs">Live</span></h2>
                   <div className="text-right flex flex-col items-end">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      <p className="text-[10px] font-black text-green-600 uppercase tracking-widest">Connecté</p>
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+                      <p className="text-[7px] md:text-[8px] font-black text-green-600 uppercase tracking-tight">Connecté</p>
                     </div>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">Actualisation en direct</p>
                   </div>
               </div>
 
@@ -542,7 +563,7 @@ export default function AdminPanel() {
                 variants={container}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6"
+                className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 md:gap-4"
               >
                  {[
                    { label: 'Palettes / Jour', val: prodLogs.reduce((acc, l) => acc + l.count, 0), icon: Box, color: 'blue' },
@@ -553,40 +574,40 @@ export default function AdminPanel() {
                    <motion.div 
                     variants={item}
                     key={stat.label} 
-                    className="card p-4 md:p-6 flex flex-col justify-between hover:shadow-md transition-shadow group cursor-default"
+                    className="card p-1.5 md:p-3 flex items-center gap-2 md:gap-4 hover:shadow-md transition-shadow group cursor-default"
                    >
                      <div className={cn(
-                       "w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center mb-2 md:mb-4 transition-transform group-hover:scale-110 shadow-sm border border-black/5",
+                       "w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm border border-black/5 shrink-0",
                        stat.color === 'blue' ? "bg-blue-600 text-white" :
                        stat.color === 'green' ? "bg-green-600 text-white" :
                        stat.color === 'orange' ? "bg-orange-600 text-white" : "bg-slate-600 text-white"
                      )}>
-                       <stat.icon size={16} md:size={24} strokeWidth={2.5} />
+                       <stat.icon size={12} md:size={20} strokeWidth={2.5} />
                      </div>
                      <div>
-                       <p className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5 md:mb-1">{stat.label}</p>
-                       <p className="text-xl md:text-3xl font-black text-slate-900 leading-none tabular-nums">{stat.val}</p>
+                       <p className="text-[6px] md:text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5 leading-none">{stat.label}</p>
+                       <p className="text-[11px] md:text-xl font-black text-slate-900 leading-none tabular-nums mt-0.5">{stat.val}</p>
                      </div>
                    </motion.div>
                  ))}
               </motion.div>
 
               <div className="card overflow-hidden">
-                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Monitor de Production Live</h3>
+                 <div className="px-3 py-2 md:px-6 md:py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                   <h3 className="text-[10px] md:text-sm font-black uppercase tracking-widest text-gray-900">Monitor de Production Live</h3>
                    <div className="flex gap-2">
-                      <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-[10px] font-bold text-gray-400 uppercase">Production</span></div>
-                      <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /><span className="text-[10px] font-bold text-gray-400 uppercase">Arrêt</span></div>
+                      <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">Prod</span></div>
+                      <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">Arrêt</span></div>
                    </div>
                  </div>
                  <div className="overflow-x-auto">
                    <table className="w-full text-left">
-                     <thead className="bg-white text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider md:tracking-[0.2em] border-b border-gray-100">
+                     <thead className="bg-white text-[7px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider md:tracking-[0.2em] border-b border-gray-100">
                        <tr>
-                         <th className="px-3 md:px-6 py-3 md:py-5">Identifiant</th>
-                         <th className="px-3 md:px-6 py-3 md:py-5">Statut</th>
-                         <th className="px-3 md:px-6 py-3 md:py-5">Progression</th>
-                         <th className="px-3 md:px-6 py-3 md:py-5 hidden sm:table-cell">Opérateur</th>
+                         <th className="px-1.5 md:px-6 py-2 md:py-5">Ligne</th>
+                         <th className="px-1.5 md:px-6 py-2 md:py-5">Stat.</th>
+                         <th className="px-1.5 md:px-6 py-2 md:py-5">Pal.</th>
+                         <th className="px-1.5 md:px-6 py-2 md:py-5">Op.</th>
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-50">
@@ -595,32 +616,27 @@ export default function AdminPanel() {
                           const op = users.find(u => u.id === l.currentOperatorId);
                           const mach = machines.find(m => m.id === l.machineId);
                           return (
-                            <tr key={l.id} className="text-[10px] md:text-sm hover:bg-gray-50/50 transition-colors">
-                              <td className="px-3 md:px-6 py-3 md:py-5">
-                                <p className="font-black text-gray-900 leading-none mb-1">{l.name}</p>
-                                <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">{mach?.name}</p>
+                            <tr key={l.id} className="text-[9px] md:text-sm hover:bg-gray-50/50 transition-colors">
+                              <td className="px-2 md:px-6 py-2 md:py-5">
+                                <p className="font-black text-gray-900 leading-none mb-0.5">{l.name}</p>
+                                <p className="text-[8px] font-bold text-blue-500 uppercase tracking-tight">{mach?.name}</p>
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-5">
+                              <td className="px-1.5 md:px-6 py-2 md:py-5">
                                  <span className={cn(
-                                   "px-1.5 md:px-2 py-0.5 md:py-1 rounded-md text-[7px] md:text-[9px] font-black uppercase tracking-widest",
+                                   "px-1 md:px-2 py-0.5 md:py-1 rounded-md text-[6.5px] md:text-[9px] font-black uppercase tracking-tight",
                                    l.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
                                    l.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : "bg-status-idle-bg text-status-idle-text"
-                                 )}>{l.status}</span>
+                                 )}>{l.status === 'RUNNING' ? 'OK' : l.status?.substring(0, 4)}</span>
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-5">
-                                <div className="space-y-0.5 md:space-y-1.5 max-w-[80px] md:max-w-[120px]">
-                                  <div className="flex justify-between text-[8px] md:text-[9px] font-bold text-gray-400">
-                                    <span className="text-blue-600 italic">{prog ? `${prog.producedPallets} pal` : '0 pal'}</span>
-                                  </div>
-                                  <div className="h-1 md:h-1.5 w-full bg-gray-50 rounded-full overflow-hidden opacity-0" />
-                                </div>
+                              <td className="px-1.5 md:px-6 py-2 md:py-5">
+                                <p className="text-[10px] md:text-sm font-black text-blue-600 italic leading-none">{prog?.producedPallets || 0}</p>
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-5 hidden sm:table-cell">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-5 h-5 md:w-6 md:h-6 bg-gray-100 rounded-full flex items-center justify-center text-[8px] md:text-[10px] font-black text-gray-500 shrink-0">
-                                    {op?.name?.substring(0, 2).toUpperCase() || '—'}
+                              <td className="px-1.5 md:px-6 py-2 md:py-5">
+                                <div className="flex items-center gap-1">
+                                  <div className="w-4 h-4 md:w-6 md:h-6 bg-gray-100 rounded flex items-center justify-center text-[7px] md:text-[10px] font-bold text-gray-500 shrink-0">
+                                    {op?.name?.substring(0, 1).toUpperCase() || '—'}
                                   </div>
-                                  <span className="text-gray-600 font-bold truncate max-w-[60px] md:max-w-none">{op?.name || '—'}</span>
+                                  <span className="text-gray-600 font-bold truncate max-w-[40px] md:max-w-none text-[8px] md:text-xs">{(op?.name || '—').split(' ')[0]}</span>
                                 </div>
                               </td>
                             </tr>
@@ -634,41 +650,38 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'users' && (
-            <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-3xl font-black tracking-tighter text-gray-900">Utilisateurs</h2>
-                  <p className="text-sm text-gray-500 font-medium">Gérez l'accès des opérateurs et pilotes</p>
-                </div>
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center px-1">
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Utilisateurs</h2>
                 <button 
                   onClick={() => openModal('user')}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs tracking-widest flex items-center gap-2"
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
                 >
-                  <Plus size={16} strokeWidth={3} /> AJOUTER
+                  <Plus size={12} strokeWidth={3} /> AJOUTER
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                 {users.map(u => (
-                  <div key={u.id} className="card p-4 md:p-5 group flex justify-between items-center hover:border-blue-200 transition-colors">
-                    <div className="flex items-center gap-3 md:gap-4">
+                  <div key={u.id} className="card p-2 md:p-4 group flex justify-between items-center hover:border-blue-200 transition-colors">
+                    <div className="flex items-center gap-2 md:gap-3">
                       <div className={cn(
-                        "w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-black",
+                        "w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-sm",
                         u.role === 'ADMIN' ? "bg-red-50 text-red-600" :
                         u.role === 'PILOT' ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-600"
                       )}>
-                        {u.name.substring(0, 1)}
+                        {u.name?.substring(0, 1) || '?'}
                       </div>
                       <div>
-                        <p className="font-black text-sm md:text-base text-gray-900 leading-tight">{u.name}</p>
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5 md:mt-1">PIN: <span className="bg-gray-100 px-1 rounded text-gray-600">{u.pin}</span> • {u.role}</p>
+                        <p className="font-black text-[10px] md:text-sm text-gray-900 leading-tight">{u.name}</p>
+                        <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">PIN: <span className="bg-gray-100 px-1 rounded text-gray-600 font-mono">{u.pin}</span> • {u.role}</p>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => openModal('user', u)} className="text-gray-400 hover:text-blue-600 transition-colors p-2">
-                        <Pencil size={18} />
+                    <div className="flex gap-0.5">
+                      <button onClick={() => openModal('user', u)} className="text-gray-300 hover:text-blue-600 transition-colors p-1.5">
+                        <Pencil size={14} />
                       </button>
-                      <button onClick={() => initiateDelete('users', u.id, u.name)} className="text-gray-400 hover:text-red-500 transition-colors p-2">
-                        <Trash2 size={18} />
+                      <button onClick={() => initiateDelete('users', u.id, u.name)} className="text-gray-300 hover:text-red-500 transition-colors p-1.5">
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -678,42 +691,42 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'machines' && (
-            <div className="space-y-10 animate-in slide-in-from-right-4 duration-300">
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-3xl font-black tracking-tighter text-gray-900">Parc Machine</h2>
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center px-1">
+                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Parc Machine</h2>
                   <button 
                      onClick={() => openModal('machine')}
-                     className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs tracking-widest"
+                     className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase"
                   >
                      + MACHINE
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                    {machines.map(m => (
-                    <div key={m.id} className="card p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+                    <div key={m.id} className="card p-3 md:p-4 flex flex-col gap-3 md:gap-4">
                       <div className="flex justify-between items-center">
-                        <h3 className="font-black text-lg md:text-xl italic tracking-tighter text-gray-900">{m.name}</h3>
-                        <div className="flex gap-2">
+                        <h3 className="font-black text-base md:text-lg italic tracking-tighter text-gray-900">{m.name}</h3>
+                        <div className="flex gap-1.5 items-center">
                            <button 
                              onClick={() => openModal('line', { machineId: m.id })}
-                             className="px-2 md:px-3 py-1 md:py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all border border-blue-100"
+                             className="px-1.5 py-1 bg-blue-50 text-blue-600 rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-tight hover:bg-blue-100 transition-all border border-blue-100 shrink-0"
                            >
                              + Ligne
                            </button>
-                           <button onClick={() => openModal('machine', m)} className="text-gray-400 hover:text-blue-600 p-1 transition-colors"><Pencil size={16} md:size={18} /></button>
-                           <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-400 hover:text-red-500 p-1 transition-colors"><Trash2 size={16} md:size={18} /></button>
+                           <button onClick={() => openModal('machine', m)} className="text-gray-300 hover:text-blue-600 p-1 transition-colors"><Pencil size={14} /></button>
+                           <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Pilote actuel</p>
-                        <div className="flex items-center justify-between bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                          <span className="text-xs md:text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || 'Libre'}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none">Pilote actuel</p>
+                        <div className="flex items-center justify-between bg-blue-50/30 p-1.5 rounded-md border border-blue-100/50">
+                          <span className="text-[10px] md:text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || 'Libre'}</span>
                           {m.currentPilotId && (
                             <button 
                               onClick={() => localApi.updateDoc('machines', m.id, { currentPilotId: null })}
-                              className="text-[9px] md:text-[10px] font-black text-red-500 hover:underline uppercase"
+                              className="text-[8px] font-black text-red-500 hover:underline uppercase"
                             >
                               Libérer
                             </button>
@@ -721,23 +734,22 @@ export default function AdminPanel() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">Lignes rattachées</p>
-                        <div className="flex flex-wrap gap-2">
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Lignes</p>
+                        <div className="flex flex-wrap gap-1.5">
                           {lines.filter(l => l.machineId === m.id).map(l => (
-                            <div key={l.id} className="bg-gray-50 border border-gray-100 px-2 md:px-3 py-1 md:py-1.5 rounded-lg flex items-center gap-2 group/line transition-all hover:bg-white">
-                              <span className="text-[11px] md:text-xs font-bold text-gray-700">{l.name}</span>
-                              <div className="flex gap-1">
-                                <button onClick={() => openModal('line', l)} className="text-gray-400 hover:text-blue-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
-                                  <Pencil size={11} md:size={12} />
+                            <div key={l.id} className="bg-gray-50 border border-gray-100 px-1.5 py-1 rounded flex items-center gap-1.5 group/line transition-all hover:bg-white">
+                              <span className="text-[9px] md:text-xs font-bold text-gray-700">{l.name}</span>
+                              <div className="flex gap-0.5">
+                                <button onClick={() => openModal('line', l)} className="text-gray-300 hover:text-blue-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
+                                  <Pencil size={10} />
                                 </button>
-                                <button onClick={() => initiateDelete('lines', l.id, l.name)} className="text-gray-400 hover:text-red-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
-                                  <Trash2 size={11} md:size={12} />
+                                <button onClick={() => initiateDelete('lines', l.id, l.name)} className="text-gray-300 hover:text-red-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
+                                  <Trash2 size={10} />
                                 </button>
                               </div>
                             </div>
                           ))}
-                          {lines.filter(l => l.machineId === m.id).length === 0 && <p className="text-xs text-gray-300 font-medium italic">Aucune ligne configurée</p>}
                         </div>
                       </div>
                     </div>
@@ -748,78 +760,72 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'programmes' && (
-          <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-3xl font-black tracking-tighter text-gray-900">Programmes de Production</h2>
-                <p className="text-sm text-gray-500 font-medium">Créez et assignez des ordres de fabrication</p>
-              </div>
-              <button 
-                onClick={() => openModal('programme')}
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs tracking-widest flex items-center gap-2"
-              >
-                <Plus size={16} strokeWidth={3} /> NOUVEAU
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {programmes.map(p => (
-                <div key={p.id} className={cn(
-                  "card p-5 border-l-4 transition-all",
-                  p.status === 'ACTIVE' ? "border-blue-500" : "border-gray-300 opacity-60"
-                )}>
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{machines.find(m => m.id === p.machineId)?.name} • {lines.find(l => l.id === p.lineId)?.name}</p>
-                      <h3 className="font-black text-lg text-gray-900 leading-tight">{p.name}</h3>
-                    </div>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
-                      p.status === 'ACTIVE' ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
-                    )}>{p.status}</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-500">{p.producedPallets} palettes produites</span>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between">
-                     <p className="text-[10px] font-bold text-gray-400">Créé le {new Date(p.createdAt).toLocaleDateString()}</p>
-                     <div className="flex gap-2">
-                        <button onClick={() => openModal('programme', p)} className="text-gray-400 hover:text-blue-500"><Pencil size={14} /></button>
-                        <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
-                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'types' && (
-            <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-3xl font-black tracking-tighter text-gray-900">Motifs d'Arrêt</h2>
-                  <p className="text-sm text-gray-500 font-medium">Standardisez les types de pannes pour l'analyse</p>
-                </div>
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center px-1">
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Programmes</h2>
                 <button 
-                  onClick={() => openModal('downtime')}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs tracking-widest"
+                  onClick={() => openModal('programme')}
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
                 >
-                  NOUVEAU TYPE
+                  <Plus size={12} strokeWidth={3} /> NOUVEAU
                 </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+                {programmes.map(p => (
+                  <div key={p.id} className={cn(
+                    "card p-3 md:p-4 border-l-4 transition-all",
+                    p.status === 'ACTIVE' ? "border-blue-500" : "border-gray-300 opacity-60"
+                  )}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{machines.find(m => m.id === p.machineId)?.name} • {lines.find(l => l.id === p.lineId)?.name}</p>
+                        <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight">{p.name}</h3>
+                      </div>
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter",
+                        p.status === 'ACTIVE' ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
+                      )}>{p.status}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] md:text-xs font-bold">
+                        <span className="text-gray-500">{p.producedPallets} palettes</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-gray-50 flex justify-between items-center">
+                       <p className="text-[8px] font-bold text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</p>
+                       <div className="flex gap-1">
+                          <button onClick={() => openModal('programme', p)} className="text-gray-300 hover:text-blue-500 p-1"><Pencil size={12} /></button>
+                          <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} /></button>
+                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        {activeTab === 'types' && (
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center px-1">
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Motifs d'Arrêt</h2>
+                <button 
+                  onClick={() => openModal('downtime')}
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase"
+                >
+                  NOUVEAU
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
                 {downtimeTypes.map(t => (
-                  <div key={t.id} className="card p-6 text-center animate-in zoom-in-95 group relative hover:border-orange-200 transition-all">
-                    <div className="text-4xl mb-4 grayscale group-hover:grayscale-0 transition-all">{t.icon || '⚠️'}</div>
-                    <p className="font-black text-xs uppercase tracking-widest text-gray-700 leading-tight">{t.name}</p>
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => openModal('downtime', t)} className="text-gray-400 hover:text-blue-500 p-1">
-                        <Pencil size={14} />
+                  <div key={t.id} className="card p-2 md:p-4 text-center animate-in zoom-in-95 group relative hover:border-orange-200 transition-all">
+                    <div className="text-2xl md:text-3xl mb-2 grayscale group-hover:grayscale-0 transition-all">{t.icon || '⚠️'}</div>
+                    <p className="font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-700 leading-tight">{t.name}</p>
+                    <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => openModal('downtime', t)} className="text-gray-300 hover:text-blue-500 p-1">
+                        <Pencil size={12} />
                       </button>
-                      <button onClick={() => initiateDelete('downtime_types', t.id, t.name)} className="text-gray-400 hover:text-red-500 p-1">
-                        <Trash2 size={14} />
+                      <button onClick={() => initiateDelete('downtime_types', t.id, t.name)} className="text-gray-300 hover:text-red-500 p-1">
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   </div>
@@ -829,35 +835,32 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'history' && (
-            <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-3xl font-black tracking-tighter text-gray-900">Historique complet</h2>
-                  <p className="text-sm text-gray-500 font-medium">Modifiez ou supprimez les enregistrements passés</p>
-                </div>
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center px-1">
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Historique</h2>
               </div>
 
-              <div className="space-y-12">
+              <div className="space-y-6 md:space-y-8">
                 {/* Production Logs History */}
-                <div className="space-y-4">
-                  <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                    <Package className="text-blue-600" size={20} />
-                    Production
+                <div className="space-y-2">
+                  <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                    <Package className="text-blue-600" size={16} />
+                    Production Log
                   </h3>
                   <div className="card overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
-                      <thead className="bg-gray-50 text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                      <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
                         <tr>
-                          <th className="px-3 md:px-6 py-3 md:py-4">Horodatage</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">Machine / Ligne</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4">Programme</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4 hidden md:table-cell">Opérateur</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4 text-center">Qté</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4 text-right">Actions</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3">Heure</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3">Prog.</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3 hidden md:table-cell">Opérateur</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3 text-center">Qté</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50 text-[10px] md:text-sm">
+                      <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
                         <AnimatePresence mode="popLayout">
                           {prodLogs.map(log => (
                             <motion.tr 
@@ -867,26 +870,26 @@ export default function AdminPanel() {
                               transition={{ duration: 0.2 }}
                               className="hover:bg-gray-50/50"
                             >
-                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-gray-900">
+                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900">
                                 {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">
+                              <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
                                 <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                <p className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 text-blue-600 font-bold truncate max-w-[80px] md:max-w-none">
+                              <td className="px-2 md:px-6 py-2 md:py-3 text-blue-600 font-bold truncate max-w-[60px] md:max-w-none">
                                 {programmes.find(p => p.id === log.programmeId)?.name || '—'}
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium hidden md:table-cell">
+                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium hidden md:table-cell">
                                 {users.find(u => u.id === log.operatorId)?.name || '—'}
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 text-center">
-                                <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-black">{log.count}</span>
+                              <td className="px-2 md:px-6 py-2 md:py-3 text-center">
+                                <span className="bg-blue-50 text-blue-700 px-1 py-0.5 rounded font-black">{log.count}</span>
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 text-right">
+                              <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <button onClick={() => openModal('production_log', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={18} /></button>
-                                  <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={18} /></button>
+                                  <button onClick={() => openModal('production_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil size={12} md:size={14} /></button>
+                                  <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} md:size={14} /></button>
                                 </div>
                               </td>
                               </motion.tr>
@@ -899,24 +902,24 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Downtime Logs History */}
-                <div className="space-y-4">
-                  <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                    <Timer className="text-orange-600" size={20} />
-                    Arrêts (Downtime)
+                <div className="space-y-2">
+                  <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                    <Timer className="text-orange-600" size={16} />
+                    Arrêts Log
                   </h3>
                   <div className="card overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
-                      <thead className="bg-gray-50 text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                      <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
                         <tr>
-                          <th className="px-3 md:px-6 py-3 md:py-4">Début</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4">Durée</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4">Type / Motif</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">Machine / Ligne</th>
-                          <th className="px-3 md:px-6 py-3 md:py-4 text-right">Actions</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3">Heure</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3">Fin</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3">Motif</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
+                          <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50 text-[10px] md:text-sm">
+                      <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
                         <AnimatePresence mode="popLayout">
                           {downLogs.map(log => (
                             <motion.tr 
@@ -926,27 +929,26 @@ export default function AdminPanel() {
                               transition={{ duration: 0.2 }}
                               className="hover:bg-gray-50/50"
                             >
-                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-gray-900">
+                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900">
                                 {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-gray-600">
-                                {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[8px] md:text-[10px]">Active</span>}
+                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-600">
+                                {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[7px] md:text-[9px]">Active</span>}
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4">
-                                <div className="flex items-center gap-1.5 md:gap-2">
-                                  <span className="text-sm md:text-lg">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
+                              <td className="px-2 md:px-6 py-2 md:py-3">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
                                   <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
                                 </div>
-                                {log.description && <p className="text-[8px] md:text-[10px] text-gray-400 italic mt-0.5 truncate max-w-[100px] md:max-w-none">{log.description}</p>}
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">
+                              <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
                                 <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                <p className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                               </td>
-                              <td className="px-3 md:px-6 py-3 md:py-4 text-right">
+                              <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <button onClick={() => openModal('downtime_log', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={18} /></button>
-                                  <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={18} /></button>
+                                  <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil size={12} md:size={14} /></button>
+                                  <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} md:size={14} /></button>
                                 </div>
                               </td>
                               </motion.tr>
@@ -961,49 +963,48 @@ export default function AdminPanel() {
             </div>
           )}
           {activeTab === 'reports' && (
-            <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-              <div className="space-y-1">
-                <h2 className="text-3xl font-black tracking-tighter text-gray-900">Data Export</h2>
-                <p className="text-sm text-gray-500 font-medium">Générez des rapports Excel pour analyse externe</p>
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="px-1">
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Exports</h2>
               </div>
-              <div className="grid md:grid-cols-2 gap-8">
-                 <div className="card p-8 flex flex-col gap-6 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 text-blue-50/50 group-hover:text-blue-100/50 transition-colors rotate-12">
-                       <Package size={140} />
+              <div className="grid md:grid-cols-2 gap-4">
+                 <div className="card p-4 md:p-6 flex flex-col gap-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 text-blue-50/50 group-hover:text-blue-100/50 transition-colors rotate-12">
+                       <Package size={80} />
                     </div>
-                    <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100 relative z-10">
-                       <History size={32} strokeWidth={2.5} />
+                    <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 relative z-10">
+                       <History size={20} strokeWidth={2.5} />
                     </div>
                     <div className="relative z-10">
-                      <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-2">Production Logs</h3>
-                      <p className="text-gray-500 text-sm font-medium leading-relaxed">Historique détaillé de chaque palette déclarée par ligne, opérateur et programme.</p>
+                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">Production Logs</h3>
+                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">Historique détaillé des palettes déclarées.</p>
                     </div>
                     <button 
                       onClick={() => exportToExcel('production')}
-                      className="w-full py-4 bg-blue-600 text-white rounded-xl font-black shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-3 relative z-10 text-xs tracking-[0.2em] uppercase"
+                      className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[9px] tracking-widest uppercase"
                     >
-                      <Download size={18} strokeWidth={3} />
-                      Exporter Production
+                      <Download size={14} strokeWidth={3} />
+                      Exporter
                     </button>
                  </div>
 
-                 <div className="card p-8 flex flex-col gap-6 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 text-orange-50/50 group-hover:text-orange-100/50 transition-colors rotate-12">
-                       <Timer size={140} />
+                 <div className="card p-4 md:p-6 flex flex-col gap-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 text-orange-50/50 group-hover:text-orange-100/50 transition-colors rotate-12">
+                       <Timer size={80} />
                     </div>
-                    <div className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-100 relative z-10">
-                       <Activity size={32} strokeWidth={2.5} />
+                    <div className="w-10 h-10 bg-orange-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-orange-100 relative z-10">
+                       <Activity size={20} strokeWidth={2.5} />
                     </div>
                     <div className="relative z-10">
-                      <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-2">Downtime Analysis</h3>
-                      <p className="text-gray-500 text-sm font-medium leading-relaxed">Analyse des temps d'arrêt, pannes machines et maintenance préventive.</p>
+                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">Downtime Analysis</h3>
+                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">Analyse des temps d'arrêt et pannes.</p>
                     </div>
                     <button 
                       onClick={() => exportToExcel('downtime')}
-                      className="w-full py-4 bg-orange-600 text-white rounded-xl font-black shadow-xl shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-3 relative z-10 text-xs tracking-[0.2em] uppercase"
+                      className="w-full py-2.5 bg-orange-600 text-white rounded-lg font-black shadow-lg shadow-orange-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[9px] tracking-widest uppercase"
                     >
-                      <Download size={18} strokeWidth={3} />
-                      Exporter Downtime
+                      <Download size={14} strokeWidth={3} />
+                      Exporter
                     </button>
                  </div>
               </div>
@@ -1018,17 +1019,17 @@ export default function AdminPanel() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white w-full max-w-md rounded-3xl p-8 space-y-6 shadow-2xl border border-gray-100"
+            className="bg-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl border border-gray-100"
           >
-            <div className="space-y-1">
-              <h3 className="text-2xl font-black tracking-tight text-gray-900 uppercase italic">
+            <div className="space-y-0.5">
+              <h3 className="text-base font-black tracking-tight text-gray-900 uppercase italic leading-none">
                 {editingId ? 'Modifier' : 'Nouveau'} {
                   modalType === 'user' ? 'Utilisateur' : 
                   modalType === 'machine' ? 'Machine' : 
                   modalType === 'line' ? 'Ligne' : 
                   modalType === 'programme' ? 'Programme' : 'Motif d\'Arrêt'}
               </h3>
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Configuration Système</p>
+              <p className="text-[7px] text-gray-400 font-black uppercase tracking-widest">Configuration</p>
             </div>
 
             <div className="space-y-4">

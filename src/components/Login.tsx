@@ -34,63 +34,63 @@ export default function Login() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-xl space-y-8 border border-gray-100"
+        className="w-full max-w-xs bg-white p-6 rounded-2xl shadow-xl space-y-4 border border-gray-100"
       >
-        <div className="text-center space-y-2">
-          <div className="mx-auto w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-4">
-            <Lock size={24} />
+        <div className="text-center space-y-1">
+          <div className="mx-auto w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-2">
+            <Lock size={20} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">FactoryTrack Pro</h1>
-          <p className="text-sm text-gray-500">Entrez votre code PIN pour continuer</p>
+          <h1 className="text-xl font-black text-gray-900 tracking-tighter italic">PILOT<span className="text-blue-600">CLOUD</span></h1>
+          <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Enter PIN</p>
         </div>
 
-        <div className="flex justify-center gap-4 py-4">
+        <div className="flex justify-center gap-3 py-2">
           {[...Array(4)].map((_, i) => (
             <div 
               key={i}
-              className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${
+              className={`w-3 h-3 rounded-full border-2 transition-all duration-200 ${
                 pin.length > i 
                   ? 'bg-blue-600 border-blue-600' 
-                  : error ? 'border-red-400' : 'border-gray-300'
+                  : error ? 'border-red-400' : 'border-gray-200'
               }`}
             />
           ))}
         </div>
 
         {error && (
-          <p className="text-center text-red-500 text-sm font-medium animate-pulse">
-            Code PIN incorrect
+          <p className="text-center text-red-500 text-[10px] font-black uppercase animate-pulse">
+            PIN INCORRECT
           </p>
         )}
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
             <button
               key={num}
               onClick={() => handleKeyPress(num.toString())}
-              className="h-16 rounded-xl text-xl font-semibold bg-gray-50 text-gray-700 hover:bg-gray-100 active:scale-95 transition-all"
+              className="h-12 rounded-lg text-lg font-black bg-gray-50 text-gray-900 hover:bg-gray-100 active:scale-95 transition-all border border-gray-100"
             >
               {num}
             </button>
           ))}
           <button
             onClick={handleDelete}
-            className="h-16 rounded-xl flex items-center justify-center bg-gray-50 text-gray-500 hover:bg-gray-100 active:scale-95 transition-all"
+            className="h-12 rounded-lg flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-gray-100 active:scale-95 transition-all border border-gray-100"
           >
-            <Delete size={24} />
+            <Delete size={18} />
           </button>
           <button
             onClick={() => handleKeyPress('0')}
-            className="h-16 rounded-xl text-xl font-semibold bg-gray-50 text-gray-700 hover:bg-gray-100 active:scale-95 transition-all"
+            className="h-12 rounded-lg text-lg font-black bg-gray-50 text-gray-900 hover:bg-gray-100 active:scale-95 transition-all border border-gray-100"
           >
             0
           </button>
           <button
             onClick={handleSubmit}
             disabled={pin.length < 4}
-            className="h-16 rounded-xl flex items-center justify-center bg-blue-600 text-white disabled:bg-gray-300 hover:bg-blue-700 active:scale-95 transition-all"
+            className="h-12 rounded-lg flex items-center justify-center bg-blue-600 text-white disabled:bg-gray-200 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-100"
           >
-            <ArrowRight size={24} />
+            <ArrowRight size={20} />
           </button>
         </div>
       </motion.div>

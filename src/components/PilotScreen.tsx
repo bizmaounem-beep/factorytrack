@@ -134,6 +134,19 @@ export default function PilotScreen() {
     setIsAssigning(null);
   };
 
+  const handleReleaseLine = async (lineId: string) => {
+    try {
+      await localApi.updateDoc('lines', lineId, {
+        currentProgrammeId: null,
+        currentOperatorId: null,
+        status: 'IDLE'
+      });
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de la libération de la ligne');
+    }
+  };
+
   const openEditModal = (type: 'prod' | 'down', log: any) => {
     setEditModalType(type);
     setEditModalData({ ...log });
@@ -289,33 +302,39 @@ export default function PilotScreen() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-20">
       {/* MOBILE HEADER */}
-      <header className="sm:hidden bg-white border-b border-gray-100 px-4 py-2 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-        <div className="flex items-center gap-1.5">
+      <header className="sm:hidden bg-white border-b border-gray-100 px-2 py-0.5 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+        <div className="flex items-center gap-1">
           {selectedMachineId ? (
             <button 
               onClick={() => handleMachineSelect('')}
-              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors mr-1"
+              className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors mr-0.5"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={14} />
             </button>
           ) : (
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              {isMobileMenuOpen ? <X size={14} /> : <Menu size={14} />}
             </button>
           )}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <div className="bg-blue-600 p-1 rounded-md text-white">
-              <Monitor size={14} />
+              <Monitor size={10} />
             </div>
-            <h1 className="font-black text-base tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
+            <h1 className="font-black text-xs tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
+        <button 
+          onClick={handleLogout}
+          className="p-1 px-1.5 border border-red-50 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[7px] uppercase"
+        >
+          LOGOUT
+        </button>
       </header>
 
-      {/* MOBILE SLIDING MENU */}
+      {/* SLIDING MENU */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
@@ -325,7 +344,7 @@ export default function PilotScreen() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 sm:hidden"
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] sm:hidden"
             />
             
             {/* Drawer */}
@@ -334,44 +353,44 @@ export default function PilotScreen() {
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 p-6 flex flex-col gap-8 shadow-2xl sm:hidden"
+              className="fixed inset-y-0 left-0 w-[260px] bg-white z-[70] p-4 flex flex-col gap-6 shadow-2xl sm:hidden"
             >
-              <div className="flex items-center gap-3 px-2">
-                <div className="bg-blue-600 p-2 rounded-lg text-white">
-                  <Monitor size={20} />
+              <div className="flex items-center gap-2 px-1">
+                <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+                  <Monitor size={16} />
                 </div>
-                <h1 className="font-black text-xl tracking-tighter text-gray-900 leading-none capitalize italic">PILOT<br/><span className="text-blue-600">CLOUD</span></h1>
+                <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none capitalize italic">PILOT<span className="text-blue-600">CLOUD</span></h1>
               </div>
               
-              <nav className="flex flex-col gap-2 flex-1">
+              <nav className="flex flex-col gap-1.5 flex-1">
                 <button
                   onClick={() => { setActiveTab('monitor'); setIsMobileMenuOpen(false); }}
                   className={cn(
-                    "flex items-center gap-4 px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                    activeTab === 'monitor' ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-gray-50"
+                    "flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    activeTab === 'monitor' ? "bg-blue-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"
                   )}
                 >
-                  <Monitor size={20} />
-                  Machine Monitor
+                  <Monitor size={16} />
+                  Monitor
                 </button>
                 <button
                   onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
                   className={cn(
-                    "flex items-center gap-4 px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                    activeTab === 'history' ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-gray-50"
+                    "flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    activeTab === 'history' ? "bg-blue-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"
                   )}
                 >
-                  <History size={20} />
+                  <History size={16} />
                   Historique
                 </button>
 
-                <div className="mt-auto pt-8 border-t border-gray-100">
+                <div className="mt-auto pt-4 border-t border-gray-100">
                   <button 
                     onClick={handleLogout}
-                    className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
                   >
-                    <Trash2 size={20} />
-                    LOGOUT
+                    <Trash2 size={16} />
+                    QUITTER
                   </button>
                 </div>
               </nav>
@@ -454,59 +473,61 @@ export default function PilotScreen() {
 
       {/* Mobile-only machine selector when in monitor tab */}
       {activeTab === 'monitor' && (
-        <div className="p-3 sm:hidden bg-white border-b border-gray-100 space-y-3">
+        <div className="px-2 py-1 sm:hidden bg-white border-b border-gray-100 space-y-1 shadow-sm">
            {selectedMachineId && (
-             <div className="flex gap-2">
+             <div className="flex gap-1">
                 {lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') ? (
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 active:scale-95 transition-all"
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-red-600 text-white rounded-lg font-black text-[8px] uppercase tracking-tight shadow-md shadow-red-50 active:scale-95 transition-all"
                   >
-                    <Activity size={16} className="animate-pulse" />
-                    ARRÊT GÉNÉRAL
+                    <Activity size={10} className="animate-pulse" />
+                    ARRÊT
                   </button>
                 ) : lines.filter(l => l.machineId === selectedMachineId).some(l => l.activeDowntimeId) ? (
                   <button 
                     onClick={handleResumeMachine}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 active:scale-95 transition-all"
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-green-600 text-white rounded-lg font-black text-[8px] uppercase tracking-tight shadow-md shadow-green-50 active:scale-95 transition-all"
                   >
-                    <Activity size={16} />
-                    RELANCER TOUT
+                    <Activity size={10} />
+                    RELANCER
                   </button>
                 ) : null}
                 <button 
                   onClick={() => handleMachineSelect('')}
-                  className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-[9px] uppercase tracking-widest"
+                  className="px-1.5 py-1 bg-gray-50 text-gray-400 border border-gray-100 rounded-lg font-black text-[7px] uppercase tracking-widest shrink-0"
                 >
-                  CHANGER
+                  CHANGE
                 </button>
              </div>
            )}
-           <select 
-            value={selectedMachineId}
-            onChange={e => handleMachineSelect(e.target.value)}
-            className="w-full p-3 bg-gray-50/50 rounded-xl font-bold border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700 text-xs"
-          >
-            <option value="">Sélectionner une machine...</option>
-            {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+           {!selectedMachineId && (
+             <select 
+              value={selectedMachineId}
+              onChange={e => handleMachineSelect(e.target.value)}
+              className="w-full p-1.5 bg-gray-50/50 rounded-lg font-black border border-gray-100 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-gray-700 text-[9px] appearance-none"
+            >
+              <option value="">SÉLECTIONNER MACHINE...</option>
+              {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name.toUpperCase()}</option>)}
+            </select>
+           )}
         </div>
       )}
 
       {activeTab === 'monitor' ? (
         !selectedMachineId ? (
-        <div className="flex flex-col items-center justify-center p-8 text-center space-y-3">
-          <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
-             <LayoutGrid size={24} />
+        <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">
+          <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
+             <LayoutGrid size={20} />
           </div>
-          <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Choisir une machine</p>
+          <p className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">Choisir une machine</p>
         </div>
       ) : (
         <motion.div 
           variants={container}
           initial="hidden"
           animate="show"
-          className="p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
+          className="p-1 sm:p-4 space-y-1 sm:space-y-4 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-4"
         >
           {lines.filter(l => l.machineId === selectedMachineId).map(line => {
             const prog = programmes.find(p => p.id === line.currentProgrammeId);
@@ -521,49 +542,60 @@ export default function PilotScreen() {
                 layout
                 className="card border-l-4 border-slate-200 hover:border-blue-500 transition-colors flex flex-col overflow-hidden"
               >
-                <div className="p-3 sm:p-4 flex justify-between items-start border-b border-slate-50">
-                  <div>
-                    <h3 className="font-bold text-xs sm:text-sm text-slate-900 leading-none">{line.name}</h3>
-                    <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
+                <div className="px-2 py-1.5 sm:p-4 flex justify-between items-center border-b border-slate-50 shrink-0">
+                  <div className="leading-none">
+                    <h3 className="font-black text-[10px] sm:text-sm text-slate-900">{line.name}</h3>
+                    <div className="flex items-center gap-1 mt-0.5 sm:mt-2">
                        <span className={cn(
-                        "px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest flex items-center gap-1",
+                        "px-1 py-0.5 rounded-full text-[6px] sm:text-[9px] font-black uppercase tracking-widest flex items-center gap-0.5",
                         line.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
                         line.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : "bg-status-idle-bg text-status-idle-text"
                       )}>
                         <span className={cn(
-                          "w-1 sm:w-1.5 h-1 sm:h-1.5 rounded-full",
+                          "w-1 h-1 rounded-full",
                           line.status === 'RUNNING' ? "bg-green-600 animate-pulse" : line.status === 'STOPPED' ? "bg-red-600" : "bg-slate-400"
                         )} />
-                        {line.status === 'RUNNING' ? "EN PRODUCTION" : 
-                         line.status === 'STOPPED' ? "EN ARRÊT" : "EN ATTENTE"}
+                        {line.status === 'RUNNING' ? "PROD" : 
+                         line.status === 'STOPPED' ? "ARRÊT" : "ATTENTE"}
                       </span>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => setIsAssigning(line.id)}
-                    className="p-1.5 sm:p-2 text-blue-600 bg-blue-50 rounded-lg sm:rounded-xl active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100"
-                  >
-                    <Plus size={14} sm:size={16} strokeWidth={3} />
-                    <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-tight">
-                      {prog ? 'Changer' : 'Assigner'}
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {prog && (
+                      <button 
+                        onClick={() => handleReleaseLine(line.id)}
+                        className="p-1 sm:p-2 text-red-600 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all shadow-sm flex items-center gap-1 border border-red-100 shrink-0 h-6 sm:h-auto"
+                        title="Libérer la ligne"
+                      >
+                        <X size={10} sm:size={16} strokeWidth={3} />
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setIsAssigning(line.id)}
+                      className="p-1 sm:p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100 shrink-0 h-6 sm:h-auto"
+                    >
+                      <Plus size={10} sm:size={16} strokeWidth={3} />
+                      <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight">
+                        {prog ? 'CHG.' : 'ASS.'}
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="p-2 sm:p-4 grid grid-cols-2 gap-2 sm:gap-4 flex-1">
-                  <div className="space-y-0.5">
-                    <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">Prog. Actif</p>
+                <div className="p-1.5 sm:p-4 grid grid-cols-2 gap-1 sm:gap-4 flex-1">
+                  <div className="space-y-0 text-left leading-none">
+                    <p className="text-[7px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Prog.</p>
                     <p className={cn(
-                      "text-[10px] sm:text-sm font-black truncate",
+                      "text-[9px] sm:text-sm font-black truncate",
                       prog ? "text-blue-900" : "text-slate-300 italic"
                     )}>
                       {prog ? prog.name : '—'}
                     </p>
                   </div>
-                  <div className="space-y-0.5">
-                    <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">Opérateur</p>
+                  <div className="space-y-0 text-left leading-none">
+                    <p className="text-[7px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Op.</p>
                     <p className={cn(
-                      "text-[10px] sm:text-sm font-bold truncate",
+                      "text-[9px] sm:text-sm font-bold truncate",
                       op ? "text-slate-800" : "text-slate-300 italic"
                     )}>
                       {op ? op.name : '—'}
@@ -571,11 +603,11 @@ export default function PilotScreen() {
                   </div>
                   
                   {line.tracksProduction !== 0 && (
-                    <div className="col-span-2 space-y-1">
-                      <div className="flex justify-between items-center bg-blue-50/30 p-2 sm:p-4 rounded-xl border border-blue-100/20">
-                        <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em]">Produit</p>
-                        <p className="text-xl sm:text-3xl font-black text-blue-600 leading-none">
-                          {prog ? prog.producedPallets : '0'}
+                    <div className="col-span-2 mt-0.5">
+                      <div className="flex justify-between items-center bg-blue-50/20 p-1 sm:p-4 rounded-lg border border-blue-100/10">
+                        <p className="text-[7px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-tight">Produit</p>
+                        <p className="text-sm sm:text-3xl font-black text-blue-600 leading-none">
+                          {prog ? prog.producedPallets : '0'}<span className="text-[7px] ml-0.5 text-slate-300 not-italic">P.</span>
                         </p>
                       </div>
                     </div>
@@ -583,13 +615,13 @@ export default function PilotScreen() {
                 </div>
 
                 {down && (
-                  <div className="px-3 pb-3">
-                     <div className="bg-status-downtime-bg/50 p-2 rounded-lg flex justify-between items-center border border-orange-100">
-                        <div className="flex items-center gap-1.5 text-status-downtime-text">
-                          <Activity size={12} className="animate-pulse" />
-                          <span className="text-[9px] font-black uppercase tracking-tight">{downType?.name || 'Arrêt'}</span>
+                  <div className="px-1.5 pb-1.5">
+                     <div className="bg-status-downtime-bg/40 p-1 rounded-lg flex justify-between items-center border border-orange-100/50">
+                        <div className="flex items-center gap-1 text-status-downtime-text leading-none">
+                          <Activity size={10} className="animate-pulse" />
+                          <span className="text-[8px] font-black uppercase tracking-tight truncate max-w-[80px]">{downType?.name || 'Arrêt'}</span>
                         </div>
-                        <span className="text-[8px] font-mono font-bold text-orange-800 bg-white/60 px-1.5 py-0.5 rounded-md border border-orange-100/50">
+                        <span className="text-[7px] font-mono font-bold text-orange-800 bg-white/40 px-1 rounded border border-orange-100/30">
                               {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -612,31 +644,30 @@ export default function PilotScreen() {
           </div>
         </div>
       ) : (
-        <div className="p-4 space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
-          <div className="flex justify-between items-end">
+        <div className="p-2 space-y-4 max-w-5xl mx-auto animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-1">
             <div>
-              <h2 className="text-2xl font-black tracking-tight text-gray-900 uppercase">Historique Production & Arrêts</h2>
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Gérez les données enregistrées</p>
+              <h2 className="text-sm md:text-base font-black tracking-tight text-gray-900 uppercase">Historique Production</h2>
             </div>
           </div>
 
           <div className="space-y-12">
             {/* Production History */}
             <div className="space-y-4">
-              <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                <Package className="text-blue-600" size={18} />
-                PRODUCTION
+              <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                <Package className="text-blue-600" size={16} />
+                PRODUCTION LOG
               </h3>
               <div className="card overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
                         <tr>
-                          <th className="px-3 md:px-5 py-3 md:py-4">Moment</th>
-                          <th className="px-3 md:px-5 py-3 md:py-4">Ligne</th>
-                          <th className="px-3 md:px-5 py-3 md:py-4 hidden sm:table-cell">Opérateur</th>
-                          <th className="px-3 md:px-5 py-3 md:py-4 text-center">Qté</th>
-                          <th className="px-3 md:px-5 py-3 md:py-4 text-right">Actions</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3">Moment</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3">Ligne</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Opérateur</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3 text-center">Qté</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
@@ -649,20 +680,20 @@ export default function PilotScreen() {
                               transition={{ duration: 0.2 }}
                               className="hover:bg-gray-50/50"
                             >
-                              <td className="px-3 md:px-5 py-3 md:py-4 font-bold text-gray-900">
+                              <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900">
                                 {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </td>
-                              <td className="px-3 md:px-5 py-3 md:py-4">
+                              <td className="px-2 md:px-5 py-2 md:py-3">
                                 <p className="font-bold text-gray-700 truncate max-w-[60px] md:max-w-none">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                                 <p className="text-[7px] md:text-[9px] font-bold text-gray-400 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
                               </td>
-                              <td className="px-3 md:px-5 py-3 md:py-4 font-medium text-gray-600 hidden sm:table-cell">
+                              <td className="px-2 md:px-5 py-2 md:py-3 font-medium text-gray-600 hidden sm:table-cell">
                                 {users.find(u => u.id === log.operatorId)?.name || '—'}
                               </td>
-                              <td className="px-3 md:px-5 py-3 md:py-4 text-center">
+                              <td className="px-2 md:px-5 py-2 md:py-3 text-center">
                                 <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-black">{log.count}</span>
                               </td>
-                              <td className="px-3 md:px-5 py-3 md:py-4 text-right">
+                              <td className="px-2 md:px-5 py-2 md:py-3 text-right">
                                 <div className="flex justify-end gap-1">
                                   <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={16} /></button>
                                   <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={16} /></button>
@@ -679,20 +710,20 @@ export default function PilotScreen() {
 
             {/* Downtime History */}
             <div className="space-y-4">
-              <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                <Timer className="text-orange-600" size={18} />
-                ARRÊTS (HISTORY)
+              <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                <Timer className="text-orange-600" size={16} />
+                ARRÊTS LOG
               </h3>
               <div className="card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
                       <tr>
-                        <th className="px-3 md:px-5 py-3 md:py-4">Début</th>
-                        <th className="px-3 md:px-5 py-3 md:py-4">Durée</th>
-                        <th className="px-3 md:px-5 py-3 md:py-4">Motif</th>
-                        <th className="px-3 md:px-5 py-3 md:py-4 hidden sm:table-cell">Ligne</th>
-                        <th className="px-3 md:px-5 py-3 md:py-4 text-right">Actions</th>
+                        <th className="px-2 md:px-5 py-2 md:py-3">Début</th>
+                        <th className="px-2 md:px-5 py-2 md:py-3">Durée</th>
+                        <th className="px-2 md:px-5 py-2 md:py-3">Motif</th>
+                        <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
+                        <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
@@ -705,29 +736,29 @@ export default function PilotScreen() {
                             transition={{ duration: 0.2 }}
                             className="hover:bg-gray-50/50"
                           >
-                            <td className="px-5 py-4 font-bold text-gray-900">
+                            <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900">
                               {new Date(log.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-2 md:px-5 py-2 md:py-3">
                               {log.duration ? (
                                 <span className="font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
                                   {formatDuration(log.duration)}
                                 </span>
                               ) : <span className="text-orange-500 font-black uppercase">En cours</span>}
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-2 md:px-5 py-2 md:py-3">
                               <div className="flex items-center gap-2">
                                 <span className="text-base">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                <p className="font-bold text-gray-700">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                <p className="font-bold text-gray-700 leading-tight">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
                               </div>
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-2 md:px-5 py-2 md:py-3">
                               <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                             </td>
-                            <td className="px-5 py-4 text-right">
+                            <td className="px-2 md:px-5 py-2 md:py-3 text-right">
                               <div className="flex justify-end gap-1">
-                                <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={16} /></button>
-                                <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={16} /></button>
+                                <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={16} /></button>
+                                <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={16} /></button>
                               </div>
                             </td>
                           </motion.tr>
@@ -746,17 +777,17 @@ export default function PilotScreen() {
     {/* DELETE CONFIRMATION */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full space-y-6 shadow-2xl">
-             <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto">
-               <Trash2 size={32} />
+          <div className="bg-white rounded-[32px] p-6 max-w-xs w-full space-y-4 shadow-2xl">
+             <div className="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center mx-auto">
+               <Trash2 size={24} />
              </div>
-             <div className="text-center space-y-2">
-               <h3 className="text-xl font-black text-gray-900">Confirmer la suppression</h3>
-               <p className="text-sm text-gray-500 font-medium leading-relaxed">Voulez-vous vraiment supprimer cet enregistrement ?<br/><span className="text-gray-900 font-bold">{confirmDelete.name}</span></p>
+             <div className="text-center space-y-1">
+               <h3 className="text-lg font-black text-gray-900 italic uppercase">Supprimer ?</h3>
+               <p className="text-[11px] text-gray-500 font-medium leading-tight">Voulez-vous supprimer cet enregistrement ?<br/><span className="text-gray-900 font-bold">{confirmDelete.name}</span></p>
              </div>
-             <div className="flex gap-3 mt-4">
-                <button onClick={() => setConfirmDelete(null)} className="flex-1 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-all uppercase text-[10px] tracking-widest">Annuler</button>
-                <button onClick={handleDelete} className="flex-1 py-3 bg-red-600 text-white font-black rounded-xl shadow-lg shadow-red-100 active:scale-95 transition-all text-[10px] tracking-widest uppercase">Supprimer</button>
+             <div className="flex gap-2.5 mt-2">
+                <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 font-bold text-gray-400 hover:bg-gray-50 rounded-xl transition-all uppercase text-[9px] tracking-widest">Annuler</button>
+                <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-600 text-white font-black rounded-xl shadow-lg shadow-red-50 active:scale-95 transition-all text-[9px] tracking-widest uppercase">Supprimer</button>
              </div>
           </div>
         </div>
@@ -764,14 +795,17 @@ export default function PilotScreen() {
 
       {/* EDIT MODAL */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-3xl p-8 max-w-md w-full space-y-6 shadow-2xl border border-gray-100"
+            className="bg-white rounded-[32px] p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100"
           >
-            <h3 className="text-2xl font-black text-gray-900 uppercase italic">Corriger Enregistrement</h3>
-            
+            <div className="space-y-0.5">
+              <h3 className="text-lg font-black text-gray-900 uppercase italic">Corriger</h3>
+              <p className="text-[7px] text-gray-400 font-black uppercase tracking-widest">Enregistrement manuel</p>
+            </div>
+
             <div className="space-y-4">
               {editModalType === 'prod' ? (
                 <>
@@ -857,9 +891,9 @@ export default function PilotScreen() {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
           >
-            <div className="p-6 bg-blue-600 text-white">
-              <h2 className="text-2xl font-black tracking-tight">Assigner un Programme</h2>
-              <p className="text-blue-100 text-sm font-medium opacity-80">
+            <div className="p-4 bg-blue-600 text-white space-y-0.5">
+              <h2 className="text-lg font-black tracking-tight uppercase leading-none italic">Assigner Programme</h2>
+              <p className="text-blue-100 text-[8px] font-black uppercase tracking-widest opacity-80 leading-none">
                 Ligne: {lines.find(l => l.id === isAssigning)?.name}
               </p>
             </div>
