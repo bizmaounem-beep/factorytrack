@@ -66,9 +66,6 @@ export default function AdminPanel() {
         modalType === 'downtime_log' ? 'downtime_logs' : 'downtime_types';
 
       let finalData = { ...modalData };
-      if (modalType === 'programme' && finalData.targetPallets) {
-        finalData.targetPallets = parseInt(finalData.targetPallets);
-      }
       if (modalType === 'production_log' && finalData.count) {
         finalData.count = parseInt(finalData.count);
       }
@@ -78,8 +75,14 @@ export default function AdminPanel() {
       if (modalType === 'downtime' && !finalData.icon) {
         finalData.icon = '⚠️';
       }
-      if (modalType === 'line' && selectedMachineForLine) {
-        finalData.machineId = selectedMachineForLine;
+      if (modalType === 'line') {
+        const machineIdToUse = selectedMachineForLine || modalData.machineId;
+        if (machineIdToUse) {
+          finalData.machineId = machineIdToUse;
+          // Robust conversion for tracksProduction
+          // If it's explicitly boolean false or number 0, it's 0. Otherwise (true, 1, undefined) it's 1.
+          finalData.tracksProduction = (modalData.tracksProduction === false || modalData.tracksProduction === 0) ? 0 : 1;
+        }
         if (!editingId) finalData.status = 'IDLE';
       }
 
@@ -249,7 +252,7 @@ export default function AdminPanel() {
       dashboardSheet.getRow(currentRow).values = ["Production par Programme"];
       dashboardSheet.getRow(currentRow).font = { bold: true };
       currentRow++;
-      dashboardSheet.getRow(currentRow).values = ['Programme', 'Cible', 'Réalisé', '%'];
+      dashboardSheet.getRow(currentRow).values = ['Programme', 'Réalisé'];
       dashboardSheet.getRow(currentRow).font = { bold: true };
       currentRow++;
 
@@ -257,11 +260,8 @@ export default function AdminPanel() {
         const prod = prodLogs.filter(l => l.programmeId === p.id).reduce((acc, l) => acc + l.count, 0);
         dashboardSheet.getRow(currentRow).values = [
           p.name, 
-          p.targetPallets, 
-          prod, 
-          prod / p.targetPallets
+          prod
         ];
-        dashboardSheet.getRow(currentRow).getCell(4).numFmt = '0%';
         currentRow++;
       });
 
@@ -575,15 +575,9 @@ export default function AdminPanel() {
                               <td className="px-3 md:px-6 py-3 md:py-5">
                                 <div className="space-y-0.5 md:space-y-1.5 max-w-[80px] md:max-w-[120px]">
                                   <div className="flex justify-between text-[8px] md:text-[9px] font-bold text-gray-400">
-                                    <span>{prog ? `${prog.producedPallets}/${prog.targetPallets}` : '0/0'}</span>
-                                    <span>{prog ? Math.round((prog.producedPallets/prog.targetPallets)*100) : 0}%</span>
+                                    <span className="text-blue-600 italic">{prog ? `${prog.producedPallets} pal` : '0 pal'}</span>
                                   </div>
-                                  <div className="h-1 md:h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                                     <div 
-                                      className="h-full bg-blue-500 rounded-full" 
-                                      style={{ width: `${prog ? Math.min((prog.producedPallets/prog.targetPallets)*100, 100) : 0}%` }}
-                                     />
-                                  </div>
+                                  <div className="h-1 md:h-1.5 w-full bg-gray-50 rounded-full overflow-hidden opacity-0" />
                                 </div>
                               </td>
                               <td className="px-3 md:px-6 py-3 md:py-5 hidden sm:table-cell">
@@ -750,11 +744,7 @@ export default function AdminPanel() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-500">{p.producedPallets} / {p.targetPallets} pal</span>
-                      <span className="text-blue-600 font-black">{Math.round((p.producedPallets/p.targetPallets)*100)}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((p.producedPallets/p.targetPallets)*100, 100)}%` }} />
+                      <span className="text-gray-500">{p.producedPallets} palettes produites</span>
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between">

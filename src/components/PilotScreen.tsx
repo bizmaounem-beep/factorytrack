@@ -208,25 +208,31 @@ export default function PilotScreen() {
     }
   };
 
-  const handleStartDowntime = async (lineId: string, typeId: string) => {
-    if (!user) return;
+  const handleStartDowntime = async (lineId: string | null, typeId: string) => {
+    if (!user || !selectedMachineId) return;
     try {
-      const log = await localApi.addDoc('downtime_logs', {
-        machineId: selectedMachineId,
-        lineId,
-        typeId,
-        operatorId: user.id,
-        startTime: new Date().toISOString(),
-      });
+      const machineLines = lines.filter(l => l.machineId === selectedMachineId);
+      const startTime = new Date().toISOString();
 
-      await localApi.updateDoc('lines', lineId, {
-        activeDowntimeId: log.id,
-        status: 'STOPPED'
-      });
+      for (const line of machineLines) {
+        const log = await localApi.addDoc('downtime_logs', {
+          machineId: selectedMachineId,
+          lineId: line.id,
+          typeId,
+          operatorId: user.id,
+          startTime,
+        });
+
+        await localApi.updateDoc('lines', line.id, {
+          activeDowntimeId: log.id,
+          status: 'STOPPED'
+        });
+      }
+      
       setDeclaringDowntimeLineId(null);
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de la déclaration de l\'arrêt');
+      alert('Erreur lors de la déclaration de l\'arrêt machine');
     }
   };
 
@@ -460,19 +466,12 @@ export default function PilotScreen() {
                      <div className="bg-status-downtime-bg p-3 rounded-lg flex justify-between items-center border border-orange-100 shadow-inner">
                         <div className="flex items-center gap-2 text-status-downtime-text">
                           <Activity size={14} className="animate-pulse" />
-                          <span className="text-xs font-bold uppercase tracking-tighter">{downType?.name || 'Arrêt'}</span>
+                          <span className="text-xs font-bold uppercase tracking-tighter">{downType?.name || 'Arrêt Machine'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-mono font-bold text-orange-800 bg-white/40 px-2 py-0.5 rounded">
                               Depuis {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          <button 
-                            onClick={() => setConfirmDelete({col: 'downtime_logs', id: down.id, name: `Arrêt actif: ${downType?.name}`})}
-                            className="p-1.5 text-red-600 bg-white/40 rounded hover:bg-red-50 transition-colors"
-                            title="Supprimer cet arrêt"
-                          >
-                            <Trash2 size={12} />
-                          </button>
                         </div>
                       </div>
                   ) : (
@@ -487,7 +486,7 @@ export default function PilotScreen() {
                       )}
                     >
                       <Timer size={14} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Déclarer un Arrêt</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Arrêter la Machine</span>
                     </button>
                   )}
                 </div>
@@ -853,17 +852,17 @@ export default function PilotScreen() {
             className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col"
           >
             <div className="p-6 bg-orange-600 text-white">
-              <h2 className="text-xl font-black tracking-tight uppercase italic">Déclarer un Arrêt</h2>
+              <h2 className="text-xl font-black tracking-tight uppercase italic">Arrêt de Machine</h2>
               <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80">
-                Ligne: {lines.find(l => l.id === declaringDowntimeLineId)?.name}
+                Action: Stop général sur toute la machine
               </p>
             </div>
             <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
               {downtimeTypes.map(type => (
                 <button
                   key={type.id}
-                  onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id)}
-                  className="p-4 border border-orange-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-50 transition-all group"
+                  onClick={() => handleStartDowntime(null, type.id)}
+                  className="p-4 border border-orange-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-50 transition-all group shadow-sm bg-white"
                 >
                   <span className="text-2xl group-hover:scale-110 transition-transform">{type.icon}</span>
                   <span className="text-[9px] font-black uppercase text-gray-700 text-center leading-tight">{type.name}</span>
