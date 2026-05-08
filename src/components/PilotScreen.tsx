@@ -3,12 +3,13 @@ import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, User as AppUser, DowntimeType, DowntimeLog, ProductionLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2 } from 'lucide-react';
+import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X } from 'lucide-react';
 import { cn, formatDuration } from '../lib/utils';
 
 export default function PilotScreen() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'monitor' | 'history'>('monitor');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
   const [lines, setLines] = useState<Line[]>([]);
@@ -225,17 +226,98 @@ export default function PilotScreen() {
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] pb-20">
-      <div className="bg-white p-4 shadow-sm flex flex-col gap-4 sticky top-0 z-20 border-b border-gray-200">
-        <div className="flex justify-between items-center">
+      {/* MOBILE HEADER */}
+      <header className="sm:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+            <Monitor size={18} />
+          </div>
+          <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
+        </div>
+      </header>
+
+      {/* MOBILE SLIDING MENU */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 sm:hidden"
+            />
+            
+            {/* Drawer */}
+            <motion.aside 
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 p-6 flex flex-col gap-8 shadow-2xl sm:hidden"
+            >
+              <div className="flex items-center gap-3 px-2">
+                <div className="bg-blue-600 p-2 rounded-lg text-white">
+                  <Monitor size={20} />
+                </div>
+                <h1 className="font-black text-xl tracking-tighter text-gray-900 leading-none capitalize italic">PILOT<br/><span className="text-blue-600">CLOUD</span></h1>
+              </div>
+              
+              <nav className="flex flex-col gap-2 flex-1">
+                <button
+                  onClick={() => { setActiveTab('monitor'); setIsMobileMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                    activeTab === 'monitor' ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-gray-50"
+                  )}
+                >
+                  <Monitor size={20} />
+                  Machine Monitor
+                </button>
+                <button
+                  onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                    activeTab === 'history' ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-gray-50"
+                  )}
+                >
+                  <History size={20} />
+                  Historique
+                </button>
+
+                <div className="mt-auto pt-8 border-t border-gray-100">
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
+                  >
+                    <Trash2 size={20} />
+                    Logout
+                  </button>
+                </div>
+              </nav>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      <div className="bg-white p-4 shadow-sm flex flex-col gap-4 sticky top-0 sm:top-0 z-20 border-b border-gray-200 hidden sm:block">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <Monitor className="text-blue-600" size={24} />
             <h1 className="font-black text-xl tracking-tighter uppercase italic">Pilot Monitor</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button 
               onClick={() => setActiveTab(activeTab === 'monitor' ? 'history' : 'monitor')}
               className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
                 activeTab === 'history' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               )}
             >
@@ -257,6 +339,20 @@ export default function PilotScreen() {
           </select>
         )}
       </div>
+
+      {/* Mobile-only machine selector when in monitor tab */}
+      {activeTab === 'monitor' && (
+        <div className="p-4 sm:hidden bg-white border-b border-gray-100">
+          <select 
+            value={selectedMachineId}
+            onChange={e => handleMachineSelect(e.target.value)}
+            className="w-full p-3 bg-gray-50 rounded-xl font-bold border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700"
+          >
+            <option value="">Sélectionner une machine...</option>
+            {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+      )}
 
       {activeTab === 'monitor' ? (
         !selectedMachineId ? (
@@ -308,46 +404,46 @@ export default function PilotScreen() {
                   </button>
                 </div>
 
-                <div className="p-4 grid grid-cols-2 gap-4 flex-1">
-                  <div className="space-y-1">
-                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">Programme Actif</p>
+                <div className="p-3 sm:p-4 grid grid-cols-2 gap-3 sm:gap-4 flex-1">
+                  <div className="space-y-0.5">
+                    <p className="text-[8px] sm:text-[9px] text-gray-400 font-black uppercase tracking-widest">Programme Actif</p>
                     <p className={cn(
-                      "text-sm font-black",
+                      "text-xs sm:text-sm font-black truncate",
                       prog ? "text-blue-900" : "text-gray-300 italic"
                     )}>
-                      {prog ? prog.name : 'Aucun programme'}
+                      {prog ? prog.name : 'Aucun'}
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">Opérateur</p>
+                  <div className="space-y-0.5">
+                    <p className="text-[8px] sm:text-[9px] text-gray-400 font-black uppercase tracking-widest">Opérateur</p>
                     <p className={cn(
-                      "text-sm font-bold",
+                      "text-xs sm:text-sm font-bold truncate",
                       op ? "text-gray-800" : "text-gray-300 italic"
                     )}>
                       {op ? op.name : 'Non assigné'}
                     </p>
                   </div>
                   
-                  <div className="col-span-2 space-y-2 mt-2">
+                  <div className="col-span-2 space-y-2 mt-1">
                     <div className="flex justify-between items-end">
-                      <div className="space-y-0.5">
-                        <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">Progression Réelle</p>
+                      <div className="space-y-0">
+                        <p className="text-[8px] sm:text-[9px] text-gray-400 font-black uppercase tracking-widest">Progression</p>
                         <div className="flex items-baseline gap-1">
-                          <p className="text-2xl font-black text-blue-600 leading-none">
+                          <p className="text-xl sm:text-2xl font-black text-blue-600 leading-none">
                             {prog ? prog.producedPallets : '0'}
                           </p>
-                          <p className="text-xs font-bold text-gray-400">/ {prog ? prog.targetPallets : '0'} palettes</p>
+                          <p className="text-[10px] font-bold text-gray-400">/ {prog ? prog.targetPallets : '0'}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-black text-blue-900 leading-none">
+                        <p className="text-base sm:text-lg font-black text-blue-900 leading-none">
                            {prog ? `${Math.round((prog.producedPallets / prog.targetPallets) * 100)}%` : '0%'}
                         </p>
                       </div>
                     </div>
                     
                     {/* Progress Bar */}
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 shadow-inner">
+                    <div className="w-full h-1.5 sm:h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 shadow-inner">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: prog ? `${Math.min((prog.producedPallets / prog.targetPallets) * 100, 100)}%` : '0%' }}
@@ -386,6 +482,17 @@ export default function PilotScreen() {
         </div>
       )
     ) : (
+      !selectedMachineId ? (
+        <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
+             <History size={32} />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-xl font-black text-gray-900 uppercase italic">Aucune machine sélectionnée</h3>
+            <p className="text-sm text-gray-500 font-medium max-w-xs mx-auto">Veuillez sélectionner une machine dans le menu pour voir son historique.</p>
+          </div>
+        </div>
+      ) : (
         <div className="p-4 space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
           <div className="flex justify-between items-end">
             <div>
@@ -403,50 +510,50 @@ export default function PilotScreen() {
               </h3>
               <div className="card overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-gray-50 text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
-                      <tr>
-                        <th className="px-5 py-4">Horodatage</th>
-                        <th className="px-5 py-4">Ligne</th>
-                        <th className="px-5 py-4">Opérateur</th>
-                        <th className="px-5 py-4">Quantité</th>
-                        <th className="px-5 py-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 text-xs">
-                      <AnimatePresence mode="popLayout">
-                        {filteredProdLogs.slice(0, 50).map(log => (
-                          <motion.tr 
-                            key={log.id} 
-                            initial={{ opacity: 1 }}
-                            exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
-                            transition={{ duration: 0.2 }}
-                            className="hover:bg-gray-50/50"
-                          >
-                            <td className="px-5 py-4 font-bold text-gray-900">
-                              {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                            </td>
-                            <td className="px-5 py-4">
-                              <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                              <p className="text-[9px] font-bold text-gray-400 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                            </td>
-                            <td className="px-5 py-4 font-medium text-gray-600">
-                              {users.find(u => u.id === log.operatorId)?.name || '—'}
-                            </td>
-                            <td className="px-5 py-4">
-                              <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-black">{log.count} pal</span>
-                            </td>
-                            <td className="px-5 py-4 text-right">
-                              <div className="flex justify-end gap-1">
-                                <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={16} /></button>
-                                <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={16} /></button>
-                              </div>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </AnimatePresence>
-                    </tbody>
-                  </table>
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
+                        <tr>
+                          <th className="px-3 md:px-5 py-3 md:py-4">Moment</th>
+                          <th className="px-3 md:px-5 py-3 md:py-4">Ligne</th>
+                          <th className="px-3 md:px-5 py-3 md:py-4 hidden sm:table-cell">Opérateur</th>
+                          <th className="px-3 md:px-5 py-3 md:py-4 text-center">Qté</th>
+                          <th className="px-3 md:px-5 py-3 md:py-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
+                        <AnimatePresence mode="popLayout">
+                          {filteredProdLogs.slice(0, 50).map(log => (
+                            <motion.tr 
+                              key={log.id} 
+                              initial={{ opacity: 1 }}
+                              exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                              transition={{ duration: 0.2 }}
+                              className="hover:bg-gray-50/50"
+                            >
+                              <td className="px-3 md:px-5 py-3 md:py-4 font-bold text-gray-900">
+                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="px-3 md:px-5 py-3 md:py-4">
+                                <p className="font-bold text-gray-700 truncate max-w-[60px] md:max-w-none">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                <p className="text-[7px] md:text-[9px] font-bold text-gray-400 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                              </td>
+                              <td className="px-3 md:px-5 py-3 md:py-4 font-medium text-gray-600 hidden sm:table-cell">
+                                {users.find(u => u.id === log.operatorId)?.name || '—'}
+                              </td>
+                              <td className="px-3 md:px-5 py-3 md:py-4 text-center">
+                                <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-black">{log.count}</span>
+                              </td>
+                              <td className="px-3 md:px-5 py-3 md:py-4 text-right">
+                                <div className="flex justify-end gap-1">
+                                  <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={16} /></button>
+                                  <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={16} /></button>
+                                </div>
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
                 </div>
               </div>
             </div>
@@ -460,16 +567,16 @@ export default function PilotScreen() {
               <div className="card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    <thead className="bg-gray-50 text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
+                    <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
                       <tr>
-                        <th className="px-5 py-4">Début</th>
-                        <th className="px-5 py-4">Durée</th>
-                        <th className="px-5 py-4">Motif</th>
-                        <th className="px-5 py-4">Ligne</th>
-                        <th className="px-5 py-4 text-right">Actions</th>
+                        <th className="px-3 md:px-5 py-3 md:py-4">Début</th>
+                        <th className="px-3 md:px-5 py-3 md:py-4">Durée</th>
+                        <th className="px-3 md:px-5 py-3 md:py-4">Motif</th>
+                        <th className="px-3 md:px-5 py-3 md:py-4 hidden sm:table-cell">Ligne</th>
+                        <th className="px-3 md:px-5 py-3 md:py-4 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50 text-xs">
+                    <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
                       <AnimatePresence mode="popLayout">
                         {filteredDownLogs.slice(0, 50).map(log => (
                           <motion.tr 
@@ -514,9 +621,10 @@ export default function PilotScreen() {
             </div>
           </div>
         </div>
-      )}
+      )
+    )}
 
-      {/* DELETE CONFIRMATION */}
+    {/* DELETE CONFIRMATION */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full space-y-6 shadow-2xl">

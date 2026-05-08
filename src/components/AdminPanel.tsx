@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, Factory, Package, Timer, History, 
   Download, Plus, Trash2, PieChart, LayoutDashboard,
-  Box, Terminal, Activity, Pencil
+  Box, Terminal, Activity, Pencil, Menu, X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ExcelJS from 'exceljs';
@@ -15,6 +15,7 @@ import { saveAs } from 'file-saver';
 export default function AdminPanel() {
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalType, setModalType] = useState<'user' | 'machine' | 'line' | 'downtime' | 'programme' | 'production_log' | 'downtime_log'>('user');
@@ -413,42 +414,89 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] flex flex-col md:flex-row">
-      {/* SIDEBAR */}
-      <aside className="bg-white w-full md:w-64 md:min-h-screen border-r border-gray-200 p-6 shrink-0 z-30 flex flex-col gap-8">
-        <div className="flex items-center gap-3 px-2">
-          <div className="bg-blue-600 p-2 rounded-lg text-white">
-            <Terminal size={20} />
+      {/* MOBILE HEADER */}
+      <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+            <Terminal size={18} />
           </div>
-          <h1 className="font-black text-xl tracking-tighter text-gray-900 leading-none">FACTORY<br/><span className="text-blue-600">CLOUD</span></h1>
+          <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
         </div>
-        
-        <nav className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+      </header>
+
+      {/* SIDEBAR (Desktop) & SLIDING MENU (Mobile) */}
+      <AnimatePresence>
+        {(isMobileMenuOpen || window.innerWidth >= 768) && (
+          <>
+            {/* Backdrop for mobile */}
+            {isMobileMenuOpen && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+              />
+            )}
+            
+            <motion.aside 
+              initial={window.innerWidth < 768 ? { x: -300 } : false}
+              animate={{ x: 0 }}
+              exit={{ x: -300 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap",
-                activeTab === tab.id 
-                  ? "bg-blue-600 text-white shadow-xl shadow-blue-100 translate-x-1" 
-                  : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                "bg-white w-72 md:w-64 min-h-screen border-r border-gray-200 p-6 shrink-0 flex flex-col gap-8 z-50 transition-all",
+                "fixed inset-y-0 left-0 md:sticky md:top-0",
+                !isMobileMenuOpen && "hidden md:flex"
               )}
             >
-              <tab.icon size={16} strokeWidth={2.5} />
-              {tab.label}
-            </button>
-          ))}
-          <div className="mt-auto pt-8 border-t border-gray-100 hidden md:block">
-            <button 
-              onClick={logout}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
-            >
-              <Trash2 size={16} strokeWidth={2.5} />
-              Quitter
-            </button>
-          </div>
-        </nav>
-      </aside>
+              <div className="flex items-center gap-3 px-2">
+                <div className="bg-blue-600 p-2 rounded-lg text-white">
+                  <Terminal size={20} />
+                </div>
+                <h1 className="font-black text-xl tracking-tighter text-gray-900 leading-none capitalize italic">FACTORY<br/><span className="text-blue-600">CLOUD</span></h1>
+              </div>
+              
+              <nav className="flex flex-col gap-1.5 flex-1">
+                {tabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all",
+                      activeTab === tab.id 
+                        ? "bg-blue-600 text-white shadow-xl shadow-blue-100 translate-x-1" 
+                        : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                    )}
+                  >
+                    <tab.icon size={18} strokeWidth={2.5} />
+                    {tab.label}
+                  </button>
+                ))}
+                
+                <div className="mt-auto pt-8 border-t border-gray-100">
+                  <button 
+                    onClick={logout}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
+                  >
+                    <Trash2 size={16} strokeWidth={2.5} />
+                    Quitter
+                  </button>
+                </div>
+              </nav>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
@@ -464,25 +512,25 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                  {[
                    { label: 'Palettes / Jour', val: prodLogs.reduce((acc, l) => acc + l.count, 0), icon: Box, color: 'blue' },
                    { label: 'Lignes Actives', val: lines.filter(l => l.status === 'RUNNING').length, icon: Activity, color: 'green' },
                    { label: 'Arrêts en cours', val: lines.filter(l => !!l.activeDowntimeId).length, icon: Timer, color: 'orange' },
                    { label: 'Effectif total', val: users.length, icon: Users, color: 'gray' },
                  ].map(stat => (
-                   <div key={stat.label} className="card p-6 flex flex-col justify-between hover:shadow-md transition-shadow group">
+                   <div key={stat.label} className="card p-3 md:p-6 flex flex-col justify-between hover:shadow-md transition-shadow group">
                      <div className={cn(
-                       "w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110",
+                       "w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl flex items-center justify-center mb-2 md:mb-4 transition-transform group-hover:scale-110",
                        stat.color === 'blue' ? "bg-blue-50 text-blue-600" :
                        stat.color === 'green' ? "bg-green-50 text-green-600" :
                        stat.color === 'orange' ? "bg-orange-50 text-orange-600" : "bg-gray-50 text-gray-600"
                      )}>
-                       <stat.icon size={24} strokeWidth={2.5} />
+                       <stat.icon size={16} md:size={24} strokeWidth={2.5} />
                      </div>
                      <div>
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                       <p className="text-3xl font-black text-gray-900 leading-none">{stat.val}</p>
+                       <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">{stat.label}</p>
+                       <p className="text-xl md:text-3xl font-black text-gray-900 leading-none">{stat.val}</p>
                      </div>
                    </div>
                  ))}
@@ -498,12 +546,12 @@ export default function AdminPanel() {
                  </div>
                  <div className="overflow-x-auto">
                    <table className="w-full text-left">
-                     <thead className="bg-white text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] border-b border-gray-100">
+                     <thead className="bg-white text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider md:tracking-[0.2em] border-b border-gray-100">
                        <tr>
-                         <th className="px-6 py-5">Identifiant</th>
-                         <th className="px-6 py-5">Statut</th>
-                         <th className="px-6 py-5">Progression</th>
-                         <th className="px-6 py-5">Opérateur</th>
+                         <th className="px-3 md:px-6 py-3 md:py-5">Identifiant</th>
+                         <th className="px-3 md:px-6 py-3 md:py-5">Statut</th>
+                         <th className="px-3 md:px-6 py-3 md:py-5">Progression</th>
+                         <th className="px-3 md:px-6 py-3 md:py-5 hidden sm:table-cell">Opérateur</th>
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-50">
@@ -512,25 +560,25 @@ export default function AdminPanel() {
                           const op = users.find(u => u.id === l.currentOperatorId);
                           const mach = machines.find(m => m.id === l.machineId);
                           return (
-                            <tr key={l.id} className="text-sm hover:bg-gray-50/50 transition-colors">
-                              <td className="px-6 py-5">
+                            <tr key={l.id} className="text-[10px] md:text-sm hover:bg-gray-50/50 transition-colors">
+                              <td className="px-3 md:px-6 py-3 md:py-5">
                                 <p className="font-black text-gray-900 leading-none mb-1">{l.name}</p>
-                                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">{mach?.name}</p>
+                                <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">{mach?.name}</p>
                               </td>
-                              <td className="px-6 py-5">
+                              <td className="px-3 md:px-6 py-3 md:py-5">
                                  <span className={cn(
-                                   "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest",
+                                   "px-1.5 md:px-2 py-0.5 md:py-1 rounded-md text-[7px] md:text-[9px] font-black uppercase tracking-widest",
                                    l.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
                                    l.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : "bg-status-idle-bg text-status-idle-text"
                                  )}>{l.status}</span>
                               </td>
-                              <td className="px-6 py-5">
-                                <div className="space-y-1.5 max-w-[120px]">
-                                  <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                              <td className="px-3 md:px-6 py-3 md:py-5">
+                                <div className="space-y-0.5 md:space-y-1.5 max-w-[80px] md:max-w-[120px]">
+                                  <div className="flex justify-between text-[8px] md:text-[9px] font-bold text-gray-400">
                                     <span>{prog ? `${prog.producedPallets}/${prog.targetPallets}` : '0/0'}</span>
                                     <span>{prog ? Math.round((prog.producedPallets/prog.targetPallets)*100) : 0}%</span>
                                   </div>
-                                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-1 md:h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                                      <div 
                                       className="h-full bg-blue-500 rounded-full" 
                                       style={{ width: `${prog ? Math.min((prog.producedPallets/prog.targetPallets)*100, 100) : 0}%` }}
@@ -538,12 +586,12 @@ export default function AdminPanel() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-5">
+                              <td className="px-3 md:px-6 py-3 md:py-5 hidden sm:table-cell">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-black text-gray-500">
+                                  <div className="w-5 h-5 md:w-6 md:h-6 bg-gray-100 rounded-full flex items-center justify-center text-[8px] md:text-[10px] font-black text-gray-500 shrink-0">
                                     {op?.name?.substring(0, 2).toUpperCase() || '—'}
                                   </div>
-                                  <span className="text-gray-600 font-bold">{op?.name || '—'}</span>
+                                  <span className="text-gray-600 font-bold truncate max-w-[60px] md:max-w-none">{op?.name || '—'}</span>
                                 </div>
                               </td>
                             </tr>
@@ -570,20 +618,20 @@ export default function AdminPanel() {
                   <Plus size={16} strokeWidth={3} /> AJOUTER
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {users.map(u => (
-                  <div key={u.id} className="card p-5 group flex justify-between items-center hover:border-blue-200 transition-colors">
-                    <div className="flex items-center gap-4">
+                  <div key={u.id} className="card p-4 md:p-5 group flex justify-between items-center hover:border-blue-200 transition-colors">
+                    <div className="flex items-center gap-3 md:gap-4">
                       <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center font-black",
+                        "w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-black",
                         u.role === 'ADMIN' ? "bg-red-50 text-red-600" :
                         u.role === 'PILOT' ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-600"
                       )}>
                         {u.name.substring(0, 1)}
                       </div>
                       <div>
-                        <p className="font-black text-gray-900 leading-tight">{u.name}</p>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">PIN: <span className="bg-gray-100 px-1 rounded text-gray-600">{u.pin}</span> • {u.role}</p>
+                        <p className="font-black text-sm md:text-base text-gray-900 leading-tight">{u.name}</p>
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5 md:mt-1">PIN: <span className="bg-gray-100 px-1 rounded text-gray-600">{u.pin}</span> • {u.role}</p>
                       </div>
                     </div>
                     <div className="flex gap-1">
@@ -613,30 +661,30 @@ export default function AdminPanel() {
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {machines.map(m => (
-                    <div key={m.id} className="card p-6 flex flex-col gap-6">
+                   {machines.map(m => (
+                    <div key={m.id} className="card p-4 md:p-6 flex flex-col gap-4 md:gap-6">
                       <div className="flex justify-between items-center">
-                        <h3 className="font-black text-xl italic tracking-tighter text-gray-900">{m.name}</h3>
+                        <h3 className="font-black text-lg md:text-xl italic tracking-tighter text-gray-900">{m.name}</h3>
                         <div className="flex gap-2">
                            <button 
                              onClick={() => openModal('line', { machineId: m.id })}
-                             className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all"
+                             className="px-2 md:px-3 py-1 md:py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all border border-blue-100"
                            >
                              + Ligne
                            </button>
-                           <button onClick={() => openModal('machine', m)} className="text-gray-400 hover:text-blue-600 p-1 transition-colors"><Pencil size={18} /></button>
-                           <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-400 hover:text-red-500 p-1 transition-colors"><Trash2 size={18} /></button>
+                           <button onClick={() => openModal('machine', m)} className="text-gray-400 hover:text-blue-600 p-1 transition-colors"><Pencil size={16} md:size={18} /></button>
+                           <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-400 hover:text-red-500 p-1 transition-colors"><Trash2 size={16} md:size={18} /></button>
                         </div>
                       </div>
 
                       <div className="flex flex-col gap-1">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Pilote actuel</p>
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Pilote actuel</p>
                         <div className="flex items-center justify-between bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                          <span className="text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || 'Libre'}</span>
+                          <span className="text-xs md:text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || 'Libre'}</span>
                           {m.currentPilotId && (
                             <button 
                               onClick={() => localApi.updateDoc('machines', m.id, { currentPilotId: null })}
-                              className="text-[10px] font-black text-red-500 hover:underline uppercase"
+                              className="text-[9px] md:text-[10px] font-black text-red-500 hover:underline uppercase"
                             >
                               Libérer
                             </button>
@@ -645,17 +693,17 @@ export default function AdminPanel() {
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Lignes rattachées</p>
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">Lignes rattachées</p>
                         <div className="flex flex-wrap gap-2">
                           {lines.filter(l => l.machineId === m.id).map(l => (
-                            <div key={l.id} className="bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg flex items-center gap-2 group/line">
-                              <span className="text-xs font-bold text-gray-700">{l.name}</span>
-                              <div className="flex gap-1 opacity-0 group-hover/line:opacity-100 transition-opacity">
-                                <button onClick={() => openModal('line', l)} className="text-gray-400 hover:text-blue-500">
-                                  <Pencil size={12} />
+                            <div key={l.id} className="bg-gray-50 border border-gray-100 px-2 md:px-3 py-1 md:py-1.5 rounded-lg flex items-center gap-2 group/line transition-all hover:bg-white">
+                              <span className="text-[11px] md:text-xs font-bold text-gray-700">{l.name}</span>
+                              <div className="flex gap-1">
+                                <button onClick={() => openModal('line', l)} className="text-gray-400 hover:text-blue-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
+                                  <Pencil size={11} md:size={12} />
                                 </button>
-                                <button onClick={() => initiateDelete('lines', l.id, l.name)} className="text-gray-400 hover:text-red-500">
-                                  <Trash2 size={12} />
+                                <button onClick={() => initiateDelete('lines', l.id, l.name)} className="text-gray-400 hover:text-red-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
+                                  <Trash2 size={11} md:size={12} />
                                 </button>
                               </div>
                             </div>
@@ -774,48 +822,48 @@ export default function AdminPanel() {
                   <div className="card overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
-                          <tr>
-                            <th className="px-6 py-4">Date & Heure</th>
-                            <th className="px-6 py-4">Machine / Ligne</th>
-                            <th className="px-6 py-4">Programme</th>
-                            <th className="px-6 py-4">Opérateur</th>
-                            <th className="px-6 py-4">Quantité</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50 text-sm">
-                          <AnimatePresence mode="popLayout">
-                            {prodLogs.map(log => (
-                              <motion.tr 
-                                key={log.id} 
-                                initial={{ opacity: 1 }}
-                                exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
-                                transition={{ duration: 0.2 }}
-                                className="hover:bg-gray-50/50"
-                              >
-                                <td className="px-6 py-4 font-medium text-gray-900">
-                                  {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                                </td>
-                                <td className="px-6 py-4 text-blue-600 font-bold">
-                                  {programmes.find(p => p.id === log.programmeId)?.name || '—'}
-                                </td>
-                                <td className="px-6 py-4 font-medium">
-                                  {users.find(u => u.id === log.operatorId)?.name || '—'}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-black">{log.count} pal</span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  <div className="flex justify-end gap-1">
-                                    <button onClick={() => openModal('production_log', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={18} /></button>
-                                    <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={18} /></button>
-                                  </div>
-                                </td>
+                      <thead className="bg-gray-50 text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                        <tr>
+                          <th className="px-3 md:px-6 py-3 md:py-4">Horodatage</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">Machine / Ligne</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4">Programme</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4 hidden md:table-cell">Opérateur</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4 text-center">Qté</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 text-[10px] md:text-sm">
+                        <AnimatePresence mode="popLayout">
+                          {prodLogs.map(log => (
+                            <motion.tr 
+                              key={log.id} 
+                              initial={{ opacity: 1 }}
+                              exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                              transition={{ duration: 0.2 }}
+                              className="hover:bg-gray-50/50"
+                            >
+                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-gray-900">
+                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">
+                                <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                <p className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 text-blue-600 font-bold truncate max-w-[80px] md:max-w-none">
+                                {programmes.find(p => p.id === log.programmeId)?.name || '—'}
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium hidden md:table-cell">
+                                {users.find(u => u.id === log.operatorId)?.name || '—'}
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 text-center">
+                                <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-black">{log.count}</span>
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 text-right">
+                                <div className="flex justify-end gap-1">
+                                  <button onClick={() => openModal('production_log', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={18} /></button>
+                                  <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={18} /></button>
+                                </div>
+                              </td>
                               </motion.tr>
                             ))}
                           </AnimatePresence>
@@ -834,56 +882,48 @@ export default function AdminPanel() {
                   <div className="card overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
-                          <tr>
-                            <th className="px-6 py-4">Début</th>
-                            <th className="px-6 py-4">Fin</th>
-                            <th className="px-6 py-4">Durée</th>
-                            <th className="px-6 py-4">Type / Motif</th>
-                            <th className="px-6 py-4">Machine / Ligne</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50 text-sm">
-                          <AnimatePresence mode="popLayout">
-                            {downLogs.map(log => (
-                              <motion.tr 
-                                key={log.id} 
-                                initial={{ opacity: 1 }}
-                                exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
-                                transition={{ duration: 0.2 }}
-                                className="hover:bg-gray-50/50"
-                              >
-                                <td className="px-6 py-4 font-medium text-gray-900">
-                                  {new Date(log.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                </td>
-                                <td className="px-6 py-4 font-medium text-gray-600">
-                                  {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[10px]">En cours</span>}
-                                </td>
-                                <td className="px-6 py-4">
-                                  {log.duration ? (
-                                    <span className="font-mono font-bold bg-gray-100 px-2 py-1 rounded text-gray-700">
-                                      {formatDuration(log.duration)}
-                                    </span>
-                                  ) : '—'}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-lg">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                    <p className="font-bold text-gray-800">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
-                                  </div>
-                                  {log.description && <p className="text-[10px] text-gray-400 italic mt-0.5">{log.description}</p>}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  <div className="flex justify-end gap-1">
-                                    <button onClick={() => openModal('downtime_log', log)} className="text-gray-400 hover:text-blue-600 p-2"><Pencil size={18} /></button>
-                                    <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={18} /></button>
-                                  </div>
-                                </td>
+                      <thead className="bg-gray-50 text-[8px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                        <tr>
+                          <th className="px-3 md:px-6 py-3 md:py-4">Début</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4">Durée</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4">Type / Motif</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">Machine / Ligne</th>
+                          <th className="px-3 md:px-6 py-3 md:py-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 text-[10px] md:text-sm">
+                        <AnimatePresence mode="popLayout">
+                          {downLogs.map(log => (
+                            <motion.tr 
+                              key={log.id} 
+                              initial={{ opacity: 1 }}
+                              exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                              transition={{ duration: 0.2 }}
+                              className="hover:bg-gray-50/50"
+                            >
+                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-gray-900">
+                                {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-gray-600">
+                                {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[8px] md:text-[10px]">Active</span>}
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4">
+                                <div className="flex items-center gap-1.5 md:gap-2">
+                                  <span className="text-sm md:text-lg">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
+                                  <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                </div>
+                                {log.description && <p className="text-[8px] md:text-[10px] text-gray-400 italic mt-0.5 truncate max-w-[100px] md:max-w-none">{log.description}</p>}
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">
+                                <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                <p className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                              </td>
+                              <td className="px-3 md:px-6 py-3 md:py-4 text-right">
+                                <div className="flex justify-end gap-1">
+                                  <button onClick={() => openModal('downtime_log', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil size={14} md:size={18} /></button>
+                                  <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 size={14} md:size={18} /></button>
+                                </div>
+                              </td>
                               </motion.tr>
                             ))}
                           </AnimatePresence>

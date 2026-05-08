@@ -3,7 +3,7 @@ import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, DowntimeType, DowntimeLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle } from 'lucide-react';
+import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
 
 export default function OperatorScreen() {
@@ -12,6 +12,7 @@ export default function OperatorScreen() {
   const [lines, setLines] = useState<Line[]>([]);
   const [downtimeTypes, setDowntimeTypes] = useState<DowntimeType[]>([]);
   const [availableProgrammes, setAvailableProgrammes] = useState<Programme[]>([]);
+  const [downtimeLogs, setDowntimeLogs] = useState<DowntimeLog[]>([]);
   
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -30,39 +31,16 @@ export default function OperatorScreen() {
     const unsubDowntimeTypes = localApi.onSnapshot('downtime_types', setDowntimeTypes);
     const unsubLines = localApi.onSnapshot('lines', setLines);
     const unsubProgs = localApi.onSnapshot('programmes', setAvailableProgrammes);
+    const unsubDown = localApi.onSnapshot('downtime_logs', setDowntimeLogs);
     
     return () => {
       unsubMachines();
       unsubDowntimeTypes();
       unsubLines();
       unsubProgs();
+      unsubDown();
     };
   }, []);
-
-  // Handle active line and related records summary
-  useEffect(() => {
-    if (!selectedLineId) {
-      setActiveLine(null);
-      setActiveProgramme(null);
-      setActiveDowntime(null);
-      return;
-    }
-
-    const line = lines.find(l => l.id === selectedLineId);
-    if (line) {
-      setActiveLine(line);
-      if (line.currentProgrammeId) {
-        const prog = availableProgrammes.find(p => p.id === line.currentProgrammeId);
-        setActiveProgramme(prog || null);
-      } else {
-        setActiveProgramme(null);
-      }
-
-      if (line.activeDowntimeId) {
-        // We'll need another effect to fetch logs if needed, but for now we look in lines
-      }
-    }
-  }, [selectedLineId, lines, availableProgrammes]);
 
   // Handle active line and related records summary
   useEffect(() => {
@@ -80,11 +58,16 @@ export default function OperatorScreen() {
       setActiveProgramme(prog || null);
 
       if (line.activeDowntimeId) {
-         // We'll fetch downtime_logs directly if needed or find in state
-         // localApi.onSnapshot handles downLogs which we should add to state
+        const dLog = downtimeLogs.find(d => d.id === line.activeDowntimeId);
+        setActiveDowntime(dLog || null);
+      } else {
+        setActiveDowntime(null);
       }
+
+      // Reset timer if line or programme changes
+      setTimer(0);
     }
-  }, [selectedLineId, lines, availableProgrammes]);
+  }, [selectedLineId, lines, availableProgrammes, downtimeLogs]);
 
   // Timer logic for downtime
   useEffect(() => {
@@ -221,16 +204,25 @@ export default function OperatorScreen() {
 
   if (!selectedMachineId) {
     return (
-      <div className="p-4 space-y-4">
-        <h2 className="text-xl font-bold">Sélectionner Machine</h2>
-        <div className="grid gap-3">
+      <div className="min-h-screen bg-[#F3F4F6] p-4 flex flex-col items-center justify-center space-y-8">
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
+            <Factory size={32} />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tight">Sélectionner Machine</h2>
+          <p className="text-sm text-gray-400 font-medium uppercase tracking-widest leading-none">Choisissez un poste de travail</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
           {machines.map(m => (
             <button
               key={m.id}
               onClick={() => setSelectedMachineId(m.id)}
-              className="p-6 bg-white rounded-xl shadow-sm border border-gray-100 text-left font-medium active:bg-gray-50"
+              className="p-8 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 transition-all active:scale-95 active:bg-gray-50 hover:border-blue-300 group"
             >
-              {m.name}
+              <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                <Settings size={24} />
+              </div>
+              <span className="font-bold text-gray-800 text-lg uppercase tracking-tight">{m.name}</span>
             </button>
           ))}
         </div>
@@ -240,19 +232,33 @@ export default function OperatorScreen() {
 
   if (!selectedLineId) {
     return (
-      <div className="p-4 space-y-4">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setSelectedMachineId(null)} className="text-blue-600 font-medium">← Back</button>
-          <h2 className="text-xl font-bold">Sélectionner Ligne</h2>
+      <div className="min-h-screen bg-[#F3F4F6] p-4 flex flex-col items-center justify-center space-y-8">
+        <div className="text-center space-y-2">
+          <button 
+            onClick={() => { setSelectedMachineId(null); setSelectedLineId(null); }} 
+            className="text-xs font-black text-blue-600 mb-4 flex items-center gap-1 mx-auto hover:underline uppercase tracking-widest"
+          >
+            ← Retour aux machines
+          </button>
+          <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
+            <Monitor size={32} />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tight">Sélectionner Ligne</h2>
+          <p className="text-sm text-gray-400 font-medium uppercase tracking-widest leading-none">
+            Poste: {machines.find(m => m.id === selectedMachineId)?.name}
+          </p>
         </div>
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
           {lines.filter(l => l.machineId === selectedMachineId).map(l => (
             <button
               key={l.id}
               onClick={() => setSelectedLineId(l.id)}
-              className="p-6 bg-white rounded-xl shadow-sm border border-gray-100 text-left font-medium active:bg-gray-50"
+              className="p-8 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 transition-all active:scale-95 active:bg-gray-50 hover:border-blue-300 group"
             >
-              {l.name}
+              <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                 <Activity size={24} />
+              </div>
+              <span className="font-bold text-gray-800 text-lg uppercase tracking-tight">{l.name}</span>
             </button>
           ))}
         </div>
@@ -263,30 +269,30 @@ export default function OperatorScreen() {
   return (
     <div className="min-h-screen bg-[#F3F4F6] flex flex-col overflow-hidden">
       {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 px-4 py-4 flex justify-between items-center shadow-sm shrink-0">
-        <div className="flex items-center gap-4">
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Opérateur</p>
-            <p className="text-sm font-bold text-gray-900">{user?.name}</p>
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm shrink-0">
+        <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
+          <div className="shrink-0">
+            <p className="text-[9px] text-gray-500 uppercase tracking-wider font-semibold leading-none">Opérateur</p>
+            <p className="text-xs font-bold text-gray-900 truncate max-w-[120px]">{user?.name}</p>
           </div>
-          <div className="h-8 w-px bg-gray-200 mx-1" />
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Poste</p>
-            <p className="text-sm font-bold text-gray-900">
+          <div className="h-6 w-px bg-gray-200" />
+          <div className="overflow-hidden">
+            <p className="text-[9px] text-gray-500 uppercase tracking-wider font-semibold leading-none">Poste</p>
+            <p className="text-xs font-bold text-gray-900 truncate">
               {machines.find(m => m.id === activeLine?.machineId)?.name} 
               <span className="text-blue-600"> | {activeLine?.name}</span>
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end w-full sm:w-auto">
           <span className={cn(
-            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5",
+            "px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5",
             activeLine?.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
             activeLine?.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : 
             "bg-status-idle-bg text-status-idle-text"
           )}>
             <span className={cn(
-              "w-2 h-2 rounded-full",
+              "w-1.5 h-1.5 rounded-full",
               activeLine?.status === 'RUNNING' ? "bg-green-600 animate-pulse" :
               activeLine?.status === 'STOPPED' ? "bg-red-600" : "bg-gray-400"
             )} />
@@ -302,7 +308,7 @@ export default function OperatorScreen() {
             {/* LEFT COLUMN: PRODUCTION */}
             <div className="lg:col-span-7 space-y-6 flex flex-col">
               {/* PROGRAMME CARD */}
-              <div className="card p-6 flex flex-col gap-4 border-l-4 border-blue-500">
+              <div className="card p-5 sm:p-6 flex flex-col gap-4 border-l-4 border-blue-500">
                 {!activeProgramme ? (
                   <div className="py-2 space-y-4">
                     <div className="flex items-center gap-2 text-gray-400">
@@ -335,7 +341,7 @@ export default function OperatorScreen() {
                       </div>
                     ) : (
                       <div className="py-8 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
-                        <p className="text-gray-400 font-medium italic">Aucun programme actif pour cette ligne</p>
+                        <p className="text-gray-400 font-medium italic text-sm">Aucun programme actif pour cette ligne</p>
                         <p className="text-[10px] font-bold text-gray-300 uppercase mt-1">Contactez un administrateur</p>
                       </div>
                     )}
@@ -343,11 +349,11 @@ export default function OperatorScreen() {
                 ) : (
                   <>
                     <div className="flex justify-between items-start">
-                      <div>
-                        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Programme en cours</h2>
-                        <h1 className="text-xl font-bold text-gray-800">{activeProgramme.name}</h1>
+                      <div className="overflow-hidden">
+                        <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Programme en cours</h2>
+                        <h1 className="text-lg sm:text-xl font-bold text-gray-800 truncate">{activeProgramme.name}</h1>
                       </div>
-                      <div className="text-right flex flex-col items-end gap-1">
+                      <div className="text-right flex flex-col items-end gap-1 shrink-0">
                         {activeLine?.status !== 'RUNNING' && (
                           <button 
                             onClick={() => handleSelectProgramme('')} 
@@ -357,28 +363,28 @@ export default function OperatorScreen() {
                           </button>
                         )}
                         <div>
-                          <p className="text-xs text-gray-400 uppercase font-bold tracking-tight">Cible</p>
-                          <p className="text-lg font-bold text-gray-900">{activeProgramme.targetPallets}</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tight">Cible</p>
+                          <p className="text-base sm:text-lg font-bold text-gray-900">{activeProgramme.targetPallets}</p>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-3 mt-1">
-                      <div className="bg-gray-50 p-2.5 rounded">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold">Produit</p>
-                        <p className="text-lg font-bold text-blue-600">
-                          {activeProgramme.producedPallets} <span className="text-xs font-normal text-gray-400">pal</span>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+                      <div className="bg-gray-50 p-2 rounded">
+                        <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold">Produit</p>
+                        <p className="text-sm md:text-lg font-bold text-blue-600">
+                          {activeProgramme.producedPallets} <span className="text-[8px] md:text-xs font-normal text-gray-400">pal</span>
                         </p>
                       </div>
-                      <div className="bg-gray-50 p-2.5 rounded">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold">Reste</p>
-                        <p className="text-lg font-bold text-orange-600">
-                          {Math.max(0, activeProgramme.targetPallets - activeProgramme.producedPallets)} <span className="text-xs font-normal text-gray-400">pal</span>
+                      <div className="bg-gray-50 p-2 rounded border border-orange-50 lg:border-transparent">
+                        <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold">Reste</p>
+                        <p className="text-sm md:text-lg font-bold text-orange-600">
+                          {Math.max(0, activeProgramme.targetPallets - activeProgramme.producedPallets)} <span className="text-[8px] md:text-xs font-normal text-gray-400">pal</span>
                         </p>
                       </div>
-                      <div className="bg-gray-50 p-2.5 rounded">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold">Efficacité</p>
-                        <p className="text-lg font-bold text-green-600">
+                      <div className="bg-gray-50 p-2 rounded col-span-2 lg:col-span-1 border border-green-50 lg:border-transparent">
+                        <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold text-center lg:text-left">Efficacité</p>
+                        <p className="text-sm md:text-lg font-bold text-green-600 text-center lg:text-left">
                           {activeProgramme.targetPallets > 0 
                             ? Math.round((activeProgramme.producedPallets / activeProgramme.targetPallets) * 100) 
                             : 0}%
@@ -399,81 +405,80 @@ export default function OperatorScreen() {
 
               {/* SAISIE CARD */}
               {activeLine?.status === 'RUNNING' && activeProgramme && (
-                <div className="card p-6 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4">
-                  <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-none">Saisie de Production</h2>
-                  <div className="flex gap-3">
+                <div className="card p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4">
+                  <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Saisie de Production</h2>
+                  <div className="flex gap-2 sm:gap-3">
                     <input 
                       type="number"
                       value={palletInput}
                       onChange={e => setPalletInput(e.target.value)}
-                      placeholder="Entrer palettes"
-                      className="flex-1 border-2 border-gray-200 rounded-lg px-4 py-3 text-lg font-bold focus:border-blue-500 outline-none transition-colors"
+                      placeholder="0"
+                      className="flex-1 border-2 border-gray-200 rounded-lg px-3 py-2 text-base sm:text-lg font-bold focus:border-blue-500 outline-none transition-colors shadow-inner"
                       autoFocus
                     />
                     <button 
                       onClick={handleAddPallets}
-                      className="bg-[#3B82F6] text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                      className="bg-[#3B82F6] text-white px-4 sm:px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-md active:scale-95 text-sm"
                     >
-                      + Ajouter
+                      OK
                     </button>
                   </div>
                 </div>
               )}
 
               {/* ACTIONS */}
-              <div className="mt-auto flex gap-4 min-h-[80px]">
+              <div className="mt-auto flex gap-3 sm:gap-4 min-h-[60px] sm:min-h-[80px]">
                 {activeLine?.status !== 'RUNNING' ? (
                   <button 
                     disabled={!activeProgramme || !!activeDowntime}
                     onClick={handleStartProduction}
-                    className="flex-1 border-2 border-[#22C55E] text-[#15803D] bg-green-50/50 rounded-lg flex items-center justify-center gap-3 font-bold text-lg hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    className="flex-1 border-2 border-[#22C55E] text-[#15803D] bg-green-50/50 rounded-lg flex items-center justify-center gap-2 sm:gap-3 font-black text-sm sm:text-lg hover:bg-green-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-sm uppercase italic tracking-tighter"
                   >
-                    <Play size={24} fill="currentColor" /> START PRODUCTION
+                    <Play size={20} sm:size={24} fill="currentColor" /> START
                   </button>
                 ) : (
                   <button 
                     onClick={handleStopProduction}
-                    className="flex-1 border-2 border-[#EF4444] text-[#B91C1C] bg-red-50 rounded-lg flex items-center justify-center gap-3 font-bold text-lg hover:bg-red-100 transition-colors shadow-sm"
+                    className="flex-1 border-2 border-[#EF4444] text-[#B91C1C] bg-red-50 rounded-lg flex items-center justify-center gap-2 sm:gap-3 font-black text-sm sm:text-lg hover:bg-red-100 transition-colors shadow-sm uppercase italic tracking-tighter"
                   >
-                    <Square size={24} fill="currentColor" /> FIN PRODUCTION
+                    <Square size={20} sm:size={24} fill="currentColor" /> FIN
                   </button>
                 )}
               </div>
             </div>
 
             {/* RIGHT COLUMN: DOWNTIME */}
-            <div className="lg:col-span-5 flex flex-col gap-6">
-              <div className="card p-5 flex-1 flex flex-col min-h-[300px]">
-                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Déclarer un Arrêt (Downtime)</h2>
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              <div className="card p-4 sm:p-5 flex-1 flex flex-col min-h-[250px] sm:min-h-[300px]">
+                <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Déclarer un Arrêt</h2>
                 {activeLine?.status !== 'RUNNING' && !activeDowntime && (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-3 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100 mb-4">
-                    <AlertCircle className="text-gray-300" size={32} />
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-4 sm:p-6 space-y-2 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100 mb-4">
+                    <AlertCircle className="text-gray-300" size={24} sm:size={32} />
                     <div className="space-y-1">
-                      <p className="text-gray-400 font-bold text-sm uppercase tracking-tight">Production non lancée</p>
-                      <p className="text-[10px] text-gray-300 font-medium uppercase leading-tight">Vous ne pouvez pas déclarer d'arrêt tant que la production n'est pas "RUNNING"</p>
+                      <p className="text-gray-400 font-bold text-[11px] sm:text-sm uppercase tracking-tight leading-none mb-1">Production non lancée</p>
+                      <p className="text-[9px] text-gray-300 font-medium uppercase leading-tight">Lancez la production pour déclarer un arrêt</p>
                     </div>
                   </div>
                 )}
                 {activeDowntime ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-6 bg-orange-50/30 rounded-2xl border border-orange-100/50">
-                    <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 animate-pulse">
-                      <Timer size={40} />
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-4 sm:p-6 space-y-4 sm:space-y-6 bg-orange-50/30 rounded-2xl border border-orange-100/50">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 animate-pulse">
+                      <Timer size={32} sm:size={40} />
                     </div>
                     <div className="w-full">
-                      <p className="text-xs uppercase font-bold text-gray-400">Arrêt Actif</p>
-                      <h4 className="text-xl font-bold text-orange-900 group-hover:text-orange-950 transition-colors">
-                        {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name || 'Arrêt en cours'}
+                      <p className="text-[10px] uppercase font-bold text-gray-400">Arrêt Actif</p>
+                      <h4 className="text-lg sm:text-xl font-bold text-orange-900 truncate">
+                        {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name || 'En cours'}
                       </h4>
                       {activeDowntime.description && (
-                         <p className="text-xs bg-orange-50 text-orange-700 px-3 py-1.5 rounded-lg inline-block mt-2 font-bold max-w-full truncate">{activeDowntime.description}</p>
+                         <p className="text-[10px] bg-orange-50 text-orange-700 px-3 py-1 rounded-lg inline-block mt-1 font-bold max-w-full truncate">{activeDowntime.description}</p>
                       )}
                       
-                      <div className="mt-4 w-full">
-                        <h3 className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5 text-center">Note additionnelle</h3>
+                      <div className="mt-3 w-full">
                         <input 
                           type="text"
-                          placeholder="Ex: Bourrage sortie, Panne élec..."
-                          className="w-full text-xs p-4 bg-white border border-orange-100 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-center shadow-inner"
+                          placeholder="Note additionnelle..."
+                          className="w-full text-[11px] p-3 bg-white border border-orange-100 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 font-bold text-center shadow-inner"
                           defaultValue={activeDowntime.description || ''}
                           onBlur={async (e) => {
                             if (e.target.value !== activeDowntime.description) {
@@ -485,43 +490,42 @@ export default function OperatorScreen() {
                         />
                       </div>
 
-                      <p className="text-4xl font-mono font-black text-orange-600 mt-2">
+                      <p className="text-3xl sm:text-4xl font-mono font-black text-orange-600 mt-2">
                         {formatDuration(timer)}
                       </p>
                     </div>
                     <button 
                       onClick={handleStopDowntime}
-                      className="w-full bg-orange-600 text-white py-4 rounded-xl font-black text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all uppercase tracking-widest"
+                      className="w-full bg-orange-600 text-white py-3 sm:py-4 rounded-xl font-black text-base sm:text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all uppercase tracking-widest"
                     >
-                      Stop Arrêt / Reprendre
+                      REPRENDRE
                     </button>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+                  <div className="flex-1 flex flex-col gap-3 overflow-hidden">
                     <div className="flex-1 overflow-y-auto pr-1">
-                      <div className="grid grid-cols-2 gap-3 pb-4">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3 pb-4">
                         {downtimeTypes.map((type) => (
                           <button
                             key={type.id}
                             disabled={activeLine?.status !== 'RUNNING'}
                             onClick={() => handleStartDowntime(type.id)}
                             className={cn(
-                              "border border-orange-100 rounded-xl p-4 text-left transition-all flex flex-col gap-2 active:scale-95 shadow-sm bg-white",
+                              "border border-orange-100 rounded-xl p-3 sm:p-4 text-left transition-all flex flex-col gap-1 sm:gap-2 active:scale-95 shadow-sm bg-white",
                               activeLine?.status !== 'RUNNING' ? "opacity-40 cursor-not-allowed grayscale" : "hover:bg-orange-50"
                             )}
                           >
-                            <span className="text-2xl">{type.icon || '⚠️'}</span>
-                            <span className="text-[10px] font-bold text-gray-700 leading-tight uppercase tracking-widest">{type.name}</span>
+                            <span className="text-xl sm:text-2xl">{type.icon || '⚠️'}</span>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 leading-tight uppercase tracking-widest">{type.name}</span>
                           </button>
                         ))}
                       </div>
                     </div>
                     <div className="pt-2 border-t border-gray-50">
-                      <h3 className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1 shadow-sm inline-block px-2 bg-gray-50 rounded">Précisions avant arrêt (Optionnel)</h3>
                       <input 
                         type="text"
-                        placeholder="Ex: Bourrage sortie..."
-                        className="w-full text-xs p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 font-bold transition-all"
+                        placeholder="Note optionnelle..."
+                        className="w-full text-[11px] p-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 font-bold transition-all shadow-inner"
                         value={downtimeDescription}
                         onChange={e => setDowntimeDescription(e.target.value)}
                       />
