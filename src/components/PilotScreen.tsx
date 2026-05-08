@@ -247,21 +247,36 @@ export default function PilotScreen() {
   const assignedProgIds = lines.map(l => l.currentProgrammeId).filter(Boolean);
   const availableProgs = programmes.filter(p => p.machineId === selectedMachineId && p.status === 'ACTIVE' && !assignedProgIds.includes(p.id));
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="min-h-screen bg-[#F3F4F6] pb-20">
+    <div className="min-h-screen bg-[#F8FAFC] pb-20">
       {/* MOBILE HEADER */}
-      <header className="sm:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+      <header className="sm:hidden bg-white border-b border-gray-100 px-4 py-2 flex justify-between items-center sticky top-0 z-40 shadow-sm">
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
         >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <div className="flex items-center gap-2">
-          <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-            <Monitor size={18} />
+        <div className="flex items-center gap-1.5">
+          <div className="bg-blue-600 p-1 rounded-md text-white">
+            <Monitor size={14} />
           </div>
-          <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
+          <h1 className="font-black text-base tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
         </div>
       </header>
 
@@ -351,11 +366,34 @@ export default function PilotScreen() {
           </div>
         </div>
         
+        {activeTab === 'monitor' && selectedMachineId && (
+          <div className="flex justify-between items-center bg-gray-50/50 p-2 sm:p-4 rounded-2xl border border-gray-100 mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-50">
+                <LayoutGrid size={20} />
+              </div>
+              <div>
+                <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest leading-none mb-1">Status Machine</p>
+                <p className="text-sm font-black text-gray-800">{machines.find(m => m.id === selectedMachineId)?.name}</p>
+              </div>
+            </div>
+            {lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') && (
+              <button 
+                onClick={() => setDeclaringDowntimeLineId('global')}
+                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all animate-in fade-in zoom-in"
+              >
+                <Activity size={16} className="animate-pulse" />
+                Arrêt Machine
+              </button>
+            )}
+          </div>
+        )}
+
         {activeTab === 'monitor' && (
           <select 
             value={selectedMachineId}
             onChange={e => handleMachineSelect(e.target.value)}
-            className="w-full p-3 bg-gray-50 rounded-xl font-bold border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700"
+            className="w-full p-4 bg-gray-50/50 rounded-2xl font-bold border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700 appearance-none cursor-pointer"
           >
             <option value="">Sélectionner une machine...</option>
             {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -365,11 +403,20 @@ export default function PilotScreen() {
 
       {/* Mobile-only machine selector when in monitor tab */}
       {activeTab === 'monitor' && (
-        <div className="p-4 sm:hidden bg-white border-b border-gray-100">
-          <select 
+        <div className="p-3 sm:hidden bg-white border-b border-gray-100 space-y-3">
+           {selectedMachineId && lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') && (
+              <button 
+                onClick={() => setDeclaringDowntimeLineId('global')}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 active:scale-95 transition-all"
+              >
+                <Activity size={16} className="animate-pulse" />
+                ARRÊT GÉNÉRAL
+              </button>
+            )}
+           <select 
             value={selectedMachineId}
             onChange={e => handleMachineSelect(e.target.value)}
-            className="w-full p-3 bg-gray-50 rounded-xl font-bold border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700"
+            className="w-full p-3 bg-gray-50/50 rounded-xl font-bold border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700 text-xs"
           >
             <option value="">Sélectionner une machine...</option>
             {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -379,14 +426,19 @@ export default function PilotScreen() {
 
       {activeTab === 'monitor' ? (
         !selectedMachineId ? (
-        <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
-          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
-             <LayoutGrid size={32} />
+        <div className="flex flex-col items-center justify-center p-8 text-center space-y-3">
+          <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
+             <LayoutGrid size={24} />
           </div>
-          <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">Choisir une machine pour monitorer les lignes</p>
+          <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Choisir une machine</p>
         </div>
       ) : (
-        <div className="p-4 space-y-4 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+        <motion.div 
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
+        >
           {lines.filter(l => l.machineId === selectedMachineId).map(line => {
             const prog = programmes.find(p => p.id === line.currentProgrammeId);
             const op = users.find(u => u.id === line.currentOperatorId);
@@ -396,21 +448,22 @@ export default function PilotScreen() {
             return (
               <motion.div 
                 key={line.id}
+                variants={item}
                 layout
-                className="card border-l-4 border-gray-200 hover:border-blue-500 transition-colors flex flex-col"
+                className="card border-l-4 border-slate-200 hover:border-blue-500 transition-colors flex flex-col overflow-hidden"
               >
-                <div className="p-4 flex justify-between items-start border-b border-gray-50">
+                <div className="p-3 sm:p-4 flex justify-between items-start border-b border-slate-50">
                   <div>
-                    <h3 className="font-bold text-gray-900 leading-none">{line.name}</h3>
-                    <div className="flex items-center gap-2 mt-2">
+                    <h3 className="font-bold text-xs sm:text-sm text-slate-900 leading-none">{line.name}</h3>
+                    <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
                        <span className={cn(
-                        "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1",
+                        "px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest flex items-center gap-1",
                         line.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
                         line.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : "bg-status-idle-bg text-status-idle-text"
                       )}>
                         <span className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          line.status === 'RUNNING' ? "bg-green-600 animate-pulse" : line.status === 'STOPPED' ? "bg-red-600" : "bg-gray-400"
+                          "w-1 sm:w-1.5 h-1 sm:h-1.5 rounded-full",
+                          line.status === 'RUNNING' ? "bg-green-600 animate-pulse" : line.status === 'STOPPED' ? "bg-red-600" : "bg-slate-400"
                         )} />
                         {line.status}
                       </span>
@@ -418,82 +471,64 @@ export default function PilotScreen() {
                   </div>
                   <button 
                     onClick={() => setIsAssigning(line.id)}
-                    className="p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100"
+                    className="p-1.5 sm:p-2 text-blue-600 bg-blue-50 rounded-lg sm:rounded-xl active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100"
                   >
-                    <Plus size={16} strokeWidth={3} />
-                    <span className="text-[10px] font-black uppercase tracking-tight">
+                    <Plus size={14} sm:size={16} strokeWidth={3} />
+                    <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-tight">
                       {prog ? 'Changer' : 'Assigner'}
                     </span>
                   </button>
                 </div>
 
-                <div className="p-3 sm:p-4 grid grid-cols-2 gap-3 sm:gap-4 flex-1">
+                <div className="p-2 sm:p-4 grid grid-cols-2 gap-2 sm:gap-4 flex-1">
                   <div className="space-y-0.5">
-                    <p className="text-[8px] sm:text-[9px] text-gray-400 font-black uppercase tracking-widest">Programme Actif</p>
+                    <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">Prog. Actif</p>
                     <p className={cn(
-                      "text-xs sm:text-sm font-black truncate",
-                      prog ? "text-blue-900" : "text-gray-300 italic"
+                      "text-[10px] sm:text-sm font-black truncate",
+                      prog ? "text-blue-900" : "text-slate-300 italic"
                     )}>
-                      {prog ? prog.name : 'Aucun'}
+                      {prog ? prog.name : '—'}
                     </p>
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-[8px] sm:text-[9px] text-gray-400 font-black uppercase tracking-widest">Opérateur</p>
+                    <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none">Opérateur</p>
                     <p className={cn(
-                      "text-xs sm:text-sm font-bold truncate",
-                      op ? "text-gray-800" : "text-gray-300 italic"
+                      "text-[10px] sm:text-sm font-bold truncate",
+                      op ? "text-slate-800" : "text-slate-300 italic"
                     )}>
-                      {op ? op.name : 'Non assigné'}
+                      {op ? op.name : '—'}
                     </p>
                   </div>
                   
                   {line.tracksProduction !== 0 && (
-                    <div className="col-span-2 space-y-2 mt-1">
-                      <div className="flex justify-between items-end bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
-                        <div className="space-y-0 text-center flex-1">
-                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Palettes Produites</p>
-                          <p className="text-3xl font-black text-blue-600 leading-none mt-1">
-                            {prog ? prog.producedPallets : '0'}
-                          </p>
-                        </div>
+                    <div className="col-span-2 space-y-1">
+                      <div className="flex justify-between items-center bg-blue-50/30 p-2 sm:p-4 rounded-xl border border-blue-100/20">
+                        <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em]">Produit</p>
+                        <p className="text-xl sm:text-3xl font-black text-blue-600 leading-none">
+                          {prog ? prog.producedPallets : '0'}
+                        </p>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="px-4 pb-4">
-                  {down ? (
-                     <div className="bg-status-downtime-bg p-3 rounded-lg flex justify-between items-center border border-orange-100 shadow-inner">
-                        <div className="flex items-center gap-2 text-status-downtime-text">
-                          <Activity size={14} className="animate-pulse" />
-                          <span className="text-xs font-bold uppercase tracking-tighter">{downType?.name || 'Arrêt Machine'}</span>
+                {down && (
+                  <div className="px-3 pb-3">
+                     <div className="bg-status-downtime-bg/50 p-2 rounded-lg flex justify-between items-center border border-orange-100">
+                        <div className="flex items-center gap-1.5 text-status-downtime-text">
+                          <Activity size={12} className="animate-pulse" />
+                          <span className="text-[9px] font-black uppercase tracking-tight">{downType?.name || 'Arrêt'}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono font-bold text-orange-800 bg-white/40 px-2 py-0.5 rounded">
-                              Depuis {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
+                        <span className="text-[8px] font-mono font-bold text-orange-800 bg-white/60 px-1.5 py-0.5 rounded-md border border-orange-100/50">
+                              {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
-                  ) : (
-                    <button 
-                      disabled={line.status !== 'RUNNING'}
-                      onClick={() => setDeclaringDowntimeLineId(line.id)}
-                      className={cn(
-                        "w-full py-2.5 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 transition-all",
-                        line.status === 'RUNNING' 
-                          ? "border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 shadow-sm"
-                          : "border-gray-100 text-gray-300 cursor-not-allowed"
-                      )}
-                    >
-                      <Timer size={14} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Arrêter la Machine</span>
-                    </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )
     ) : (
       !selectedMachineId ? (

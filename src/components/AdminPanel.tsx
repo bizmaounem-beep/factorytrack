@@ -412,8 +412,23 @@ export default function AdminPanel() {
     { id: 'history', label: 'Historique', icon: History },
   ];
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row">
       {/* MOBILE HEADER */}
       <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
         <button 
@@ -512,29 +527,38 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+              <motion.div 
+                variants={container}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6"
+              >
                  {[
                    { label: 'Palettes / Jour', val: prodLogs.reduce((acc, l) => acc + l.count, 0), icon: Box, color: 'blue' },
                    { label: 'Lignes Actives', val: lines.filter(l => l.status === 'RUNNING').length, icon: Activity, color: 'green' },
                    { label: 'Arrêts en cours', val: lines.filter(l => !!l.activeDowntimeId).length, icon: Timer, color: 'orange' },
                    { label: 'Effectif total', val: users.length, icon: Users, color: 'gray' },
                  ].map(stat => (
-                   <div key={stat.label} className="card p-3 md:p-6 flex flex-col justify-between hover:shadow-md transition-shadow group">
+                   <motion.div 
+                    variants={item}
+                    key={stat.label} 
+                    className="card p-4 md:p-6 flex flex-col justify-between hover:shadow-md transition-shadow group cursor-default"
+                   >
                      <div className={cn(
-                       "w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl flex items-center justify-center mb-2 md:mb-4 transition-transform group-hover:scale-110",
-                       stat.color === 'blue' ? "bg-blue-50 text-blue-600" :
-                       stat.color === 'green' ? "bg-green-50 text-green-600" :
-                       stat.color === 'orange' ? "bg-orange-50 text-orange-600" : "bg-gray-50 text-gray-600"
+                       "w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center mb-2 md:mb-4 transition-transform group-hover:scale-110 shadow-sm border border-black/5",
+                       stat.color === 'blue' ? "bg-blue-600 text-white" :
+                       stat.color === 'green' ? "bg-green-600 text-white" :
+                       stat.color === 'orange' ? "bg-orange-600 text-white" : "bg-slate-600 text-white"
                      )}>
                        <stat.icon size={16} md:size={24} strokeWidth={2.5} />
                      </div>
                      <div>
-                       <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">{stat.label}</p>
-                       <p className="text-xl md:text-3xl font-black text-gray-900 leading-none">{stat.val}</p>
+                       <p className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5 md:mb-1">{stat.label}</p>
+                       <p className="text-xl md:text-3xl font-black text-slate-900 leading-none tabular-nums">{stat.val}</p>
                      </div>
-                   </div>
+                   </motion.div>
                  ))}
-              </div>
+              </motion.div>
 
               <div className="card overflow-hidden">
                  <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
