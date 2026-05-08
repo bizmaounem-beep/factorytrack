@@ -117,7 +117,7 @@ export default function PilotScreen() {
     // Update line
     await localApi.updateDoc('lines', isAssigning, {
       currentProgrammeId: progRef.id,
-      status: 'IDLE'
+      status: 'EN ATTENTE'
     });
 
     setIsAssigning(null);
@@ -129,7 +129,7 @@ export default function PilotScreen() {
     if (!isAssigning) return;
     await localApi.updateDoc('lines', isAssigning, {
       currentProgrammeId: progId,
-      status: 'IDLE'
+      status: 'EN ATTENTE'
     });
     setIsAssigning(null);
   };
@@ -194,7 +194,7 @@ export default function PilotScreen() {
           if (!logData.endTime) {
             await localApi.updateDoc('lines', logData.lineId, {
               activeDowntimeId: null,
-              status: 'IDLE'
+              status: 'EN ATTENTE'
             });
           }
         }
@@ -222,7 +222,7 @@ export default function PilotScreen() {
           }
           await localApi.updateDoc('lines', line.id, {
             activeDowntimeId: null,
-            status: 'IDLE'
+            status: 'EN ATTENTE'
           });
         }
       }
@@ -276,14 +276,14 @@ export default function PilotScreen() {
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.05
+        staggerChildren: 0.01
       }
     }
   };
 
   const item = {
-    hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0 }
+    hidden: { opacity: 0, y: 3 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" } }
   };
 
   return (
@@ -333,7 +333,7 @@ export default function PilotScreen() {
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
               className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 p-6 flex flex-col gap-8 shadow-2xl sm:hidden"
             >
               <div className="flex items-center gap-3 px-2">
@@ -371,7 +371,7 @@ export default function PilotScreen() {
                     className="flex items-center gap-4 px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
                   >
                     <Trash2 size={20} />
-                    Logout
+                    LOGOUT
                   </button>
                 </div>
               </nav>
@@ -397,7 +397,7 @@ export default function PilotScreen() {
               {activeTab === 'monitor' ? <History size={14} /> : <Monitor size={14} />}
               {activeTab === 'monitor' ? 'Historique' : 'Monitor'}
             </button>
-            <button onClick={handleLogout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">Logout</button>
+            <button onClick={handleLogout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">LOGOUT</button>
           </div>
         </div>
         
@@ -534,7 +534,8 @@ export default function PilotScreen() {
                           "w-1 sm:w-1.5 h-1 sm:h-1.5 rounded-full",
                           line.status === 'RUNNING' ? "bg-green-600 animate-pulse" : line.status === 'STOPPED' ? "bg-red-600" : "bg-slate-400"
                         )} />
-                        {line.status}
+                        {line.status === 'RUNNING' ? "EN PRODUCTION" : 
+                         line.status === 'STOPPED' ? "EN ARRÊT" : "EN ATTENTE"}
                       </span>
                     </div>
                   </div>

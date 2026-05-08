@@ -417,32 +417,40 @@ export default function AdminPanel() {
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.05
+        staggerChildren: 0.01
       }
     }
   };
 
   const item = {
-    hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0 }
+    hidden: { opacity: 0, y: 3 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" } }
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row">
       {/* MOBILE HEADER */}
       <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-        <div className="flex items-center gap-2">
-          <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-            <Terminal size={18} />
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+              <Terminal size={18} />
+            </div>
+            <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
           </div>
-          <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
         </div>
+        <button 
+          onClick={logout}
+          className="p-2 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[10px] uppercase px-3 border border-red-100"
+        >
+          LOGOUT
+        </button>
       </header>
 
       {/* SIDEBAR (Desktop) & SLIDING MENU (Mobile) */}
@@ -464,9 +472,9 @@ export default function AdminPanel() {
               initial={window.innerWidth < 768 ? { x: -300 } : false}
               animate={{ x: 0 }}
               exit={{ x: -300 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
               className={cn(
-                "bg-white w-72 md:w-64 min-h-screen border-r border-gray-200 p-6 shrink-0 flex flex-col gap-8 z-50 transition-all",
+                "bg-white w-72 md:w-64 min-h-screen border-r border-gray-200 p-6 shrink-0 flex flex-col gap-8 z-50 transition-all overflow-y-auto",
                 "fixed inset-y-0 left-0 md:sticky md:top-0",
                 !isMobileMenuOpen && "hidden md:flex"
               )}
@@ -520,11 +528,14 @@ export default function AdminPanel() {
           {activeTab === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in duration-500">
               <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-black tracking-tighter text-gray-900">Dashboard Temps Réel</h2>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dernière mise à jour</p>
-                  <p className="text-sm font-bold text-blue-600">{new Date().toLocaleTimeString()}</p>
-                </div>
+                <h2 className="text-3xl font-black tracking-tighter text-gray-900">Dashboard <span className="text-blue-600 uppercase">Live</span></h2>
+                  <div className="text-right flex flex-col items-end">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <p className="text-[10px] font-black text-green-600 uppercase tracking-widest">Connecté</p>
+                    </div>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">Actualisation en direct</p>
+                  </div>
               </div>
 
               <motion.div 

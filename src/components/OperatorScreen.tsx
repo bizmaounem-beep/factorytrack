@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
-import { Machine, Line, Programme, DowntimeType, DowntimeLog } from '../types';
+import { Machine, Line, Programme, DowntimeType, DowntimeLog, User } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
@@ -10,6 +10,7 @@ export default function OperatorScreen() {
   const { user, logout } = useAuth();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [downtimeTypes, setDowntimeTypes] = useState<DowntimeType[]>([]);
   const [availableProgrammes, setAvailableProgrammes] = useState<Programme[]>([]);
   const [downtimeLogs, setDowntimeLogs] = useState<DowntimeLog[]>([]);
@@ -32,6 +33,7 @@ export default function OperatorScreen() {
     const unsubLines = localApi.onSnapshot('lines', setLines);
     const unsubProgs = localApi.onSnapshot('programmes', setAvailableProgrammes);
     const unsubDown = localApi.onSnapshot('downtime_logs', setDowntimeLogs);
+    const unsubUsers = localApi.onSnapshot('users', setUsers);
     
     return () => {
       unsubMachines();
@@ -39,6 +41,7 @@ export default function OperatorScreen() {
       unsubLines();
       unsubProgs();
       unsubDown();
+      unsubUsers();
     };
   }, []);
 
@@ -116,7 +119,7 @@ export default function OperatorScreen() {
 
     // Stop production
     await localApi.updateDoc('lines', selectedLineId, {
-      status: 'IDLE'
+      status: 'EN ATTENTE'
     });
   };
 
@@ -132,7 +135,7 @@ export default function OperatorScreen() {
       // Clear line
       await localApi.updateDoc('lines', selectedLineId, {
         currentProgrammeId: null,
-        status: 'IDLE',
+        status: 'EN ATTENTE',
         currentOperatorId: null // Clear operator as well
       });
     }
@@ -224,7 +227,7 @@ export default function OperatorScreen() {
     };
     // If we're clearing the programme, stop production
     if (!progId) {
-      updates.status = 'IDLE';
+      updates.status = 'EN ATTENTE';
     }
     await localApi.updateDoc('lines', selectedLineId, updates);
   };
@@ -235,49 +238,70 @@ export default function OperatorScreen() {
       show: {
         opacity: 1,
         transition: {
-          staggerChildren: 0.05
+          staggerChildren: 0.01
         }
       }
     };
 
     const item = {
-      hidden: { opacity: 0, y: 10 },
-      show: { opacity: 1, y: 0 }
+      hidden: { opacity: 0, y: 3 },
+      show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" } }
     };
 
     return (
-      <div className="min-h-screen bg-[#F8FAFC] p-4 flex flex-col items-center justify-center space-y-8">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-2"
-        >
-          <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-100">
-            <Factory size={32} />
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+        <header className="flex justify-between items-center p-4 bg-white border-b border-gray-100 shadow-sm sm:hidden">
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+              <Factory size={16} />
+            </div>
+            <h1 className="font-black text-sm tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
           </div>
-          <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tight">Sélectionner Machine</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] leading-none">Choisissez un poste de travail</p>
-        </motion.div>
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg"
-        >
-          {machines.map(m => (
-            <motion.button
-              key={m.id}
-              variants={item}
-              onClick={() => setSelectedMachineId(m.id)}
-              className="p-5 sm:p-8 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center gap-2 sm:gap-3 transition-all active:scale-[0.98] hover:shadow-md hover:border-blue-200 group"
-            >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                <Settings size={20} sm:size={24} />
-              </div>
-              <span className="font-bold text-slate-800 text-base sm:text-lg uppercase tracking-tight">{m.name}</span>
-            </motion.button>
-          ))}
-        </motion.div>
+          <button onClick={logout} className="p-2 text-red-500 bg-red-50 rounded-lg font-black text-[10px] uppercase px-3">
+             LOGOUT
+          </button>
+        </header>
+
+        <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-8">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center space-y-2"
+          >
+            <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-100">
+              <Factory size={32} />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tight">Sélectionner Machine</h2>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] leading-none">Choisissez un poste de travail</p>
+          </motion.div>
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg"
+          >
+            {machines.map(m => (
+              <motion.button
+                key={m.id}
+                variants={item}
+                onClick={() => setSelectedMachineId(m.id)}
+                className="p-5 sm:p-8 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center gap-2 sm:gap-3 transition-all active:scale-[0.98] hover:shadow-md hover:border-blue-200 group"
+              >
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                  <Factory size={20} sm:size={24} />
+                </div>
+                <span className="font-bold text-slate-800 text-base sm:text-lg uppercase tracking-tight">{m.name}</span>
+              </motion.button>
+            ))}
+          </motion.div>
+        </div>
+        
+        {/* Desktop Logout Shortcut */}
+        <div className="hidden sm:block absolute bottom-4 right-4">
+           <button onClick={logout} className="p-3 bg-white/80 backdrop-blur rounded-full shadow-lg border border-gray-100 text-gray-400 hover:text-red-500 transition-colors">
+               <span className="text-[10px] font-black uppercase">LOGOUT</span>
+           </button>
+        </div>
       </div>
     );
   }
@@ -288,59 +312,103 @@ export default function OperatorScreen() {
       show: {
         opacity: 1,
         transition: {
-          staggerChildren: 0.05
+          staggerChildren: 0.01
         }
       }
     };
 
     const item = {
-      hidden: { opacity: 0, y: 10 },
-      show: { opacity: 1, y: 0 }
+      hidden: { opacity: 0, y: 3 },
+      show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" } }
     };
 
     return (
-      <div className="min-h-screen bg-[#F8FAFC] p-4 flex flex-col items-center justify-center space-y-8">
-        <div className="text-center space-y-2">
-          <motion.button 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            onClick={() => { setSelectedMachineId(null); setSelectedLineId(null); }} 
-            className="text-[10px] font-black text-blue-600 mb-6 flex items-center gap-1.5 mx-auto hover:bg-blue-50 px-4 py-2 rounded-full transition-all uppercase tracking-widest group"
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+        <header className="flex justify-between items-center p-4 bg-white border-b border-gray-100 shadow-sm sm:hidden">
+          <button 
+            onClick={() => setSelectedMachineId(null)}
+            className="p-2 bg-gray-50 rounded-lg text-gray-500"
           >
-            <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Retour aux machines
-          </motion.button>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-100"
-          >
-            <Monitor size={32} />
-          </motion.div>
-          <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tight">Sélectionner Ligne</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] leading-none">
-            Poste: {machines.find(m => m.id === selectedMachineId)?.name}
-          </p>
-        </div>
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg"
-        >
-          {lines.filter(l => l.machineId === selectedMachineId).map(l => (
-            <motion.button
-              key={l.id}
-              variants={item}
-              onClick={() => setSelectedLineId(l.id)}
-              className="p-5 sm:p-8 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center gap-2 sm:gap-3 transition-all active:scale-[0.98] hover:shadow-md hover:border-blue-200 group"
+            <ArrowLeft size={20} />
+          </button>
+          <button onClick={logout} className="p-2 text-red-500 bg-red-50 rounded-lg font-black text-[10px] uppercase px-3">
+             LOGOUT
+          </button>
+        </header>
+
+        <div className="flex-1 p-4 flex flex-col items-center justify-center space-y-8">
+          <div className="text-center space-y-2">
+            <motion.button 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={() => { setSelectedMachineId(null); setSelectedLineId(null); }} 
+              className="text-[10px] font-black text-blue-600 mb-6 flex items-center gap-1.5 mx-auto hover:bg-blue-50 px-4 py-2 rounded-full transition-all uppercase tracking-widest group"
             >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                 <Activity size={20} sm:size={24} />
-              </div>
-              <span className="font-bold text-slate-800 text-base sm:text-lg uppercase tracking-tight">{l.name}</span>
+              <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Retour aux machines
             </motion.button>
-          ))}
-        </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-100"
+            >
+              <Monitor size={32} />
+            </motion.div>
+            <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tight">Sélectionner Ligne</h2>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] leading-none">
+              Poste: {machines.find(m => m.id === selectedMachineId)?.name}
+            </p>
+          </div>
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg"
+          >
+            {lines.filter(l => l.machineId === selectedMachineId).map(l => {
+              const isBusy = (l.status !== 'IDLE' || !!l.currentOperatorId) && l.currentOperatorId !== user?.id;
+              const operatorName = users.find(u => u.id === l.currentOperatorId)?.name;
+
+              return (
+                <motion.button
+                  key={l.id}
+                  variants={item}
+                  disabled={isBusy}
+                  onClick={() => setSelectedLineId(l.id)}
+                  className={cn(
+                    "p-5 sm:p-8 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center gap-2 sm:gap-3 transition-all active:scale-[0.98] group relative overflow-hidden",
+                    isBusy ? "opacity-60 cursor-not-allowed grayscale" : "hover:shadow-md hover:border-blue-200"
+                  )}
+                >
+                  {isBusy && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                      <span className="text-[8px] font-black text-red-600 uppercase tracking-tighter">Occupé</span>
+                    </div>
+                  )}
+                  <div className={cn(
+                    "w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center transition-colors",
+                    isBusy ? "bg-red-50 text-red-300" : "bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600"
+                  )}>
+                     <Activity size={20} sm:size={24} />
+                  </div>
+                  <div className="text-center">
+                    <span className="font-bold text-slate-800 text-base sm:text-lg uppercase tracking-tight block">{l.name}</span>
+                    {isBusy && operatorName && (
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">{operatorName}</span>
+                    )}
+                  </div>
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        </div>
+        
+        {/* Desktop Logout Shortcut */}
+        <div className="hidden sm:block absolute bottom-4 right-4">
+           <button onClick={logout} className="p-3 bg-white/80 backdrop-blur rounded-full shadow-lg border border-gray-100 text-gray-400 hover:text-red-500 transition-colors">
+               <span className="text-[10px] font-black uppercase">LOGOUT</span>
+           </button>
+        </div>
       </div>
     );
   }
@@ -350,15 +418,21 @@ export default function OperatorScreen() {
       {/* HEADER */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm shrink-0">
         <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
-          <button 
-            onClick={() => {
-              if (selectedLineId) setSelectedLineId('');
-              else setSelectedMachineId('');
-            }}
-            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors shrink-0"
-          >
-            <ArrowLeft size={20} />
-          </button>
+          {!activeLine?.status || activeLine?.status === 'IDLE' ? (
+            <button 
+              onClick={() => {
+                if (selectedLineId) setSelectedLineId(null);
+                else setSelectedMachineId(null);
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors shrink-0"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          ) : (
+            <div className="p-2 text-gray-300 cursor-not-allowed shrink-0" title="Production en cours">
+              <ArrowLeft size={20} />
+            </div>
+          )}
           <div className="shrink-0">
             <p className="text-[9px] text-gray-500 uppercase tracking-wider font-semibold leading-none">Opérateur</p>
             <p className="text-xs font-bold text-gray-900 truncate max-w-[120px]">{user?.name}</p>
@@ -372,7 +446,8 @@ export default function OperatorScreen() {
             </p>
           </div>
         </div>
-        <div className="flex items-center justify-end w-full sm:w-auto">
+        
+        <div className="flex items-center justify-between w-full sm:w-auto gap-3">
           <span className={cn(
             "px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5",
             activeLine?.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
@@ -384,8 +459,15 @@ export default function OperatorScreen() {
               activeLine?.status === 'RUNNING' ? "bg-green-600 animate-pulse" :
               activeLine?.status === 'STOPPED' ? "bg-red-600" : "bg-gray-400"
             )} />
-            {activeLine?.status}
+            {activeLine?.status === 'RUNNING' ? "EN PRODUCTION" : 
+             activeLine?.status === 'STOPPED' ? "EN ARRÊT" : "EN ATTENTE"}
           </span>
+          
+          <div className="sm:hidden flex items-center gap-1">
+             <button onClick={logout} className="p-2 bg-red-50 rounded-lg text-red-500 font-black text-[10px] uppercase px-3">
+                 LOGOUT
+             </button>
+          </div>
         </div>
       </header>
 
@@ -673,6 +755,7 @@ export default function OperatorScreen() {
             initial={{ y: 50 }}
             animate={{ y: 0 }}
             exit={{ y: 50 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
             className="bg-red-600 text-white flex items-center justify-center py-3 gap-3 shrink-0"
           >
             <AlertCircle size={20} fill="currentColor" className="animate-pulse" />
@@ -686,12 +769,9 @@ export default function OperatorScreen() {
       </AnimatePresence>
 
       {/* ADMIN NAV ACCESS */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-         <button onClick={() => { setSelectedLineId(null); }} className="p-3 bg-white/80 backdrop-blur rounded-full shadow-lg border border-gray-100 text-gray-400 hover:text-blue-600 transition-colors">
-             <Settings size={18} />
-         </button>
+      <div className="hidden sm:flex absolute bottom-4 right-4">
          <button onClick={logout} className="p-3 bg-white/80 backdrop-blur rounded-full shadow-lg border border-gray-100 text-gray-400 hover:text-red-500 transition-colors">
-             <span className="text-[10px] font-black uppercase">OFF</span>
+             <span className="text-[10px] font-black uppercase">LOGOUT</span>
          </button>
       </div>
     </div>
