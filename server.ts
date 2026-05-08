@@ -76,6 +76,32 @@ db.exec(`
   );
 `);
 
+// Seed default data if empty
+const count = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+if (count.count === 0) {
+  console.log('Seeding initial database data...');
+  
+  // Default Admin
+  db.prepare('INSERT INTO users (id, name, pin, role) VALUES (?, ?, ?, ?)').run(
+    'admin-1', 'Admin', '1234', 'ADMIN'
+  );
+
+  // Default Downtime Types
+  const dtTypes = [
+    { id: 'dt-1', name: 'Panne Machine', icon: '⚙️' },
+    { id: 'dt-2', name: 'Changement Format', icon: '🔧' },
+    { id: 'dt-3', name: 'Manque Matière', icon: '📦' },
+    { id: 'dt-4', name: 'Pause / Nettoyage', icon: '🧹' },
+    { id: 'dt-5', name: 'Réglage Qualité', icon: '⚖️' },
+    { id: 'dt-6', name: 'Autre', icon: '❓' }
+  ];
+  
+  const insertDT = db.prepare('INSERT INTO downtime_types (id, name, icon) VALUES (?, ?, ?)');
+  for (const dt of dtTypes) {
+    insertDT.run(dt.id, dt.name, dt.icon);
+  }
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json());
