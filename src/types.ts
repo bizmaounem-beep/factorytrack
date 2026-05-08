@@ -22,6 +22,7 @@ export interface Line {
   currentProgrammeId?: string;
   currentOperatorId?: string;
   activeDowntimeId?: string;
+  tracksProduction: boolean;
 }
 
 export interface Programme {
@@ -29,7 +30,6 @@ export interface Programme {
   name: string;
   machineId: string;
   lineId: string;
-  targetPallets: number;
   producedPallets: number;
   status: 'ACTIVE' | 'FINISHED';
   createdAt: string;

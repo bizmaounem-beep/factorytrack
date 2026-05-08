@@ -4,6 +4,8 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,7 +35,8 @@ db.exec(`
     status TEXT,
     currentProgrammeId TEXT,
     currentOperatorId TEXT,
-    activeDowntimeId TEXT
+    activeDowntimeId TEXT,
+    tracksProduction INTEGER DEFAULT 1
   );
 
   CREATE TABLE IF NOT EXISTS programmes (
@@ -41,7 +44,6 @@ db.exec(`
     name TEXT,
     machineId TEXT,
     lineId TEXT,
-    targetPallets INTEGER,
     producedPallets INTEGER,
     status TEXT,
     createdAt TEXT
@@ -104,11 +106,30 @@ if (count.count === 0) {
 
 async function startServer() {
   const app = express();
+  const httpServer = createServer(app);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
   app.use(express.json());
 
+  // Socket logic
+  io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+    socket.on('disconnect', () => {
+      console.log('User disconnected');
+    });
+  });
+
+  // Broadcast helper
+  const notifyChange = (collection: string) => {
+    io.emit('db_change', { collection });
+  };
+
   // API Endpoints
-  // Generic collection operations to mimic Firestore-ish interaction
-  
   app.get('/api/db/:collection', (req, res) => {
     try {
       const rows = db.prepare(`SELECT * FROM ${req.params.collection}`).all();
@@ -138,6 +159,8 @@ async function startServer() {
       
       const stmt = db.prepare(`INSERT INTO ${req.params.collection} (${keys.join(',')}) VALUES (${placeholders})`);
       stmt.run(...values);
+      
+      notifyChange(req.params.collection);
       res.json(data);
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
@@ -153,6 +176,8 @@ async function startServer() {
       
       const stmt = db.prepare(`UPDATE ${req.params.collection} SET ${sets} WHERE id = ?`);
       stmt.run(...values, req.params.id);
+      
+      notifyChange(req.params.collection);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
@@ -162,6 +187,7 @@ async function startServer() {
   app.delete('/api/db/:collection/:id', (req, res) => {
     try {
       db.prepare(`DELETE FROM ${req.params.collection} WHERE id = ?`).run(req.params.id);
+      notifyChange(req.params.collection);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
@@ -171,7 +197,13 @@ async function startServer() {
   // Specialized Login Route
   app.post('/api/login', (req, res) => {
     const { name, pin } = req.body;
-    const user = db.prepare('SELECT * FROM users WHERE name = ? AND pin = ?').get(name, pin);
+    let user;
+    if (name) {
+      user = db.prepare('SELECT * FROM users WHERE name = ? AND pin = ?').get(name, pin);
+    } else {
+      user = db.prepare('SELECT * FROM users WHERE pin = ?').get(pin);
+    }
+    
     if (user) {
       res.json(user);
     } else {
@@ -195,7 +227,7 @@ async function startServer() {
   }
 
   const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });
 }

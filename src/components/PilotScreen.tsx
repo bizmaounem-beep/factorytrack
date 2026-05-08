@@ -23,13 +23,13 @@ export default function PilotScreen() {
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
   const [showCreateNew, setShowCreateNew] = useState(false);
   const [newProgName, setNewProgName] = useState('');
-  const [newProgTarget, setNewProgTarget] = useState('100');
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editModalType, setEditModalType] = useState<'prod' | 'down'>('prod');
   const [editModalData, setEditModalData] = useState<any>({});
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
+  const [declaringDowntimeLineId, setDeclaringDowntimeLineId] = useState<string | null>(null);
 
   useEffect(() => {
     const u1 = localApi.onSnapshot('machines', setMachines);
@@ -101,17 +101,13 @@ export default function PilotScreen() {
   }, [downLogs]);
 
   const handleAssignProgramme = async () => {
-    if (!isAssigning || !newProgName || !newProgTarget) return;
-
-    const target = parseInt(newProgTarget);
-    if (isNaN(target)) return;
+    if (!isAssigning || !newProgName) return;
 
     // Create new programme
     const newProg = {
       name: newProgName,
       machineId: selectedMachineId,
       lineId: isAssigning,
-      targetPallets: target,
       producedPallets: 0,
       status: 'ACTIVE' as const,
       createdAt: new Date().toISOString()
@@ -127,7 +123,6 @@ export default function PilotScreen() {
     setIsAssigning(null);
     setShowCreateNew(false);
     setNewProgName('');
-    setNewProgTarget('100');
   };
 
   const handleSelectExistingProgramme = async (progId: string) => {
@@ -213,6 +208,28 @@ export default function PilotScreen() {
     }
   };
 
+  const handleStartDowntime = async (lineId: string, typeId: string) => {
+    if (!user) return;
+    try {
+      const log = await localApi.addDoc('downtime_logs', {
+        machineId: selectedMachineId,
+        lineId,
+        typeId,
+        operatorId: user.id,
+        startTime: new Date().toISOString(),
+      });
+
+      await localApi.updateDoc('lines', lineId, {
+        activeDowntimeId: log.id,
+        status: 'STOPPED'
+      });
+      setDeclaringDowntimeLineId(null);
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de la déclaration de l\'arrêt');
+    }
+  };
+
   // Filter logs for the selected machine
   const filteredProdLogs = prodLogs.filter(log => log.machineId === selectedMachineId);
   const filteredDownLogs = downLogs.filter(log => log.machineId === selectedMachineId);
@@ -222,7 +239,7 @@ export default function PilotScreen() {
 
   // Filter programmes that are already assigned to other lines
   const assignedProgIds = lines.map(l => l.currentProgrammeId).filter(Boolean);
-  const availableProgs = programmes.filter(p => p.machineId === selectedMachineId && !assignedProgIds.includes(p.id));
+  const availableProgs = programmes.filter(p => p.machineId === selectedMachineId && p.status === 'ACTIVE' && !assignedProgIds.includes(p.id));
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] pb-20">
@@ -424,58 +441,56 @@ export default function PilotScreen() {
                     </p>
                   </div>
                   
-                  <div className="col-span-2 space-y-2 mt-1">
-                    <div className="flex justify-between items-end">
-                      <div className="space-y-0">
-                        <p className="text-[8px] sm:text-[9px] text-gray-400 font-black uppercase tracking-widest">Progression</p>
-                        <div className="flex items-baseline gap-1">
-                          <p className="text-xl sm:text-2xl font-black text-blue-600 leading-none">
+                  {line.tracksProduction !== 0 && (
+                    <div className="col-span-2 space-y-2 mt-1">
+                      <div className="flex justify-between items-end bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
+                        <div className="space-y-0 text-center flex-1">
+                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Palettes Produites</p>
+                          <p className="text-3xl font-black text-blue-600 leading-none mt-1">
                             {prog ? prog.producedPallets : '0'}
                           </p>
-                          <p className="text-[10px] font-bold text-gray-400">/ {prog ? prog.targetPallets : '0'}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-base sm:text-lg font-black text-blue-900 leading-none">
-                           {prog ? `${Math.round((prog.producedPallets / prog.targetPallets) * 100)}%` : '0%'}
-                        </p>
-                      </div>
                     </div>
-                    
-                    {/* Progress Bar */}
-                    <div className="w-full h-1.5 sm:h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 shadow-inner">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: prog ? `${Math.min((prog.producedPallets / prog.targetPallets) * 100, 100)}%` : '0%' }}
-                        className={cn(
-                          "h-full rounded-full transition-all duration-500",
-                          line.status === 'RUNNING' ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" : "bg-gray-400"
-                        )}
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                {down && (
-                  <div className="bg-status-downtime-bg p-3 mx-4 mb-4 rounded-lg flex justify-between items-center border border-orange-100 shadow-inner">
-                    <div className="flex items-center gap-2 text-status-downtime-text">
-                      <Activity size={14} className="animate-pulse" />
-                      <span className="text-xs font-bold uppercase tracking-tighter">{downType?.name || 'Arrêt'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-mono font-bold text-orange-800 bg-white/40 px-2 py-0.5 rounded">
-                          Depuis {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                       </span>
-                       <button 
-                         onClick={() => setConfirmDelete({col: 'downtime_logs', id: down.id, name: `Arrêt actif: ${downType?.name}`})}
-                         className="p-1.5 text-red-600 bg-white/40 rounded hover:bg-red-50 transition-colors"
-                         title="Supprimer cet arrêt"
-                       >
-                         <Trash2 size={12} />
-                       </button>
-                    </div>
-                  </div>
-                )}
+                <div className="px-4 pb-4">
+                  {down ? (
+                     <div className="bg-status-downtime-bg p-3 rounded-lg flex justify-between items-center border border-orange-100 shadow-inner">
+                        <div className="flex items-center gap-2 text-status-downtime-text">
+                          <Activity size={14} className="animate-pulse" />
+                          <span className="text-xs font-bold uppercase tracking-tighter">{downType?.name || 'Arrêt'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold text-orange-800 bg-white/40 px-2 py-0.5 rounded">
+                              Depuis {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <button 
+                            onClick={() => setConfirmDelete({col: 'downtime_logs', id: down.id, name: `Arrêt actif: ${downType?.name}`})}
+                            className="p-1.5 text-red-600 bg-white/40 rounded hover:bg-red-50 transition-colors"
+                            title="Supprimer cet arrêt"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                  ) : (
+                    <button 
+                      disabled={line.status !== 'RUNNING'}
+                      onClick={() => setDeclaringDowntimeLineId(line.id)}
+                      className={cn(
+                        "w-full py-2.5 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 transition-all",
+                        line.status === 'RUNNING' 
+                          ? "border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 shadow-sm"
+                          : "border-gray-100 text-gray-300 cursor-not-allowed"
+                      )}
+                    >
+                      <Timer size={14} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Déclarer un Arrêt</span>
+                    </button>
+                  )}
+                </div>
               </motion.div>
             );
           })}
@@ -760,7 +775,7 @@ export default function PilotScreen() {
                           >
                             <div>
                               <p className="font-bold text-gray-900 group-hover:text-blue-700">{p.name}</p>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cible: {p.targetPallets} palettes</p>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">Programme Actif</p>
                             </div>
                             <div className="w-8 h-8 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-300 group-hover:text-blue-500 group-hover:border-blue-200 transition-all">
                               <Plus size={16} />
@@ -802,15 +817,6 @@ export default function PilotScreen() {
                         className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Objectif palettes</label>
-                      <input 
-                        type="number"
-                        value={newProgTarget}
-                        onChange={e => setNewProgTarget(e.target.value)}
-                        className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-xl"
-                      />
-                    </div>
                   </div>
                 </div>
               )}
@@ -834,6 +840,43 @@ export default function PilotScreen() {
                   Créer & Assigner
                 </button>
               )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+      {/* DOWNTIME PICKER MODAL */}
+      {declaringDowntimeLineId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+          >
+            <div className="p-6 bg-orange-600 text-white">
+              <h2 className="text-xl font-black tracking-tight uppercase italic">Déclarer un Arrêt</h2>
+              <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80">
+                Ligne: {lines.find(l => l.id === declaringDowntimeLineId)?.name}
+              </p>
+            </div>
+            <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
+              {downtimeTypes.map(type => (
+                <button
+                  key={type.id}
+                  onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id)}
+                  className="p-4 border border-orange-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-50 transition-all group"
+                >
+                  <span className="text-2xl group-hover:scale-110 transition-transform">{type.icon}</span>
+                  <span className="text-[9px] font-black uppercase text-gray-700 text-center leading-tight">{type.name}</span>
+                </button>
+              ))}
+            </div>
+            <div className="p-4 bg-gray-50 flex gap-3">
+              <button 
+                onClick={() => setDeclaringDowntimeLineId(null)}
+                className="w-full py-4 text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 rounded-2xl"
+              >
+                Annuler
+              </button>
             </div>
           </motion.div>
         </div>

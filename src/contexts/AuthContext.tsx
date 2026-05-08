@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { localApi } from '../lib/localApi';
+import { loginLocal } from '../lib/localApi';
 
 interface AuthContextType {
   user: User | null;
@@ -26,8 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (pin: string) => {
     try {
-      const users = await localApi.getCollection('users');
-      const foundUser = users.find((u: User) => u.pin === pin);
+      const foundUser = await loginLocal(pin);
       
       if (foundUser) {
         setUser(foundUser);

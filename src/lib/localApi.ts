@@ -1,5 +1,8 @@
 // Local API helper to replace Firebase
+import { io } from 'socket.io-client';
+
 const API_BASE = '/api/db';
+const socket = io();
 
 export const localApi = {
   async getCollection(collection: string) {
@@ -32,28 +35,41 @@ export const localApi = {
     return res.json();
   },
 
-  // Mimic onSnapshot with polling
-  onSnapshot(collection: string, callback: (docs: any[]) => void, interval = 2000) {
+  // Real-time updates with Socket.io
+  onSnapshot(collection: string, callback: (docs: any[]) => void) {
     const fetchAndCallback = async () => {
       try {
         const docs = await this.getCollection(collection);
         callback(docs);
       } catch (e) {
-        console.error(`Polling error for ${collection}:`, e);
+        console.error(`Fetch error for ${collection}:`, e);
       }
     };
 
+    // Initial fetch
     fetchAndCallback();
-    const id = setInterval(fetchAndCallback, interval);
-    return () => clearInterval(id);
+
+    // Listen for changes
+    const handler = (data: { collection: string }) => {
+      if (data.collection === collection) {
+        fetchAndCallback();
+      }
+    };
+
+    socket.on('db_change', handler);
+    
+    // Return unsubscribe function
+    return () => {
+      socket.off('db_change', handler);
+    };
   }
 };
 
-export const loginLocal = async (name: string, pin: string) => {
+export const loginLocal = async (pin: string) => {
   const res = await fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, pin })
+    body: JSON.stringify({ pin })
   });
   if (!res.ok) throw new Error('Login failed');
   return res.json();

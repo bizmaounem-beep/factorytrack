@@ -1107,13 +1107,16 @@ export default function AdminPanel() {
                       <option key={l.id} value={l.id}>{l.name}</option>
                     ))}
                   </select>
-                  <input 
-                    placeholder="Objectif (palettes)"
-                    type="number"
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                    value={modalData.targetPallets || ''}
-                    onChange={e => setModalData({...modalData, targetPallets: e.target.value})}
-                  />
+                  {editingId && (
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      value={modalData.status || 'ACTIVE'}
+                      onChange={e => setModalData({...modalData, status: e.target.value})}
+                    >
+                      <option value="ACTIVE">ACTIF</option>
+                      <option value="FINISHED">CLÔTURÉ</option>
+                    </select>
+                  )}
                 </>
               )}
 
@@ -1146,12 +1149,26 @@ export default function AdminPanel() {
               )}
 
               {(modalType === 'machine' || modalType === 'line') && (
-                <input 
-                  placeholder={modalType === 'machine' ? "Nom de la machine" : "Nom de la ligne"}
-                  className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                  value={modalData.name || ''}
-                  onChange={e => setModalData({...modalData, name: e.target.value})}
-                />
+                <>
+                  <input 
+                    placeholder={modalType === 'machine' ? "Nom de la machine" : "Nom de la ligne"}
+                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    value={modalData.name || ''}
+                    onChange={e => setModalData({...modalData, name: e.target.value})}
+                  />
+                  {modalType === 'line' && (
+                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                      <input 
+                        type="checkbox"
+                        id="tracksProduction"
+                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={modalData.tracksProduction !== false}
+                        onChange={e => setModalData({...modalData, tracksProduction: e.target.checked})}
+                      />
+                      <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700">Suivi de production (Palettes)</label>
+                    </div>
+                  )}
+                </>
               )}
 
               {modalType === 'downtime' && (

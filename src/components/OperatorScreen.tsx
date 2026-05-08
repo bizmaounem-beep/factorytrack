@@ -3,7 +3,7 @@ import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { Machine, Line, Programme, DowntimeType, DowntimeLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity } from 'lucide-react';
+import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
 
 export default function OperatorScreen() {
@@ -21,7 +21,7 @@ export default function OperatorScreen() {
   const [activeProgramme, setActiveProgramme] = useState<Programme | null>(null);
   const [activeDowntime, setActiveDowntime] = useState<DowntimeLog | null>(null);
   
-  const [palletInput, setPalletInput] = useState('');
+  const [palletInput, setPalletInput] = useState('1');
   const [downtimeDescription, setDowntimeDescription] = useState('');
   const [timer, setTimer] = useState(0);
 
@@ -109,9 +109,27 @@ export default function OperatorScreen() {
     });
   };
 
-  const handleAddPallets = async () => {
-    const count = parseInt(palletInput);
-    if (isNaN(count) || count <= 0 || !activeProgramme || !user) return;
+  const handleFinishProgramme = async () => {
+    if (!selectedLineId || !activeProgramme) return;
+    
+    if (window.confirm('Voulez-vous vraiment clôturer ce programme ? Il ne sera plus modifiable par les opérateurs.')) {
+      // Mark programme as FINISHED
+      await localApi.updateDoc('programmes', activeProgramme.id, {
+        status: 'FINISHED'
+      });
+      
+      // Clear line
+      await localApi.updateDoc('lines', selectedLineId, {
+        currentProgrammeId: null,
+        status: 'IDLE',
+        currentOperatorId: null // Clear operator as well
+      });
+    }
+  };
+
+  const handleAddPallets = async (overrideCount?: number) => {
+    let count = typeof overrideCount === 'number' ? overrideCount : parseInt(palletInput);
+    if (isNaN(count) || count === 0 || !activeProgramme || !user) return;
 
     // Log production
     await localApi.addDoc('production_logs', {
@@ -119,7 +137,7 @@ export default function OperatorScreen() {
       operatorId: user.id,
       machineId: activeLine?.machineId,
       lineId: activeLine?.id,
-      count,
+      count, // can be negative for removal
       timestamp: new Date().toISOString()
     });
 
@@ -127,8 +145,6 @@ export default function OperatorScreen() {
     await localApi.updateDoc('programmes', activeProgramme.id, {
       producedPallets: (activeProgramme.producedPallets || 0) + count
     });
-
-    setPalletInput('');
   };
 
   const handleStartDowntime = async (typeId: string) => {
@@ -332,7 +348,7 @@ export default function OperatorScreen() {
                             <div className="flex justify-between items-center">
                               <div>
                                 <p className="font-black text-gray-900 group-hover:text-blue-700">{p.name}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Objectif: {p.targetPallets} palettes</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">Programme de production</p>
                               </div>
                               <Play size={16} className="text-gray-300 group-hover:text-blue-500" fill="currentColor" />
                             </div>
@@ -357,85 +373,81 @@ export default function OperatorScreen() {
                         {activeLine?.status !== 'RUNNING' && (
                           <button 
                             onClick={() => handleSelectProgramme('')} 
-                            className="text-[9px] font-black uppercase text-blue-600 hover:underline mb-1"
+                            className="text-[9px] font-black uppercase text-blue-600 hover:underline"
                           >
                             Changer
                           </button>
                         )}
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tight">Cible</p>
-                          <p className="text-base sm:text-lg font-bold text-gray-900">{activeProgramme.targetPallets}</p>
-                        </div>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
-                      <div className="bg-gray-50 p-2 rounded">
-                        <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold">Produit</p>
-                        <p className="text-sm md:text-lg font-bold text-blue-600">
-                          {activeProgramme.producedPallets} <span className="text-[8px] md:text-xs font-normal text-gray-400">pal</span>
-                        </p>
+                    {activeLine?.tracksProduction !== 0 && (
+                      <div className="grid grid-cols-1 gap-2 mt-1">
+                        <div className="bg-gray-50 p-4 rounded-xl border border-blue-50 text-center">
+                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Total Produit</p>
+                          <p className="text-4xl font-black text-blue-600 italic">
+                            {activeProgramme.producedPallets} <span className="text-sm font-bold text-gray-400 not-italic uppercase tracking-tight">Palettes</span>
+                          </p>
+                        </div>
                       </div>
-                      <div className="bg-gray-50 p-2 rounded border border-orange-50 lg:border-transparent">
-                        <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold">Reste</p>
-                        <p className="text-sm md:text-lg font-bold text-orange-600">
-                          {Math.max(0, activeProgramme.targetPallets - activeProgramme.producedPallets)} <span className="text-[8px] md:text-xs font-normal text-gray-400">pal</span>
-                        </p>
-                      </div>
-                      <div className="bg-gray-50 p-2 rounded col-span-2 lg:col-span-1 border border-green-50 lg:border-transparent">
-                        <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold text-center lg:text-left">Efficacité</p>
-                        <p className="text-sm md:text-lg font-bold text-green-600 text-center lg:text-left">
-                          {activeProgramme.targetPallets > 0 
-                            ? Math.round((activeProgramme.producedPallets / activeProgramme.targetPallets) * 100) 
-                            : 0}%
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="w-full bg-gray-100 rounded-full h-2.5 mt-1 overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min((activeProgramme.producedPallets / activeProgramme.targetPallets) * 100, 100)}%` }}
-                        className="h-full bg-blue-500 rounded-full shadow-inner"
-                      />
-                    </div>
+                    )}
                   </>
                 )}
               </div>
 
               {/* SAISIE CARD */}
-              {activeLine?.status === 'RUNNING' && activeProgramme && (
+              {activeLine?.status === 'RUNNING' && activeProgramme && activeLine?.tracksProduction !== 0 && (
                 <div className="card p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4">
-                  <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Saisie de Production</h2>
-                  <div className="flex gap-2 sm:gap-3">
+                  <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Ajuster Production</h2>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => {
+                         const val = parseInt(palletInput) || 1;
+                         setPalletInput(val.toString());
+                         handleAddPallets(-val);
+                      }}
+                      className="p-4 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors shadow-sm"
+                    >
+                      <Minus size={24} />
+                    </button>
                     <input 
                       type="number"
                       value={palletInput}
                       onChange={e => setPalletInput(e.target.value)}
-                      placeholder="0"
-                      className="flex-1 border-2 border-gray-200 rounded-lg px-3 py-2 text-base sm:text-lg font-bold focus:border-blue-500 outline-none transition-colors shadow-inner"
-                      autoFocus
+                      className="flex-1 border-2 border-gray-100 rounded-xl px-4 py-3 text-2xl font-black text-center focus:border-blue-500 outline-none transition-all shadow-inner bg-gray-50"
                     />
                     <button 
                       onClick={handleAddPallets}
-                      className="bg-[#3B82F6] text-white px-4 sm:px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-md active:scale-95 text-sm"
+                      className="p-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg active:scale-95"
                     >
-                      OK
+                      <Plus size={24} />
                     </button>
                   </div>
+                  <p className="text-[10px] font-bold text-gray-400 text-center uppercase tracking-tighter">Entrez le nombre de palettes à ajouter ou retirer</p>
                 </div>
               )}
 
               {/* ACTIONS */}
               <div className="mt-auto flex gap-3 sm:gap-4 min-h-[60px] sm:min-h-[80px]">
                 {activeLine?.status !== 'RUNNING' ? (
-                  <button 
-                    disabled={!activeProgramme || !!activeDowntime}
-                    onClick={handleStartProduction}
-                    className="flex-1 border-2 border-[#22C55E] text-[#15803D] bg-green-50/50 rounded-lg flex items-center justify-center gap-2 sm:gap-3 font-black text-sm sm:text-lg hover:bg-green-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-sm uppercase italic tracking-tighter"
-                  >
-                    <Play size={20} sm:size={24} fill="currentColor" /> START
-                  </button>
+                  <div className="flex gap-2 sm:gap-4 w-full">
+                    <button 
+                      disabled={!activeProgramme || !!activeDowntime}
+                      onClick={handleStartProduction}
+                      className="flex-[3] border-2 border-[#22C55E] text-[#15803D] bg-green-50/50 rounded-lg flex items-center justify-center gap-2 sm:gap-3 font-black text-sm sm:text-lg hover:bg-green-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-sm uppercase italic tracking-tighter"
+                    >
+                      <Play size={20} sm:size={24} fill="currentColor" /> START
+                    </button>
+                    {activeProgramme && !activeDowntime && (
+                      <button 
+                        onClick={handleFinishProgramme}
+                        className="flex-1 border-2 border-gray-400 text-gray-600 bg-gray-50 rounded-lg flex flex-col items-center justify-center gap-1 font-black px-2 shadow-sm uppercase tracking-tighter hover:bg-white hover:border-blue-400 hover:text-blue-600 transition-all group"
+                      >
+                        <CheckCircle size={18} className="text-gray-400 group-hover:text-blue-500" />
+                        <span className="text-[8px] sm:text-[10px]">Clôturer</span>
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <button 
                     onClick={handleStopProduction}
