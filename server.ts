@@ -102,6 +102,10 @@ if (count.count === 0) {
   for (const dt of dtTypes) {
     insertDT.run(dt.id, dt.name, dt.icon);
   }
+
+  // Sample machine and line
+  db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m1', 'Machine Principale');
+  db.prepare('INSERT INTO lines (id, machineId, name, status) VALUES (?, ?, ?, ?)').run('l1', 'm1', 'Ligne de Production A', 'IDLE');
 }
 
 async function startServer() {

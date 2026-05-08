@@ -103,7 +103,7 @@ export default function OperatorScreen() {
       for (const line of heldLines) {
         await localApi.updateDoc('lines', line.id, {
           currentOperatorId: null,
-          status: 'EN ATTENTE'
+          status: 'IDLE'
         });
       }
     } catch (e) {
@@ -134,7 +134,7 @@ export default function OperatorScreen() {
 
     // Stop production
     await localApi.updateDoc('lines', selectedLineId, {
-      status: 'EN ATTENTE',
+      status: 'IDLE',
       currentOperatorId: null
     });
   };
@@ -151,7 +151,7 @@ export default function OperatorScreen() {
       // Clear line
       await localApi.updateDoc('lines', selectedLineId, {
         currentProgrammeId: null,
-        status: 'EN ATTENTE',
+        status: 'IDLE',
         currentOperatorId: null // Clear operator as well
       });
     }
@@ -243,7 +243,7 @@ export default function OperatorScreen() {
     };
     // If we're clearing the programme, stop production
     if (!progId) {
-      updates.status = 'EN ATTENTE';
+      updates.status = 'IDLE';
     }
     await localApi.updateDoc('lines', selectedLineId, updates);
   };
@@ -434,7 +434,7 @@ export default function OperatorScreen() {
       {/* HEADER */}
       <header className="bg-white border-b border-gray-200 px-2 py-0.5 flex flex-col sm:flex-row justify-between items-center gap-0.5 shadow-sm shrink-0">
         <div className="flex items-center gap-1 w-full sm:w-auto overflow-hidden">
-          {!activeLine?.status || activeLine?.status === 'EN ATTENTE' ? (
+          {!activeLine?.status || activeLine?.status === 'IDLE' ? (
             <button 
               onClick={() => {
                 if (selectedLineId) setSelectedLineId(null);

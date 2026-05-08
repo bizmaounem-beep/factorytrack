@@ -11,50 +11,9 @@ export default function App() {
   const { user, loading } = useAuth();
   const [initializing, setInitializing] = useState(false);
 
-  // Auto-bootstrap empty DB
+  // Auto-bootstrap check removed - Handled by server seeding
   useEffect(() => {
-    const bootstrap = async () => {
-      try {
-        const users = await localApi.getCollection('users');
-        if (users.length === 0) {
-          setInitializing(true);
-          // Add default admin
-          const adminRef = await localApi.addDoc('users', {
-            name: 'Super Admin',
-            pin: '0000',
-            role: 'ADMIN'
-          });
-          
-          // Add some types
-          const types = [
-            { id: '1', name: 'Panne technique', icon: '🛠️' },
-            { id: '2', name: 'Changement programme', icon: '📦' },
-            { id: '3', name: 'Manque matière', icon: '🏗️' },
-            { id: '4', name: 'Pause repas', icon: '☕' },
-            { id: '5', name: 'Attente produit', icon: '⏳' },
-            { id: '6', name: 'Bourrage ligne', icon: '🛑' },
-            { id: '7', name: 'Problème traçabilité', icon: '🔎' }
-          ];
-          for (const t of types) {
-            await localApi.addDoc('downtime_types', t);
-          }
-
-          // Add a default machine/line
-          const machRef = await localApi.addDoc('machines', { id: 'm1', name: 'Machine Central' });
-          await localApi.addDoc('lines', { 
-            id: 'l1',
-            name: 'Ligne Alpha', 
-            machineId: machRef.id, 
-            status: 'IDLE' 
-          });
-
-          window.location.reload();
-        }
-      } catch (e) {
-        console.error('Bootstrap error:', e);
-      }
-    };
-    bootstrap();
+    // We could still check if DB is ready here if needed
   }, []);
 
   if (loading || initializing) {

@@ -117,7 +117,7 @@ export default function PilotScreen() {
     // Update line
     await localApi.updateDoc('lines', isAssigning, {
       currentProgrammeId: progRef.id,
-      status: 'EN ATTENTE'
+      status: 'IDLE'
     });
 
     setIsAssigning(null);
@@ -129,7 +129,7 @@ export default function PilotScreen() {
     if (!isAssigning) return;
     await localApi.updateDoc('lines', isAssigning, {
       currentProgrammeId: progId,
-      status: 'EN ATTENTE'
+      status: 'IDLE'
     });
     setIsAssigning(null);
   };
@@ -207,7 +207,7 @@ export default function PilotScreen() {
           if (!logData.endTime) {
             await localApi.updateDoc('lines', logData.lineId, {
               activeDowntimeId: null,
-              status: 'EN ATTENTE'
+              status: 'IDLE'
             });
           }
         }
@@ -235,7 +235,7 @@ export default function PilotScreen() {
           }
           await localApi.updateDoc('lines', line.id, {
             activeDowntimeId: null,
-            status: 'EN ATTENTE'
+            status: 'IDLE'
           });
         }
       }

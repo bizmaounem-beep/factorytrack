@@ -7,6 +7,10 @@ const socket = io();
 export const localApi = {
   async getCollection(collection: string) {
     const res = await fetch(`${API_BASE}/${collection}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    }
     return res.json();
   },
 
@@ -16,6 +20,10 @@ export const localApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    }
     return res.json();
   },
 
@@ -25,6 +33,10 @@ export const localApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    }
     return res.json();
   },
 
@@ -32,6 +44,10 @@ export const localApi = {
     const res = await fetch(`${API_BASE}/${collection}/${id}`, {
       method: 'DELETE'
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    }
     return res.json();
   },
 
