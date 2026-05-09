@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, Factory, Package, Timer, History, 
   Download, Plus, Trash2, PieChart, LayoutDashboard,
-  Box, Terminal, Activity, Pencil, Menu, X
+  Box, Terminal, Activity, Pencil, Menu, X, Clock
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ExcelJS from 'exceljs';
@@ -14,11 +15,13 @@ import { saveAs } from 'file-saver';
 
 export default function AdminPanel() {
   const { logout } = useAuth();
+  const { t } = useLanguage();
   const { 
     users, 
     machines, 
     lines, 
     programmes, 
+    shifts,
     downtimeTypes, 
     productionLogs: prodLogs, 
     downtimeLogs: downLogs 
@@ -29,13 +32,14 @@ export default function AdminPanel() {
 
   const [historyMachineFilter, setHistoryMachineFilter] = useState<string>('');
   const [historyLineFilter, setHistoryLineFilter] = useState<string>('');
+  const [historyShiftFilter, setHistoryShiftFilter] = useState<string>('');
   const [historyDateFilter, setHistoryDateFilter] = useState<string>('');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>('production');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [modalType, setModalType] = useState<'user' | 'machine' | 'line' | 'downtime' | 'programme' | 'production_log' | 'downtime_log'>('user');
+  const [modalType, setModalType] = useState<'user' | 'machine' | 'line' | 'downtime' | 'programme' | 'production_log' | 'downtime_log' | 'shift'>('user');
   const [modalData, setModalData] = useState<any>({});
   const [selectedMachineForLine, setSelectedMachineForLine] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
@@ -57,6 +61,7 @@ export default function AdminPanel() {
         modalType === 'machine' ? 'machines' : 
         modalType === 'line' ? 'lines' : 
         modalType === 'programme' ? 'programmes' : 
+        modalType === 'shift' ? 'shifts' :
         modalType === 'production_log' ? 'production_logs' :
         modalType === 'downtime_log' ? 'downtime_logs' : 'downtime_types';
 
@@ -145,7 +150,7 @@ export default function AdminPanel() {
       setEditingId(null);
     } catch (error) {
       console.error('Error saving item:', error);
-      alert('Erreur lors de l\'enregistrement.');
+      alert(t('error_saving'));
     }
   };
 
@@ -193,7 +198,7 @@ export default function AdminPanel() {
       setConfirmDelete(null);
     } catch (error) {
       console.error('Error deleting document:', error);
-      alert('Erreur: Impossible de supprimer cet élément.');
+      alert(t('error_deleting'));
     }
   };
 
@@ -219,7 +224,7 @@ export default function AdminPanel() {
     let title = "";
 
     if (type === 'production') {
-      title = "RAPPORT DE PRODUCTION - FACTORYTRACK PRO";
+      title = t('production_report_title');
       fileName = `Production_${new Date().toISOString().split('T')[0]}.xlsx`;
 
       // Define columns for Data sheet
@@ -227,6 +232,7 @@ export default function AdminPanel() {
         { header: 'Date', key: 'date', width: 15 },
         { header: 'Machine', key: 'machine', width: 20 },
         { header: 'Ligne', key: 'line', width: 15 },
+        { header: 'Shift', key: 'shift', width: 15 },
         { header: 'Programme', key: 'programme', width: 25 },
         { header: 'Palettes', key: 'pallets', width: 12 },
       ];
@@ -237,6 +243,7 @@ export default function AdminPanel() {
           date: new Date(log.timestamp).toLocaleDateString(),
           machine: machines.find(m => m.id === log.machineId)?.name || '—',
           line: lines.find(l => l.id === log.lineId)?.name || '—',
+          shift: shifts.find(s => s.id === log.shiftId)?.name || '—',
           programme: programmes.find(p => p.id === log.programmeId)?.name || '—',
           pallets: log.count
         });
@@ -289,7 +296,7 @@ export default function AdminPanel() {
       });
 
     } else {
-      title = "RAPPORT D'ARRÊT (DOWNTIME) - FACTORYTRACK PRO";
+      title = t('downtime_report_title');
       fileName = `Downtime_${new Date().toISOString().split('T')[0]}.xlsx`;
 
       // Define columns for Data sheet
@@ -297,6 +304,7 @@ export default function AdminPanel() {
         { header: 'Date', key: 'date', width: 12 },
         { header: 'Machine', key: 'machine', width: 20 },
         { header: 'Ligne', key: 'line', width: 15 },
+        { header: 'Shift', key: 'shift', width: 15 },
         { header: 'Type', key: 'type', width: 20 },
         { header: 'Description', key: 'desc', width: 30 },
         { header: 'Début', key: 'start', width: 12 },
@@ -314,6 +322,7 @@ export default function AdminPanel() {
           date: start.toLocaleDateString(),
           machine: machines.find(m => m.id === log.machineId)?.name || '—',
           line: lines.find(l => l.id === log.lineId)?.name || '—',
+          shift: shifts.find(s => s.id === log.shiftId)?.name || '—',
           type: downtimeTypes.find(t => t.id === log.typeId)?.name || '—',
           desc: log.description || '—',
           start: start.toLocaleTimeString(),
@@ -426,13 +435,14 @@ export default function AdminPanel() {
   };
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'users', label: 'Users', icon: Users },
-    { id: 'machines', label: 'Machines', icon: Factory },
-    { id: 'programmes', label: 'Programmes', icon: Package },
-    { id: 'types', label: 'Downtime', icon: Timer },
-    { id: 'reports', label: 'Reports', icon: Download },
-    { id: 'history', label: 'Historique', icon: History },
+    { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { id: 'users', label: t('users'), icon: Users },
+    { id: 'machines', label: t('machines'), icon: Factory },
+    { id: 'programmes', label: t('programmes'), icon: Package },
+    { id: 'shifts', label: t('shifts'), icon: Clock },
+    { id: 'types', label: t('downtime_types'), icon: Timer },
+    { id: 'history', label: t('history'), icon: History },
+    { id: 'reports', label: t('exports'), icon: Download },
   ];
 
   const container = {
@@ -468,12 +478,14 @@ export default function AdminPanel() {
             <h1 className="font-black text-sm tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
-        <button 
-          onClick={logout}
-          className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50"
-        >
-          LOGOUT
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={logout}
+            className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50"
+          >
+            {t('logout')}
+          </button>
+        </div>
       </header>
 
       {/* SIDEBAR (Desktop) & SLIDING MENU (Mobile) */}
@@ -529,13 +541,16 @@ export default function AdminPanel() {
                   </button>
                 ))}
                 
-                <div className="mt-auto pt-4 border-t border-gray-100">
+                <div className="mt-auto pt-4 border-t border-gray-100 space-y-4">
+                  <div className="px-2">
+                    <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">{t('settings')}</p>
+                  </div>
                   <button 
                     onClick={logout}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
                   >
                     <Trash2 size={14} strokeWidth={2.5} />
-                    Quitter
+                    {t('logout')}
                   </button>
                 </div>
               </nav>
@@ -551,11 +566,11 @@ export default function AdminPanel() {
           {activeTab === 'dashboard' && (
             <div className="space-y-3 md:space-y-6 animate-in fade-in duration-300">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-base md:text-lg font-black tracking-tighter text-gray-900 leading-none">Dashboard <span className="text-blue-600 uppercase text-[10px] md:text-xs">Live</span></h2>
+                <h2 className="text-base md:text-lg font-black tracking-tighter text-gray-900 leading-none">{t('dashboard')} <span className="text-blue-600 uppercase text-[10px] md:text-xs">Live</span></h2>
                   <div className="text-right flex flex-col items-end">
                     <div className="flex items-center gap-1 mb-0.5">
                       <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
-                      <p className="text-[7px] md:text-[8px] font-black text-green-600 uppercase tracking-tight">Connecté</p>
+                      <p className="text-[7px] md:text-[8px] font-black text-green-600 uppercase tracking-tight">{t('connected')}</p>
                     </div>
                   </div>
               </div>
@@ -567,10 +582,10 @@ export default function AdminPanel() {
                 className="grid grid-cols-2 lg:grid-cols-4 gap-1 md:gap-4"
               >
                  {[
-                   { label: 'Palettes / Jour', val: prodLogs.reduce((acc, l) => acc + l.count, 0), icon: Box, color: 'blue' },
-                   { label: 'Lignes Actives', val: lines.filter(l => l.status === 'RUNNING').length, icon: Activity, color: 'green' },
-                   { label: 'Arrêts en cours', val: lines.filter(l => !!l.activeDowntimeId).length, icon: Timer, color: 'orange' },
-                   { label: 'Effectif total', val: users.length, icon: Users, color: 'gray' },
+                   { label: t('pallets_per_day'), val: prodLogs.reduce((acc, l) => acc + l.count, 0), icon: Box, color: 'blue' },
+                   { label: t('active_lines'), val: lines.filter(l => l.status === 'RUNNING').length, icon: Activity, color: 'green' },
+                   { label: t('ongoing_stops'), val: lines.filter(l => !!l.activeDowntimeId).length, icon: Timer, color: 'orange' },
+                   { label: t('total_staff'), val: users.length, icon: Users, color: 'gray' },
                  ].map(stat => (
                    <motion.div 
                     variants={item}
@@ -595,7 +610,7 @@ export default function AdminPanel() {
 
               <div className="card overflow-hidden">
                  <div className="px-3 py-2 md:px-6 md:py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                   <h3 className="text-[10px] md:text-sm font-black uppercase tracking-widest text-gray-900">Monitor de Production Live</h3>
+                   <h3 className="text-[10px] md:text-sm font-black uppercase tracking-widest text-gray-900">{t('live_monitor')}</h3>
                    <div className="flex gap-2">
                       <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">Prod</span></div>
                       <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase">Arrêt</span></div>
@@ -603,14 +618,14 @@ export default function AdminPanel() {
                  </div>
                  <div className="overflow-x-auto">
                    <table className="w-full text-left">
-                     <thead className="bg-white text-[7px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider md:tracking-[0.2em] border-b border-gray-100">
-                       <tr>
-                         <th className="px-1 md:px-6 py-2 md:py-5">Ligne</th>
-                         <th className="px-1 md:px-6 py-2 md:py-5">Stat.</th>
-                         <th className="px-1 md:px-6 py-2 md:py-5">Pal.</th>
-                         <th className="px-1 md:px-6 py-2 md:py-5 text-right md:text-left">Op.</th>
-                       </tr>
-                     </thead>
+                      <thead className="bg-white text-[7px] md:text-[10px] text-gray-400 font-black uppercase tracking-wider md:tracking-[0.2em] border-b border-gray-100">
+                        <tr>
+                          <th className="px-1 md:px-6 py-2 md:py-5">{t('line_short')}</th>
+                          <th className="px-1 md:px-6 py-2 md:py-5">{t('stat_short')}</th>
+                          <th className="px-1 md:px-6 py-2 md:py-5">{t('pal_short')}</th>
+                          <th className="px-1 md:px-6 py-2 md:py-5">{t('op_short')}</th>
+                        </tr>
+                      </thead>
                      <tbody className="divide-y divide-gray-50">
                         {lines.map(l => {
                           const prog = programmes.find(p => p.id === l.currentProgrammeId);
@@ -627,7 +642,7 @@ export default function AdminPanel() {
                                     <p className="font-black text-gray-900 leading-none mb-0.5 whitespace-nowrap">{l.name}</p>
                                     <p className="text-[7.5px] font-bold text-blue-500 uppercase tracking-tight truncate max-w-[40px] md:max-w-none">{mach?.name}</p>
                                   </div>
-                                  {l.isActive === false && <Timer size={10} className="text-red-500" title="Hors Service" />}
+                                  {l.isActive === false && <Timer size={10} className="text-red-500" title={t('out_of_service')} />}
                                 </div>
                               </td>
                               <td className="px-1 md:px-6 py-2 md:py-5">
@@ -641,7 +656,7 @@ export default function AdminPanel() {
                                 <p className="text-[10px] md:text-sm font-black text-blue-600 italic leading-none">{prog?.producedPallets || 0}</p>
                               </td>
                               <td className="px-1 md:px-6 py-2 md:py-5">
-                                <div className="flex items-center justify-end md:justify-start gap-1">
+                                <div className="flex items-center gap-1">
                                   <div className="w-3.5 h-3.5 md:w-6 md:h-6 bg-gray-100 rounded flex items-center justify-center text-[7px] md:text-[10px] font-bold text-gray-500 shrink-0">
                                     {op?.name?.substring(0, 1).toUpperCase() || '—'}
                                   </div>
@@ -661,12 +676,12 @@ export default function AdminPanel() {
           {activeTab === 'users' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Utilisateurs</h2>
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('users')}</h2>
                 <button 
                   onClick={() => openModal('user')}
                   className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
                 >
-                  <Plus size={12} strokeWidth={3} /> AJOUTER
+                  <Plus size={12} strokeWidth={3} /> {t('add')}
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
@@ -703,12 +718,12 @@ export default function AdminPanel() {
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-1">
-                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Parc Machine</h2>
+                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('parc_machine')}</h2>
                   <button 
                      onClick={() => openModal('machine')}
                      className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase"
                   >
-                     + MACHINE
+                     + {t('machine').toUpperCase()}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
@@ -721,7 +736,7 @@ export default function AdminPanel() {
                              onClick={() => openModal('line', { machineId: m.id })}
                              className="px-1.5 py-1 bg-blue-50 text-blue-600 rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-tight hover:bg-blue-100 transition-all border border-blue-100 shrink-0"
                            >
-                             + Ligne
+                             + {t('line_short')}
                            </button>
                            <button onClick={() => openModal('machine', m)} className="text-gray-300 hover:text-blue-600 p-1 transition-colors"><Pencil size={14} /></button>
                            <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
@@ -729,15 +744,15 @@ export default function AdminPanel() {
                       </div>
 
                       <div className="flex flex-col gap-0.5">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none">Pilote actuel</p>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none">{t('pilot')} {t('idle')}</p>
                         <div className="flex items-center justify-between bg-blue-50/30 p-1.5 rounded-md border border-blue-100/50">
-                          <span className="text-[10px] md:text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || 'Libre'}</span>
+                          <span className="text-[10px] md:text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || t('free')}</span>
                           {m.currentPilotId && (
                             <button 
                               onClick={() => localApi.updateDoc('machines', m.id, { currentPilotId: null })}
                               className="text-[8px] font-black text-red-500 hover:underline uppercase"
                             >
-                              Libérer
+                              {t('release')}
                             </button>
                           )}
                         </div>
@@ -760,7 +775,7 @@ export default function AdminPanel() {
                               )}>
                                 {l.isActive === false && <Timer size={10} className="text-red-400" />}
                                 {l.name}
-                                {l.isActive === false && <span className="text-[7px] uppercase tracking-tighter opacity-50 ml-1">(Hors Service)</span>}
+                                {l.isActive === false && <span className="text-[7px] uppercase tracking-tighter opacity-50 ml-1">({t('out_of_service')})</span>}
                               </span>
                               <div className="flex gap-0.5">
                                 <button onClick={() => openModal('line', l)} className="text-gray-300 hover:text-blue-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
@@ -826,6 +841,43 @@ export default function AdminPanel() {
             </div>
           )}
 
+          {activeTab === 'shifts' && (
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center px-1">
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('shifts')}</h2>
+                <button 
+                  onClick={() => openModal('shift')}
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
+                >
+                  <Plus size={12} strokeWidth={3} /> {t('add')}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+                {shifts.map(s => (
+                  <div key={s.id} className="card p-4 group flex justify-between items-center hover:border-blue-200 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                        <Clock size={20} />
+                      </div>
+                      <div>
+                        <p className="font-black text-sm text-gray-900 leading-tight">{s.name}</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">{s.startTime} — {s.endTime}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-0.5">
+                      <button onClick={() => openModal('shift', s)} className="text-gray-300 hover:text-blue-600 transition-colors p-1.5">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => initiateDelete('shifts', s.id, s.name)} className="text-gray-300 hover:text-red-500 transition-colors p-1.5">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         {activeTab === 'types' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center px-1">
@@ -843,12 +895,16 @@ export default function AdminPanel() {
                     <div className="text-2xl md:text-3xl mb-2 grayscale group-hover:grayscale-0 transition-all">{t.icon || '⚠️'}</div>
                     <p className="font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-700 leading-tight">{t.name}</p>
                     <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => openModal('downtime', t)} className="text-gray-300 hover:text-blue-500 p-1">
-                        <Pencil size={12} />
-                      </button>
-                      <button onClick={() => initiateDelete('downtime_types', t.id, t.name)} className="text-gray-300 hover:text-red-500 p-1">
-                        <Trash2 size={12} />
-                      </button>
+                      {t.name.toUpperCase() !== 'AUTRE' && (
+                        <>
+                          <button onClick={() => openModal('downtime', t)} className="text-gray-300 hover:text-blue-500 p-1">
+                            <Pencil size={12} />
+                          </button>
+                          <button onClick={() => initiateDelete('downtime_types', t.id, t.name)} className="text-gray-300 hover:text-red-500 p-1">
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -860,7 +916,15 @@ export default function AdminPanel() {
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               <div className="flex flex-col gap-4 px-1">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Historique</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('history')}</h2>
+                    <button 
+                      onClick={() => exportToExcel(historyLogType === 'production' ? 'production' : 'downtime')}
+                      className="p-1.5 px-3 bg-white border border-gray-200 rounded-lg text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 transition-all flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Download size={12} /> {t('export')}
+                    </button>
+                  </div>
                   
                   <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
                     <button 
@@ -870,7 +934,7 @@ export default function AdminPanel() {
                         historyLogType === 'production' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
                       )}
                     >
-                      Production
+                      {t('production_label_short')}
                     </button>
                     <button 
                       onClick={() => setHistoryLogType('downtime')}
@@ -879,14 +943,14 @@ export default function AdminPanel() {
                         historyLogType === 'downtime' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
                       )}
                     >
-                      Arrêts
+                      {t('stop_label_short')}
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Machine</p>
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('machine')}</p>
                      <select 
                       value={historyMachineFilter}
                       onChange={e => {
@@ -895,7 +959,7 @@ export default function AdminPanel() {
                       }}
                       className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
                      >
-                       <option value="">Toutes les machines</option>
+                       <option value="">{t('all_machines')}</option>
                        {machines.map(m => (
                          <option key={m.id} value={m.id}>{m.name}</option>
                        ))}
@@ -903,13 +967,13 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Ligne</p>
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</p>
                      <select 
                       value={historyLineFilter}
                       onChange={e => setHistoryLineFilter(e.target.value)}
                       className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
                      >
-                       <option value="">Toutes les lignes</option>
+                       <option value="">{t('all_lines')}</option>
                        {lines
                         .filter(l => !historyMachineFilter || l.machineId === historyMachineFilter)
                         .map(l => (
@@ -919,7 +983,21 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</p>
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('shift')}</p>
+                     <select 
+                      value={historyShiftFilter}
+                      onChange={e => setHistoryShiftFilter(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                     >
+                       <option value="">{t('all_shifts')}</option>
+                       {shifts.map(s => (
+                         <option key={s.id} value={s.id}>{s.name}</option>
+                       ))}
+                     </select>
+                   </div>
+
+                   <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</p>
                      <input 
                       type="date"
                       value={historyDateFilter}
@@ -935,29 +1013,31 @@ export default function AdminPanel() {
                   <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
                     <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
                       <Package className="text-blue-600" size={16} />
-                      Log de Production
+                      {t('production_log').toUpperCase()}
                     </h3>
                     <div className="card overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
-                          <tr>
-                            <th className="px-2 md:px-6 py-2 md:py-3">Date / Heure</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3">Prog.</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3 hidden md:table-cell">Opérateur</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3 text-center">Qté</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
-                          </tr>
-                        </thead>
+                          <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                            <tr>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('date')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('line_short')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('program_name')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('shift')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 hidden md:table-cell text-left">{t('operator')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-center">{t('quantity_short')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-right">{t('actions')}</th>
+                            </tr>
+                          </thead>
                         <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
                           <AnimatePresence mode="popLayout">
                             {sortedProdLogs
                               .filter(log => {
                                 const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
                                 const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+                                const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
                                 const matchDate = !historyDateFilter || log.timestamp.startsWith(historyDateFilter);
-                                return matchMachine && matchLine && matchDate;
+                                return matchMachine && matchLine && matchShift && matchDate;
                               })
                               .slice(0, 100).map(log => (
                                 <motion.tr 
@@ -977,6 +1057,11 @@ export default function AdminPanel() {
                                   <td className="px-2 md:px-6 py-2 md:py-3 text-blue-600 font-bold truncate max-w-[60px] md:max-w-none">
                                     {programmes.find(p => p.id === log.programmeId)?.name || '—'}
                                   </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
+                                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[7px] md:text-[9px] font-black uppercase italic">
+                                      {shifts.find(s => s.id === log.shiftId)?.name || '—'}
+                                    </span>
+                                  </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 font-medium hidden md:table-cell">
                                     {users.find(u => u.id === log.operatorId)?.name || '—'}
                                   </td>
@@ -986,7 +1071,7 @@ export default function AdminPanel() {
                                   <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                     <div className="flex justify-end gap-1">
                                       <button onClick={() => openModal('production_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                      <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => initiateDelete('production_logs', log.id, `${t('production_of')} ${log.count} ${t('pallets')}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                     </div>
                                   </td>
                                 </motion.tr>
@@ -1001,28 +1086,30 @@ export default function AdminPanel() {
                   <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
                     <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
                       <Timer className="text-orange-600" size={16} />
-                      Log des Arrêts
+                      {t('downtime_log').toUpperCase()}
                     </h3>
                     <div className="card overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
-                          <tr>
-                            <th className="px-2 md:px-6 py-2 md:py-3">Heure Début</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3">Fin</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3">Motif</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
-                            <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
+                          <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                            <tr>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('start_time')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('end_time')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('reason')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('line_short')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('shift')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-right">{t('actions')}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
                           <AnimatePresence mode="popLayout">
                             {sortedDownLogs
                               .filter(log => {
                                 const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
                                 const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+                                const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
                                 const matchDate = !historyDateFilter || log.startTime.startsWith(historyDateFilter);
-                                return matchMachine && matchLine && matchDate;
+                                return matchMachine && matchLine && matchShift && matchDate;
                               })
                               .slice(0, 100).map(log => (
                                 <motion.tr 
@@ -1048,10 +1135,15 @@ export default function AdminPanel() {
                                     <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
                                     <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                                   </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
+                                    <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded text-[7px] md:text-[9px] font-black uppercase italic">
+                                      {shifts.find(s => s.id === log.shiftId)?.name || '—'}
+                                    </span>
+                                  </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                     <div className="flex justify-end gap-1">
                                       <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                      <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => initiateDelete('downtime_logs', log.id, `${t('stop_recorded')} ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                     </div>
                                   </td>
                                 </motion.tr>
@@ -1069,7 +1161,7 @@ export default function AdminPanel() {
           {activeTab === 'reports' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               <div className="px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Exports</h2>
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('exports')}</h2>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                  <div className="card p-4 md:p-6 flex flex-col gap-4 relative overflow-hidden group">
@@ -1080,15 +1172,15 @@ export default function AdminPanel() {
                        <History size={20} strokeWidth={2.5} />
                     </div>
                     <div className="relative z-10">
-                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">Production Logs</h3>
-                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">Historique détaillé des palettes déclarées.</p>
+                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">{t('production_log')}</h3>
+                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">{t('production_logs_desc')}</p>
                     </div>
                     <button 
                       onClick={() => exportToExcel('production')}
                       className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[9px] tracking-widest uppercase"
                     >
                       <Download size={14} strokeWidth={3} />
-                      Exporter
+                      {t('export')}
                     </button>
                  </div>
 
@@ -1100,15 +1192,15 @@ export default function AdminPanel() {
                        <Activity size={20} strokeWidth={2.5} />
                     </div>
                     <div className="relative z-10">
-                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">Downtime Analysis</h3>
-                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">Analyse des temps d'arrêt et pannes.</p>
+                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">{t('downtime_log')}</h3>
+                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">{t('downtime_analysis_desc')}</p>
                     </div>
                     <button 
                       onClick={() => exportToExcel('downtime')}
                       className="w-full py-2.5 bg-orange-600 text-white rounded-lg font-black shadow-lg shadow-orange-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[9px] tracking-widest uppercase"
                     >
                       <Download size={14} strokeWidth={3} />
-                      Exporter
+                      {t('export')}
                     </button>
                  </div>
               </div>
@@ -1127,20 +1219,52 @@ export default function AdminPanel() {
           >
             <div className="space-y-0.5">
               <h3 className="text-base font-black tracking-tight text-gray-900 uppercase italic leading-none">
-                {editingId ? 'Modifier' : 'Nouveau'} {
-                  modalType === 'user' ? 'Utilisateur' : 
-                  modalType === 'machine' ? 'Machine' : 
-                  modalType === 'line' ? 'Ligne' : 
-                  modalType === 'programme' ? 'Programme' : 'Motif d\'Arrêt'}
+                {editingId ? t('edit') : t('new')} {
+                  modalType === 'user' ? t('user') : 
+                  modalType === 'machine' ? t('machine') : 
+                  modalType === 'line' ? t('line') : 
+                  modalType === 'programme' ? t('program') : 
+                  modalType === 'shift' ? t('shift') : t('downtime_reason')}
               </h3>
-              <p className="text-[7px] text-gray-400 font-black uppercase tracking-widest">Configuration</p>
+              <p className="text-[7px] text-gray-400 font-black uppercase tracking-widest">{t('configuration')}</p>
             </div>
 
             <div className="space-y-4">
+              {modalType === 'shift' && (
+                <>
+                  <input 
+                    placeholder={t('shift_name')}
+                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    value={modalData.name || ''}
+                    onChange={e => setModalData({...modalData, name: e.target.value})}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_time')}</label>
+                      <input 
+                        type="time"
+                        className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                        value={modalData.startTime || ''}
+                        onChange={e => setModalData({...modalData, startTime: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_time')}</label>
+                      <input 
+                        type="time"
+                        className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                        value={modalData.endTime || ''}
+                        onChange={e => setModalData({...modalData, endTime: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               {modalType === 'production_log' && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantité (Palettes)</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('quantity')} ({t('pallets')})</label>
                     <input 
                       type="number"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
@@ -1149,7 +1273,7 @@ export default function AdminPanel() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date & Heure</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</label>
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
@@ -1163,18 +1287,18 @@ export default function AdminPanel() {
               {modalType === 'downtime_log' && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Motif d'arrêt</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('downtime_reason')}</label>
                     <select 
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
                       value={modalData.typeId || ''}
                       onChange={e => setModalData({...modalData, typeId: e.target.value})}
                     >
-                      <option value="">Sélectionner un motif</option>
+                      <option value="">{t('select_reason')}</option>
                       {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Début</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_time')}</label>
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
@@ -1187,7 +1311,7 @@ export default function AdminPanel() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fin</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_time')}</label>
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
@@ -1200,7 +1324,7 @@ export default function AdminPanel() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description / Commentaire</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('description_comment')}</label>
                     <textarea 
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
                       value={modalData.description || ''}
@@ -1213,7 +1337,7 @@ export default function AdminPanel() {
               {modalType === 'programme' && (
                 <>
                   <input 
-                    placeholder="Nom du programme (ex: PROD-202)"
+                    placeholder={t('program_name')}
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
@@ -1223,7 +1347,7 @@ export default function AdminPanel() {
                     value={modalData.machineId || ''}
                     onChange={e => setModalData({...modalData, machineId: e.target.value})}
                   >
-                    <option value="">Choisir Machine</option>
+                    <option value="">{t('choose_machine')}</option>
                     {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                   <select 
@@ -1232,7 +1356,7 @@ export default function AdminPanel() {
                     value={modalData.lineId || ''}
                     onChange={e => setModalData({...modalData, lineId: e.target.value})}
                   >
-                    <option value="">Choisir Ligne</option>
+                    <option value="">{t('choose_line')}</option>
                     {lines.filter(l => l.machineId === modalData.machineId).map(l => (
                       <option key={l.id} value={l.id}>{l.name}</option>
                     ))}
@@ -1243,12 +1367,12 @@ export default function AdminPanel() {
                       value={modalData.status || 'ACTIVE'}
                       onChange={e => setModalData({...modalData, status: e.target.value})}
                     >
-                      <option value="ACTIVE">ACTIF</option>
+                      <option value="ACTIVE">{t('active_label').toUpperCase()}</option>
                       <option value="FINISHED">CLÔTURÉ</option>
                     </select>
                   )}
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Paramètres Techniques</label>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
                     <textarea 
                       placeholder="Pression, Vitesse, Température..."
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
@@ -1263,13 +1387,13 @@ export default function AdminPanel() {
               {modalType === 'user' && (
                 <>
                   <input 
-                    placeholder="Nom complet"
+                    placeholder={t('full_name')}
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   <input 
-                    placeholder="PIN (4 chiffres)"
+                    placeholder={t('pin')}
                     maxLength={4}
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
                     value={modalData.pin || ''}
@@ -1280,10 +1404,10 @@ export default function AdminPanel() {
                     value={modalData.role || ''}
                     onChange={e => setModalData({...modalData, role: e.target.value})}
                   >
-                    <option value="">Choisir un rôle</option>
-                    <option value="OPERATOR">Opérateur</option>
-                    <option value="PILOT">Pilote Machine</option>
-                    <option value="ADMIN">Administrateur</option>
+                    <option value="">{t('choose_role')}</option>
+                    <option value="OPERATOR">{t('operator')}</option>
+                    <option value="PILOT">{t('pilot')}</option>
+                    <option value="ADMIN">{t('admin')}</option>
                   </select>
                 </>
               )}
@@ -1291,7 +1415,7 @@ export default function AdminPanel() {
               {(modalType === 'machine' || modalType === 'line') && (
                 <>
                   <input 
-                    placeholder={modalType === 'machine' ? "Nom de la machine" : "Nom de la ligne"}
+                    placeholder={modalType === 'machine' ? t('machine_name') : t('line_name')}
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
@@ -1306,7 +1430,7 @@ export default function AdminPanel() {
                           checked={modalData.isActive !== false}
                           onChange={e => setModalData({...modalData, isActive: e.target.checked})}
                         />
-                        <label htmlFor="isActive" className="text-sm font-bold text-gray-700">Ligne en service (Activée)</label>
+                        <label htmlFor="isActive" className="text-sm font-bold text-gray-700">{t('active_service')}</label>
                       </div>
                       <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <input 
@@ -1316,7 +1440,7 @@ export default function AdminPanel() {
                           checked={modalData.tracksProduction !== false}
                           onChange={e => setModalData({...modalData, tracksProduction: e.target.checked})}
                         />
-                        <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700">Suivi de production (Palettes)</label>
+                        <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700">{t('track_production')}</label>
                       </div>
                     </div>
                   )}
@@ -1346,13 +1470,13 @@ export default function AdminPanel() {
                 onClick={() => setIsModalOpen(false)}
                 className="flex-1 py-4 font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all uppercase text-[10px] tracking-widest"
               >
-                Annuler
+                {t('cancel')}
               </button>
               <button 
                 onClick={handleModalSubmit}
                 className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-100 active:scale-95 transition-all uppercase text-[10px] tracking-widest"
               >
-                Enregistrer
+                {t('save')}
               </button>
             </div>
           </motion.div>
@@ -1371,21 +1495,21 @@ export default function AdminPanel() {
               <Trash2 size={40} strokeWidth={2.5} />
             </div>
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-gray-900 tracking-tight italic uppercase">Supprimer ?</h3>
-              <p className="text-gray-500 font-medium">Êtes-vous sûr de vouloir supprimer <span className="text-red-600 font-black italic">{confirmDelete.name}</span> ? Cette action est irréversible.</p>
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight italic uppercase">{t('delete_question')}</h3>
+              <p className="text-gray-500 font-medium">{t('delete_confirm_msg')} <span className="text-red-600 font-black italic">{confirmDelete.name}</span> ? {t('delete_irreversible')}</p>
             </div>
             <div className="flex gap-3">
               <button 
                 onClick={() => setConfirmDelete(null)}
                 className="flex-1 py-4 font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all uppercase text-[10px] tracking-widest"
               >
-                Annuler
+                {t('cancel')}
               </button>
               <button 
                 onClick={deleteItem}
                 className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-xl shadow-red-200 active:scale-95 transition-all uppercase text-[10px] tracking-widest"
               >
-                Confirmer
+                {t('confirm')}
               </button>
             </div>
           </motion.div>

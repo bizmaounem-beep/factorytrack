@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
-import { DowntimeLog } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
+import { DowntimeLog, Shift } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft } from 'lucide-react';
 import { cn, formatDuration } from '../lib/utils';
+import { getCurrentShiftId } from '../lib/shiftUtils';
 
 export default function PilotScreen() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const { 
     machines, 
     users, 
@@ -16,7 +19,8 @@ export default function PilotScreen() {
     productionLogs: prodLogs, 
     downtimeLogs: downLogs, 
     lines, 
-    programmes 
+    programmes,
+    shifts 
   } = useData();
 
   const [historyLineFilter, setHistoryLineFilter] = useState<string>('');
@@ -257,6 +261,7 @@ export default function PilotScreen() {
     try {
       const machineLines = lines.filter(l => l.machineId === selectedMachineId);
       const startTime = new Date().toISOString();
+      const currentShiftId = getCurrentShiftId(shifts);
 
       for (const line of machineLines) {
         const log = await localApi.addDoc('downtime_logs', {
@@ -264,6 +269,7 @@ export default function PilotScreen() {
           lineId: line.id,
           typeId,
           operatorId: user.id,
+          shiftId: currentShiftId,
           startTime,
         });
 
@@ -347,12 +353,14 @@ export default function PilotScreen() {
             <h1 className="font-black text-xs tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
-        <button 
-          onClick={handleLogout}
-          className="p-1 px-1.5 border border-red-50 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[7px] uppercase"
-        >
-          LOGOUT
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleLogout}
+            className="p-1 px-1.5 border border-red-50 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[7px] uppercase"
+          >
+            {t('logout')}
+          </button>
+        </div>
       </header>
 
       {/* SLIDING MENU */}
@@ -435,9 +443,9 @@ export default function PilotScreen() {
               )}
             >
               {activeTab === 'monitor' ? <History size={14} /> : <Monitor size={14} />}
-              {activeTab === 'monitor' ? 'Historique' : 'Monitor'}
+              {activeTab === 'monitor' ? t('history') : t('monitor')}
             </button>
-            <button onClick={handleLogout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">LOGOUT</button>
+            <button onClick={handleLogout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">{t('logout')}</button>
           </div>
         </div>
         
@@ -455,7 +463,7 @@ export default function PilotScreen() {
                     onClick={() => handleMachineSelect('')}
                     className="text-[8px] font-bold text-blue-600 uppercase hover:underline"
                   >
-                    (Changer)
+                    ({t('change')})
                   </button>
                 </div>
               </div>
@@ -466,7 +474,7 @@ export default function PilotScreen() {
                 className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all animate-in fade-in zoom-in"
               >
                 <Activity size={16} className="animate-pulse" />
-                Arrêt Machine
+                {t('stop_machine')}
               </button>
             ) : lines.filter(l => l.machineId === selectedMachineId).some(l => l.activeDowntimeId) ? (
               <button 
@@ -474,7 +482,7 @@ export default function PilotScreen() {
                 className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-700 active:scale-95 transition-all animate-in fade-in zoom-in"
               >
                 <Activity size={16} />
-                Lancer Machine
+                {t('start_machine')}
               </button>
             ) : null}
           </div>
@@ -486,7 +494,7 @@ export default function PilotScreen() {
             onChange={e => handleMachineSelect(e.target.value)}
             className="w-full p-4 bg-gray-50/50 rounded-2xl font-bold border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700 appearance-none cursor-pointer"
           >
-            <option value="">Sélectionner une machine...</option>
+            <option value="">{t('machine_select')}...</option>
             {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         )}
@@ -541,14 +549,14 @@ export default function PilotScreen() {
           <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
              <LayoutGrid size={20} />
           </div>
-          <p className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">Choisir une machine</p>
+          <p className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">{t('machine_select')}</p>
         </div>
       ) : (
         <motion.div 
           variants={container}
           initial="hidden"
           animate="show"
-          className="p-1 sm:p-4 space-y-1 sm:space-y-4 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-4"
+          className="p-1 sm:p-4 space-y-1 sm:space-y-4 max-w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-4"
         >
           {lines.filter(l => l.machineId === selectedMachineId).map(line => {
             const prog = programmes.find(p => p.id === line.currentProgrammeId);
@@ -570,7 +578,7 @@ export default function PilotScreen() {
                   <div className="leading-none">
                     <div className="flex items-center gap-1.5">
                       <h3 className="font-black text-[10px] sm:text-sm text-slate-900">{line.name}</h3>
-                      {line.isActive === false && <span className="text-[7px] font-black text-red-600 bg-red-100 px-1 rounded uppercase tracking-widest border border-red-200 animate-pulse">Hors Service</span>}
+                      {line.isActive === false && <span className="text-[7px] font-black text-red-600 bg-red-100 px-1 rounded uppercase tracking-widest border border-red-200 animate-pulse">{t('out_of_service')}</span>}
                     </div>
                     <div className="flex items-center gap-1 mt-0.5 sm:mt-2">
                        <span className={cn(
@@ -582,8 +590,8 @@ export default function PilotScreen() {
                           "w-1 h-1 rounded-full",
                           line.status === 'RUNNING' ? "bg-green-600 animate-pulse" : line.status === 'STOPPED' ? "bg-red-600" : "bg-slate-400"
                         )} />
-                        {line.status === 'RUNNING' ? "PROD" : 
-                         line.status === 'STOPPED' ? "ARRÊT" : "ATTENTE"}
+                        {line.status === 'RUNNING' ? t('running') : 
+                         line.status === 'STOPPED' ? t('stopped') : t('idle')}
                       </span>
                     </div>
                   </div>
@@ -594,11 +602,11 @@ export default function PilotScreen() {
                         "p-1 sm:p-1.5 rounded-lg active:scale-95 transition-all shadow-sm flex items-center gap-1 border shrink-0 h-6 sm:h-auto",
                         line.isActive !== false ? "text-orange-600 bg-orange-50 border-orange-100" : "text-green-600 bg-green-50 border-green-100"
                       )}
-                      title={line.isActive !== false ? "Désactiver la ligne" : "Activer la ligne"}
+                      title={line.isActive !== false ? t('deactivate') : t('activate')}
                     >
                       {line.isActive !== false ? <Timer size={10} /> : <Activity size={10} />}
                       <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-tight">
-                        {line.isActive !== false ? 'Désactiver' : 'Activer'}
+                        {line.isActive !== false ? t('deactivate') : t('activate')}
                       </span>
                     </button>
                     {prog && (
@@ -684,77 +692,77 @@ export default function PilotScreen() {
           </div>
         </div>
       ) : (
-        <div className="p-2 space-y-4 max-w-5xl mx-auto animate-in fade-in duration-300">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-1">
-              <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase italic leading-none">Historique Production</h2>
-              
-              <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto shadow-inner">
-                <button 
-                  onClick={() => setHistoryLogType('production')}
-                  className={cn(
-                    "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                    historyLogType === 'production' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                  )}
-                >
-                  Production
-                </button>
-                <button 
-                  onClick={() => setHistoryLogType('downtime')}
-                  className={cn(
-                    "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                    historyLogType === 'downtime' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                  )}
-                >
-                  Arrêts
-                </button>
-              </div>
-            </div>
+        <div className="p-2 space-y-4 max-w-full mx-auto animate-in fade-in duration-300">
+              <div className="flex flex-col gap-4 px-1">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase italic leading-none">{t('history')}</h2>
+                  
+                  <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto shadow-inner">
+                    <button 
+                      onClick={() => setHistoryLogType('production')}
+                      className={cn(
+                        "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                        historyLogType === 'production' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                      )}
+                    >
+                      {t('production_log').split(' ')[2] || 'Production'}
+                    </button>
+                    <button 
+                      onClick={() => setHistoryLogType('downtime')}
+                      className={cn(
+                        "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                        historyLogType === 'downtime' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                      )}
+                    >
+                      {t('downtime_log').split(' ')[2] || 'Arrêts'}
+                    </button>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-1">
-              <div className="space-y-1">
-                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Ligne</p>
-                 <select 
-                  value={historyLineFilter}
-                  onChange={e => setHistoryLineFilter(e.target.value)}
-                  className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
-                 >
-                   <option value="">Toutes les lignes</option>
-                   {lines
-                    .filter(l => l.machineId === selectedMachineId)
-                    .map(l => (
-                     <option key={l.id} value={l.id}>{l.name}</option>
-                   ))}
-                 </select>
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-1">
+                  <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</p>
+                     <select 
+                      value={historyLineFilter}
+                      onChange={e => setHistoryLineFilter(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                     >
+                       <option value="">{t('all_lines')}</option>
+                       {lines
+                        .filter(l => l.machineId === selectedMachineId)
+                        .map(l => (
+                         <option key={l.id} value={l.id}>{l.name}</option>
+                       ))}
+                     </select>
+                  </div>
 
-              <div className="space-y-1">
-                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</p>
-                 <input 
-                  type="date"
-                  value={historyDateFilter}
-                  onChange={e => setHistoryDateFilter(e.target.value)}
-                  className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
-                 />
+                  <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</p>
+                     <input 
+                      type="date"
+                      value={historyDateFilter}
+                      onChange={e => setHistoryDateFilter(e.target.value)}
+                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                     />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
           <div className="space-y-8">
             {historyLogType === 'production' ? (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
                 <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
                   <Package className="text-blue-600" size={16} />
-                  LOG DE PRODUCTION
+                  {t('production_log').toUpperCase()}
                 </h3>
                 <div className="card overflow-hidden">
                   <div className="overflow-x-auto">
                       <table className="w-full text-left">
                         <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
                           <tr>
-                            <th className="px-2 md:px-5 py-2 md:py-3">Moment</th>
-                            <th className="px-2 md:px-5 py-2 md:py-3">Ligne</th>
-                            <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Opérateur</th>
+                            <th className="px-2 md:px-5 py-2 md:py-3 text-left">{t('date')}</th>
+                            <th className="px-2 md:px-5 py-2 md:py-3 text-left">{t('line')}</th>
+                            <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell text-left">{t('operator')}</th>
                             <th className="px-2 md:px-5 py-2 md:py-3 text-center">Qté</th>
                             <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
                           </tr>
@@ -994,9 +1002,9 @@ export default function PilotScreen() {
           >
             <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
               <div className="space-y-0.5">
-                <h2 className="text-lg font-black tracking-tight uppercase leading-none italic">Assigner Programme</h2>
+                <h2 className="text-lg font-black tracking-tight uppercase leading-none italic">{t('assign_program')}</h2>
                 <p className="text-blue-100 text-[8px] font-black uppercase tracking-widest opacity-80 leading-none">
-                  Ligne: {lines.find(l => l.id === isAssigning)?.name}
+                  {t('line')}: {lines.find(l => l.id === isAssigning)?.name}
                 </p>
               </div>
               <button 
@@ -1011,24 +1019,24 @@ export default function PilotScreen() {
                     : "bg-red-500/20 border-red-500/50 text-red-100"
                 )}
               >
-                {lines.find(l => l.id === isAssigning)?.isActive !== false ? 'Ligne Active' : 'Ligne Inactive'}
+                {lines.find(l => l.id === isAssigning)?.isActive !== false ? t('active_line') : t('inactive_line')}
               </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6">
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                  <h3 className="text-[10px] font-black text-gray-700 uppercase tracking-widest mb-3">Nouveau Programme</h3>
+                  <h3 className="text-[10px] font-black text-gray-700 uppercase tracking-widest mb-3">{t('new_program')}</h3>
                   <div className="flex flex-col gap-2">
                     <input 
                       type="text"
                       value={newProgName}
                       onChange={e => setNewProgName(e.target.value)}
-                      placeholder="Nom du programme..."
+                      placeholder={t('program_name') + "..."}
                       className="w-full p-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm"
                     />
                     <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Paramètres Techniques</label>
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
                       <textarea 
                         value={newProgParams}
                         onChange={e => setNewProgParams(e.target.value)}
@@ -1042,13 +1050,13 @@ export default function PilotScreen() {
                       onClick={handleAssignProgramme}
                       className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all shadow-md shadow-blue-100"
                     >
-                      SAUVEGARDER & ASSIGNER
+                      {t('save_assign').toUpperCase()}
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ou choisir parmi les programmes actifs</h3>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('or_choose_active')}</h3>
                   {availableProgs.length > 0 ? (
                     <div className="grid gap-2">
                       {availableProgs.map(p => (
@@ -1059,7 +1067,7 @@ export default function PilotScreen() {
                         >
                           <div>
                             <p className="font-bold text-gray-900 group-hover:text-blue-700">{p.name}</p>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">Programme prêt</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">{t('program_ready')}</p>
                           </div>
                           <div className="w-8 h-8 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-300 group-hover:text-blue-500 group-hover:border-blue-200 transition-all">
                             <Plus size={16} />
@@ -1069,7 +1077,7 @@ export default function PilotScreen() {
                     </div>
                   ) : (
                     <div className="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl italic text-gray-400 text-xs">
-                      Aucun autre programme disponible.
+                      {t('no_program_available')}
                     </div>
                   )}
                 </div>
@@ -1084,7 +1092,7 @@ export default function PilotScreen() {
                 }}
                 className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-100 rounded-2xl transition-colors uppercase text-xs tracking-widest"
               >
-                Annuler
+                {t('cancel')}
               </button>
               {showCreateNew && (
                 <button 
@@ -1107,9 +1115,9 @@ export default function PilotScreen() {
             className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col"
           >
             <div className="p-6 bg-orange-600 text-white">
-              <h2 className="text-xl font-black tracking-tight uppercase italic">Arrêt de Machine</h2>
+              <h2 className="text-xl font-black tracking-tight uppercase italic">{t('machine_stop')}</h2>
               <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80">
-                Action: Stop général sur toute la machine
+                {t('general_stop')}
               </p>
             </div>
             <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">

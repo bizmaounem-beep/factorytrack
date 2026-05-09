@@ -2,19 +2,23 @@ import { useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
-import { Line } from '../types';
-import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
+import { Line, Shift } from '../types';
+import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
+import { getCurrentShiftId } from '../lib/shiftUtils';
 
 export default function OperatorScreen() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const { 
     machines, 
     lines, 
     users, 
     downtimeTypes, 
     programmes: availableProgrammes, 
-    downtimeLogs 
+    downtimeLogs,
+    shifts 
   } = useData();
   
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
@@ -32,6 +36,8 @@ export default function OperatorScreen() {
   const activeLine = lines.find(l => l.id === selectedLineId) || null;
   const activeProgramme = activeLine ? availableProgrammes.find(p => p.id === activeLine.currentProgrammeId) || null : null;
   const activeDowntime = activeLine?.activeDowntimeId ? downtimeLogs.find(d => d.id === activeLine.activeDowntimeId) || null : null;
+
+  const currentShiftId = getCurrentShiftId(shifts);
 
   // Derive categorizing log
   const categorizingLog = !activeDowntime && activeLine 
@@ -160,6 +166,7 @@ export default function OperatorScreen() {
         operatorId: user.id,
         machineId: activeLine?.machineId,
         lineId: activeLine?.id,
+        shiftId: currentShiftId,
         count, // can be negative for removal
         timestamp: new Date().toISOString()
       });
@@ -199,6 +206,7 @@ export default function OperatorScreen() {
         typeId: 'PENDING',
         description: downtimeDescription,
         operatorId: user.id,
+        shiftId: currentShiftId,
         startTime: new Date().toISOString()
       });
 
@@ -243,8 +251,14 @@ export default function OperatorScreen() {
 
     const selectedType = downtimeTypes.find(t => t.id === typeId);
     const isChangeProg = selectedType?.name?.toUpperCase().includes('CHANGEMENT') || selectedType?.name?.toUpperCase().includes('PROGRAMME');
+    const isOther = selectedType?.name?.toUpperCase() === 'AUTRE';
 
     if (isChangeProg && !selectedProgrammeForChange) {
+      setSelectedStopType(typeId);
+      return;
+    }
+
+    if (isOther && !downtimeDescription.trim() && !categorizingLog?.description?.trim()) {
       setSelectedStopType(typeId);
       return;
     }
@@ -252,7 +266,9 @@ export default function OperatorScreen() {
     try {
       await localApi.updateDoc('downtime_logs', categorizingLogId, {
         typeId,
-        description: isChangeProg ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` : undefined
+        description: isChangeProg 
+          ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
+          : (downtimeDescription.trim() || categorizingLog?.description || undefined)
       });
 
       if (isChangeProg && selectedProgrammeForChange && selectedLineId) {
@@ -264,6 +280,7 @@ export default function OperatorScreen() {
       }
 
       setSelectedStopType(null);
+      setDowntimeDescription('');
     } catch (error) {
       console.error('Error categorizing downtime:', error);
     }
@@ -288,6 +305,7 @@ export default function OperatorScreen() {
         typeId: data.typeId,
         description: data.description,
         operatorId: user.id,
+        shiftId: currentShiftId,
         startTime: data.startTime,
         endTime: data.endTime,
         duration: durationMs
@@ -338,18 +356,20 @@ export default function OperatorScreen() {
   if (!selectedMachineId) {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col">
-        <header className="h-10 bg-slate-900 text-white flex items-center justify-between px-3 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-2">
-            <Factory size={14} className="text-slate-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest italic">FACTORYTRACK <span className="text-blue-500 font-bold">OPERATOR</span></span>
+        <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-6 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-4">
+            <Factory size={22} className="text-slate-400" />
+            <span className="text-[15px] font-black uppercase tracking-widest italic">FACTORYTRACK <span className="text-blue-500 font-bold">OPERATOR</span></span>
           </div>
-          <button onClick={handleLogout} className="bg-white/10 hover:bg-red-600 px-2 py-0.5 rounded font-black text-[8px] uppercase tracking-widest transition-colors">Logout</button>
+          <div className="flex items-center gap-4">
+            <button onClick={handleLogout} className="bg-white/10 hover:bg-red-600 px-4 py-1.5 rounded font-black text-[12px] uppercase tracking-widest transition-colors">{t('logout')}</button>
+          </div>
         </header>
 
-        <main className="flex-1 p-3 overflow-y-auto">
-          <div className="max-w-2xl mx-auto space-y-3">
-            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-200 pb-1.5">Sélectionner Machine</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <main className="flex-1 p-4 overflow-y-auto">
+          <div className="max-w-full mx-auto space-y-4">
+            <h2 className="text-[14px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-200 pb-2">{t('machine_select')}</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {machines.map(m => (
                 <button
                   key={m.id}
@@ -370,21 +390,23 @@ export default function OperatorScreen() {
   if (!selectedLineId) {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col">
-        <header className="h-10 bg-slate-900 text-white flex items-center justify-between px-3 border-b border-white/10 shrink-0">
+        <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-6 border-b border-white/10 shrink-0">
           <button onClick={() => {
             if (selectedLineId) handleGoBackFromLine();
             else setSelectedMachineId(null);
           }} className="hover:text-blue-400 transition-colors">
-            <ArrowLeft size={16} />
+            <ArrowLeft size={24} />
           </button>
-          <span className="text-[10px] font-black uppercase tracking-widest">{machines.find(m => m.id === selectedMachineId)?.name}</span>
-          <button onClick={handleLogout} className="bg-white/10 hover:bg-red-600 px-2 py-0.5 rounded font-black text-[8px] uppercase tracking-widest transition-colors">Logout</button>
+          <span className="text-[15px] font-black uppercase tracking-widest">{machines.find(m => m.id === selectedMachineId)?.name}</span>
+          <div className="flex items-center gap-4">
+            <button onClick={handleLogout} className="bg-white/10 hover:bg-red-600 px-4 py-1.5 rounded font-black text-[12px] uppercase tracking-widest transition-colors">{t('logout')}</button>
+          </div>
         </header>
 
-        <main className="flex-1 p-3 overflow-y-auto">
-          <div className="max-w-2xl mx-auto space-y-3">
-             <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-200 pb-1.5">Sélectionner Ligne</h2>
-             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <main className="flex-1 p-4 overflow-y-auto">
+          <div className="max-w-full mx-auto space-y-4">
+             <h2 className="text-[14px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-200 pb-2">{t('line_select')}</h2>
+             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).map(l => {
                 // A line is ONLY busy if it is actively RUNNING or in an ARRÊT (STOPPED) by someone else
                 // If it's IDLE, anyone can take it, even if someone else's ID is still there (stale session)
@@ -430,57 +452,57 @@ export default function OperatorScreen() {
   return (
     <div className="h-screen bg-[#F3F4F6] flex flex-col overflow-hidden">
       {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 px-2 py-0.5 flex flex-row justify-between items-center gap-0.5 shadow-sm shrink-0">
-        <div className="flex items-center gap-1 overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-row justify-between items-center gap-2 shadow-sm shrink-0">
+        <div className="flex items-center gap-3 overflow-hidden">
           {!activeLine?.status || activeLine?.status === 'IDLE' ? (
             <button 
               onClick={handleGoBackFromLine}
-              className="p-0.5 hover:bg-gray-100 rounded text-gray-500 transition-colors shrink-0"
+              className="p-2 hover:bg-gray-100 rounded text-gray-500 transition-colors shrink-0"
             >
-              <ArrowLeft size={12} />
+              <ArrowLeft size={22} />
             </button>
           ) : (
-            <div className="p-0.5 text-gray-100 cursor-not-allowed shrink-0">
-              <ArrowLeft size={12} />
+            <div className="p-2 text-gray-100 cursor-not-allowed shrink-0">
+              <ArrowLeft size={22} />
             </div>
           )}
           <div className="shrink-0 leading-none">
-            <p className="text-[5px] text-gray-400 uppercase tracking-tight font-semibold">Op</p>
-            <p className="text-[8px] font-black text-gray-900 truncate max-w-[60px]">{user?.name}</p>
+            <p className="text-[9px] text-gray-400 uppercase tracking-tight font-semibold">Op</p>
+            <p className="text-[13px] font-black text-gray-900 truncate max-w-[120px]">{user?.name}</p>
           </div>
-          <div className="h-2 w-px bg-gray-200" />
+          <div className="h-6 w-px bg-gray-200" />
           <div className="overflow-hidden leading-none">
-            <p className="text-[5px] text-gray-400 uppercase tracking-tight font-semibold">Poste</p>
-            <p className="text-[8px] font-black text-gray-900 truncate">
+            <p className="text-[9px] text-gray-400 uppercase tracking-tight font-semibold">Poste</p>
+            <p className="text-[13px] font-black text-gray-900 truncate">
               {machines.find(m => m.id === activeLine?.machineId)?.name} 
               <span className="text-blue-600"> | {activeLine?.name}</span>
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3">
           <span className={cn(
-            "px-1 py-0 rounded-full text-[5px] font-black uppercase tracking-tight flex items-center gap-0.5",
+            "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tight flex items-center gap-2",
             activeLine?.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
             activeLine?.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : 
             "bg-status-idle-bg text-status-idle-text"
           )}>
             <span className={cn(
-              "w-0.5 h-0.5 rounded-full",
+              "w-2 h-2 rounded-full",
               activeLine?.status === 'RUNNING' ? "bg-green-600 animate-pulse" :
               activeLine?.status === 'STOPPED' ? "bg-red-600" : "bg-gray-400"
             )} />
-            {activeLine?.status === 'RUNNING' ? "PROD" : 
-             activeLine?.status === 'STOPPED' ? "ARRÊT" : "WAIT"}
+            {activeLine?.status === 'RUNNING' ? t('production_label_short') : 
+             activeLine?.status === 'STOPPED' ? t('stop_label_short') : t('wait_label_short')}
           </span>
-          <button onClick={handleLogout} className="p-0.5 bg-red-50 rounded text-red-500 font-black text-[7px] uppercase px-1 border border-red-100">
-             OUT
+          <button onClick={handleLogout} className="p-1.5 bg-red-50 rounded text-red-500 font-black text-[11px] uppercase px-3 border border-red-100">
+             {t('out')}
           </button>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-1.5 sm:p-2 bg-slate-50/50">
-        <div className="max-w-5xl mx-auto space-y-2">
+      <main className="flex-1 overflow-y-auto p-1 bg-slate-50/50">
+        <div className="max-w-full mx-auto space-y-1">
           <div className="grid grid-cols-1 gap-2">
             
             {/* MAIN AREA: DOWNTIME */}
@@ -492,7 +514,7 @@ export default function OperatorScreen() {
                 <div className="flex justify-between items-center border-b border-slate-50 pb-1">
                   <h2 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                     <Activity size={10} className={activeDowntime ? "text-orange-500" : "text-slate-300"} />
-                    {activeDowntime ? "Arrêt" : "Gestion Arrêts"}
+                    {activeDowntime ? t('stop_label_short') : t('manage_stops')}
                   </h2>
                   {activeLine?.status === 'RUNNING' && (
                     <div className="flex items-center gap-1 bg-green-50 px-1 py-0 rounded border border-green-100">
@@ -505,7 +527,7 @@ export default function OperatorScreen() {
                 {activeLine?.status !== 'RUNNING' && !activeDowntime && !categorizingLogId && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-3 space-y-1 bg-slate-50 rounded border border-dashed border-slate-200">
                     <AlertCircle size={16} className="text-slate-300" />
-                    <p className="text-slate-400 font-black text-[8px] uppercase tracking-widest">En attente lancement</p>
+                    <p className="text-slate-400 font-black text-[8px] uppercase tracking-widest">{t('waiting_start')}</p>
                   </div>
                 )}
 
@@ -514,10 +536,10 @@ export default function OperatorScreen() {
                     <div className="flex justify-between items-end border-b border-blue-100 pb-2">
                       <div className="space-y-0.5">
                         <h3 className="text-[11px] sm:text-lg font-black text-blue-900 uppercase italic leading-none">
-                          {selectedStopType ? "Détails" : "Qualifier l'Arrêt"}
+                          {selectedStopType ? t('details') : t('qualify_stop')}
                         </h3>
                         <p className="text-[9px] font-bold text-blue-500/80 uppercase tracking-widest leading-none">
-                          {selectedStopType ? "Choisir programme cible" : "Veuillez indiquer la cause"}
+                          {selectedStopType ? t('choose_target_prog') : t('indicate_cause')}
                         </p>
                       </div>
                     </div>
@@ -537,26 +559,49 @@ export default function OperatorScreen() {
                       </div>
                     ) : (
                       <div className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                        {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase() === 'AUTRE' ? (
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest">{t('describe_reason')}</p>
+                            <textarea 
+                              className="w-full p-4 bg-white border border-blue-200 rounded-2xl text-sm font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="..."
+                              value={downtimeDescription}
+                              onChange={e => setDowntimeDescription(e.target.value)}
+                              rows={3}
+                            />
                             <button 
-                              key={p.id}
-                              onClick={() => {
-                                setSelectedProgrammeForChange(p.id);
-                                handleCategorizeStop(selectedStopType);
-                              }}
-                              className="p-3 bg-white border border-blue-100 rounded font-black text-[10px] text-blue-900 hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-between"
+                              onClick={() => handleCategorizeStop(selectedStopType!)}
+                              disabled={!downtimeDescription.trim()}
+                              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-50"
                             >
-                              <span>{p.name}</span>
-                              <Plus size={14} className="text-blue-300" />
+                              {t('validate')}
                             </button>
-                          ))}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                              <button 
+                                key={p.id}
+                                onClick={() => {
+                                  setSelectedProgrammeForChange(p.id);
+                                  handleCategorizeStop(selectedStopType!);
+                                }}
+                                className="p-3 bg-white border border-blue-100 rounded font-black text-[10px] text-blue-900 hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-between"
+                              >
+                                <span>{p.name}</span>
+                                <Plus size={14} className="text-blue-300" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         <button 
-                          onClick={() => setSelectedStopType(null)}
+                          onClick={() => {
+                            setSelectedStopType(null);
+                            setSelectedProgrammeForChange(null);
+                          }}
                           className="self-center px-4 py-1.5 bg-white border border-blue-200 rounded-full text-[9px] font-black text-blue-400 uppercase tracking-widest hover:bg-blue-50"
                         >
-                          ← Retour
+                          ← {t('back')}
                         </button>
                       </div>
                     )}
@@ -570,7 +615,7 @@ export default function OperatorScreen() {
                            <Timer size={18} />
                          </div>
                          <div className="flex flex-col items-center gap-0">
-                            <p className="text-[7px] uppercase font-black text-orange-300 tracking-widest leading-none">Temps Arrêt</p>
+                            <p className="text-[7px] uppercase font-black text-orange-300 tracking-widest leading-none">{t('stopped')}</p>
                             <p className="text-xl sm:text-3xl font-mono font-black text-orange-600 tabular-nums leading-none tracking-tighter">
                              {formatDuration(timer)}
                             </p>
@@ -582,7 +627,7 @@ export default function OperatorScreen() {
                         onClick={handleStopDowntime}
                         className="w-full bg-orange-600 hover:bg-orange-700 text-white py-1.5 rounded font-black text-[10px] sm:text-xs shadow active:scale-95 transition-all uppercase tracking-widest flex items-center justify-center gap-1.5"
                       >
-                        <Square size={12} fill="currentColor" /> Fin d'Arrêt
+                        <Square size={12} fill="currentColor" /> {t('stop')}
                       </button>
                     </div>
                   </div>
@@ -595,19 +640,19 @@ export default function OperatorScreen() {
                           className="w-full h-16 sm:h-20 bg-white border border-orange-500 text-orange-600 rounded-lg font-black text-sm sm:text-base shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest flex flex-col items-center justify-center gap-1 hover:bg-orange-50/20"
                         >
                           <AlertCircle size={24} />
-                          DÉCLARER ARRÊT
+                          {t('declare_downtime')}
                         </button>
                         
                         <button 
                           onClick={() => setShowManualStopModal(true)}
                           className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-full text-[8px] font-black text-slate-500 uppercase tracking-widest transition-all flex items-center gap-1 shadow-sm"
                         >
-                          <Plus size={10} /> Ajout manuel
+                          <Plus size={10} /> {t('manual_add')}
                         </button>
                       </div>
                     ) : (
                       <div className="text-center py-4 opacity-30">
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] italic">Attente production...</p>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] italic">{t('waiting_start')}...</p>
                       </div>
                     )}
                   </div>
@@ -621,11 +666,11 @@ export default function OperatorScreen() {
               <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 sm:p-3 flex flex-col gap-2 border-l-4 border-blue-500">
                 <div className="flex items-center gap-2 border-b border-slate-50 pb-1">
                   <Package size={14} className="text-blue-500" />
-                  <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Programme Actuel</h2>
+                  <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('programmes')}</h2>
                 </div>
                 {!activeProgramme ? (
                   <div className="space-y-2">
-                    <p className="text-slate-300 text-[8px] font-black uppercase tracking-widest text-center py-3 bg-slate-50 rounded-lg border border-dashed border-slate-100">Aucun programme</p>
+                    <p className="text-slate-300 text-[8px] font-black uppercase tracking-widest text-center py-3 bg-slate-50 rounded-lg border border-dashed border-slate-100">{t('no_programme')}</p>
                     <div className="grid gap-1">
                       {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
                         <button
@@ -663,7 +708,7 @@ export default function OperatorScreen() {
                         onClick={() => handleSelectProgramme('')} 
                         className="w-full mt-1 py-1 text-slate-300 hover:text-blue-500 font-black uppercase text-[7px] tracking-widest transition-all"
                       >
-                        Erreur ? Changer le programme
+                        {t('error_change_prog')}
                       </button>
                     )}
                   </div>
@@ -684,7 +729,7 @@ export default function OperatorScreen() {
                         onClick={handleStopProduction}
                         className="w-full py-2 bg-slate-800 hover:bg-black text-white rounded-lg font-black text-[10px] uppercase tracking-widest shadow active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                       >
-                        <Square size={12} fill="currentColor" /> Arrêt Prod
+                        <Square size={12} fill="currentColor" /> {t('stop_prod')}
                       </button>
                     ) : activeLine?.status === 'IDLE' ? (
                       <div className="flex flex-col gap-2 px-1">
@@ -724,7 +769,7 @@ export default function OperatorScreen() {
                               : "bg-green-600 hover:bg-green-700 text-white"
                           )}
                         >
-                          <Play size={14} fill="currentColor" /> Démarrer Production
+                          <Play size={14} fill="currentColor" /> {t('start_prod')}
                         </button>
                         
                         {isPostProduction && (
@@ -732,7 +777,7 @@ export default function OperatorScreen() {
                             onClick={() => handleAddPallets()}
                             className="text-purple-600 font-black text-[8px] uppercase tracking-widest text-center hover:opacity-70 transition-opacity animate-in fade-in slide-in-from-bottom-1 duration-300"
                           >
-                            Terminer & Clôturer Mission
+                            {t('finish_mission')}
                           </button>
                         )}
                       </div>
@@ -756,7 +801,7 @@ export default function OperatorScreen() {
           <span className="font-bold tracking-tight uppercase text-[9px]">
             {timer > 15 * 60 * 1000 
               ? `Alerte : Durée Arrêt > 15m (${formatDuration(timer)})` 
-              : 'Ligne à l\'arrêt'}
+              : t('stopped')}
           </span>
         </div>
       )}
@@ -776,8 +821,8 @@ export default function OperatorScreen() {
                  )} />
               </div>
               <p className="font-black text-[10px] sm:text-sm uppercase italic tracking-tight">
-                {activeLine?.status === 'RUNNING' && !activeDowntime ? "Production Active" : 
-                 activeLine?.status === 'STOPPED' || activeDowntime ? "Ligne à l'arrêt" : "En Attente"}
+                {activeLine?.status === 'RUNNING' && !activeDowntime ? t('active_prod_label') : 
+                 activeLine?.status === 'STOPPED' || activeDowntime ? t('stopped') : t('waiting_label')}
               </p>
            </div>
            
@@ -796,7 +841,7 @@ export default function OperatorScreen() {
       {/* ADMIN NAV ACCESS */}
       <div className="hidden sm:flex absolute bottom-4 right-4">
          <button onClick={handleLogout} className="p-3 bg-white/80 backdrop-blur rounded-full shadow-lg border border-gray-100 text-gray-400 hover:text-red-500 transition-colors">
-             <span className="text-[10px] font-black uppercase">LOGOUT</span>
+             <span className="text-[10px] font-black uppercase">{t('logout')}</span>
          </button>
       </div>
 
@@ -805,7 +850,7 @@ export default function OperatorScreen() {
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2">
           <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-300">
             <div className="bg-slate-900 px-4 py-2 text-white flex justify-between items-center shrink-0">
-               <h3 className="text-[10px] font-black uppercase tracking-widest italic">Ajouter Arret Manuel</h3>
+               <h3 className="text-[10px] font-black uppercase tracking-widest italic">{t('add_manual_stop')}</h3>
                <button onClick={() => setShowManualStopModal(false)} className="hover:text-red-400">
                  <X size={16} />
                </button>
@@ -814,7 +859,7 @@ export default function OperatorScreen() {
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Début</label>
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('start_time')}</label>
                   <input 
                     type="datetime-local"
                     className="w-full p-2 bg-slate-50 border rounded text-[10px] font-black text-slate-900 outline-none focus:border-blue-500"
@@ -823,7 +868,7 @@ export default function OperatorScreen() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Fin</label>
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('end_time')}</label>
                   <input 
                     type="datetime-local"
                     className="w-full p-2 bg-slate-50 border rounded text-[10px] font-black text-slate-900 outline-none focus:border-blue-500"
@@ -834,24 +879,24 @@ export default function OperatorScreen() {
               </div>
 
               <div className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center justify-between">
-                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Durée Totale</p>
+                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">{t('total_duration')}</p>
                 <p className="text-xs font-black text-blue-900 font-mono italic">{calculateManualDuration()}</p>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Motif</label>
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('reason')}</label>
                 <select 
                   className="w-full p-2 bg-slate-50 border rounded text-[10px] font-black text-slate-900 outline-none focus:border-blue-500"
                   value={manualStopForm.typeId}
                   onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
                 >
-                  <option value="">Sélectionner...</option>
+                  <option value="">{t('select_reason')}...</option>
                   {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Commentaires</label>
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('comments')}</label>
                 <textarea 
                   className="w-full p-2 bg-slate-50 border rounded text-[10px] font-bold text-slate-900 outline-none focus:border-blue-500"
                   placeholder="..."
@@ -866,18 +911,18 @@ export default function OperatorScreen() {
                   onClick={() => setShowManualStopModal(false)}
                   className="flex-1 py-2 font-black uppercase text-[10px] text-slate-400 hover:bg-slate-50 rounded tracking-widest"
                 >
-                  Annuler
+                  {t('cancel')}
                 </button>
                 <button 
                   onClick={() => {
                     if (!manualStopForm.typeId || !manualStopForm.startTime || !manualStopForm.endTime) {
-                      return alert('Champs obligatoires manquants.');
+                      return alert(t('missing_fields'));
                     }
                     handleManualStop(manualStopForm);
                   }}
                   className="flex-[2] bg-blue-600 text-white font-black uppercase py-2 rounded text-[10px] shadow active:scale-95 transition-all tracking-widest hover:bg-blue-700"
                 >
-                  Valider
+                  {t('validate')}
                 </button>
               </div>
             </div>

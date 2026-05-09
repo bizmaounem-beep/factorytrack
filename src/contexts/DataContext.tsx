@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { 
   Machine, Line, Programme, User, DowntimeType, 
-  ProductionLog, DowntimeLog 
+  ProductionLog, DowntimeLog, Shift 
 } from '../types';
 
 interface DataContextType {
@@ -11,6 +11,7 @@ interface DataContextType {
   users: User[];
   downtimeTypes: DowntimeType[];
   programmes: Programme[];
+  shifts: Shift[];
   productionLogs: ProductionLog[];
   downtimeLogs: DowntimeLog[];
   loading: boolean;
@@ -24,6 +25,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [downtimeTypes, setDowntimeTypes] = useState<DowntimeType[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([]);
   const [downtimeLogs, setDowntimeLogs] = useState<DowntimeLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const unsubUsers = localApi.onSnapshot('users', setUsers);
     const unsubTypes = localApi.onSnapshot('downtime_types', setDowntimeTypes);
     const unsubProgs = localApi.onSnapshot('programmes', setProgrammes);
+    const unsubShifts = localApi.onSnapshot('shifts', setShifts);
     const unsubProd = localApi.onSnapshot('production_logs', setProductionLogs);
     const unsubDown = localApi.onSnapshot('downtime_logs', setDowntimeLogs);
 
@@ -47,6 +50,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       unsubUsers();
       unsubTypes();
       unsubProgs();
+      unsubShifts();
       unsubProd();
       unsubDown();
     };
@@ -59,6 +63,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       users,
       downtimeTypes,
       programmes,
+      shifts,
       productionLogs,
       downtimeLogs,
       loading

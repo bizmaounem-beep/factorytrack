@@ -37,6 +37,13 @@ export interface Programme {
   parameters?: string;
 }
 
+export interface Shift {
+  id: string;
+  name: string;
+  startTime: string; // HH:mm
+  endTime: string;   // HH:mm
+}
+
 export interface DowntimeType {
   id: string;
   name: string;
@@ -49,6 +56,7 @@ export interface ProductionLog {
   operatorId: string;
   machineId: string;
   lineId: string;
+  shiftId?: string;
   count: number;
   timestamp: string;
 }
@@ -59,6 +67,7 @@ export interface DowntimeLog {
   lineId: string;
   typeId: string;
   operatorId: string;
+  shiftId?: string;
   startTime: string;
   endTime?: string;
   duration?: number;
