@@ -34,6 +34,7 @@ export interface Programme {
   producedPallets: number;
   status: 'ACTIVE' | 'FINISHED';
   createdAt: string;
+  parameters?: string;
 }
 
 export interface DowntimeType {

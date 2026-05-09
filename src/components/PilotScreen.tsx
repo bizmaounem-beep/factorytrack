@@ -19,6 +19,9 @@ export default function PilotScreen() {
     programmes 
   } = useData();
 
+  const [historyLineFilter, setHistoryLineFilter] = useState<string>('');
+  const [historyDateFilter, setHistoryDateFilter] = useState<string>('');
+  const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>('production');
   const [activeTab, setActiveTab] = useState<'monitor' | 'history'>('monitor');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
@@ -27,6 +30,7 @@ export default function PilotScreen() {
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
   const [showCreateNew, setShowCreateNew] = useState(false);
   const [newProgName, setNewProgName] = useState('');
+  const [newProgParams, setNewProgParams] = useState('');
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editModalType, setEditModalType] = useState<'prod' | 'down'>('prod');
@@ -101,7 +105,8 @@ export default function PilotScreen() {
         lineId: isAssigning,
         producedPallets: 0,
         status: 'ACTIVE' as const,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        parameters: newProgParams
       };
       const progRef = await localApi.addDoc('programmes', newProg);
 
@@ -113,8 +118,8 @@ export default function PilotScreen() {
       });
 
       setIsAssigning(null);
-      setShowCreateNew(false);
       setNewProgName('');
+      setNewProgParams('');
     } catch (e) {
       console.error(e);
       alert('Erreur lors de l\'assignation du programme');
@@ -284,9 +289,14 @@ export default function PilotScreen() {
     }
   };
 
-  // Filter logs for the selected machine
-  const filteredProdLogs = prodLogs.filter(log => log.machineId === selectedMachineId);
-  const filteredDownLogs = downLogs.filter(log => log.machineId === selectedMachineId);
+  // Sort and filter logs for the selected machine
+  const sortedProdLogs = [...prodLogs]
+    .filter(log => log.machineId === selectedMachineId)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const sortedDownLogs = [...downLogs]
+    .filter(log => log.machineId === selectedMachineId)
+    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   // Filter machines available for this pilot (not assigned or assigned to them)
   const availableMachines = machines.filter(m => !m.currentPilotId || m.currentPilotId === user?.id);
@@ -675,130 +685,191 @@ export default function PilotScreen() {
         </div>
       ) : (
         <div className="p-2 space-y-4 max-w-5xl mx-auto animate-in fade-in duration-300">
-          <div className="flex justify-between items-center px-1">
-            <div>
-              <h2 className="text-sm md:text-base font-black tracking-tight text-gray-900 uppercase">Historique Production</h2>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-1">
+              <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase italic leading-none">Historique Production</h2>
+              
+              <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto shadow-inner">
+                <button 
+                  onClick={() => setHistoryLogType('production')}
+                  className={cn(
+                    "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    historyLogType === 'production' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  Production
+                </button>
+                <button 
+                  onClick={() => setHistoryLogType('downtime')}
+                  className={cn(
+                    "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    historyLogType === 'downtime' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  Arrêts
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-1">
+              <div className="space-y-1">
+                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Ligne</p>
+                 <select 
+                  value={historyLineFilter}
+                  onChange={e => setHistoryLineFilter(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                 >
+                   <option value="">Toutes les lignes</option>
+                   {lines
+                    .filter(l => l.machineId === selectedMachineId)
+                    .map(l => (
+                     <option key={l.id} value={l.id}>{l.name}</option>
+                   ))}
+                 </select>
+              </div>
+
+              <div className="space-y-1">
+                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</p>
+                 <input 
+                  type="date"
+                  value={historyDateFilter}
+                  onChange={e => setHistoryDateFilter(e.target.value)}
+                  className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                 />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-12">
-            {/* Production History */}
-            <div className="space-y-4">
-              <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                <Package className="text-blue-600" size={16} />
-                PRODUCTION LOG
-              </h3>
-              <div className="card overflow-hidden">
-                <div className="overflow-x-auto">
+          <div className="space-y-8">
+            {historyLogType === 'production' ? (
+              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                  <Package className="text-blue-600" size={16} />
+                  LOG DE PRODUCTION
+                </h3>
+                <div className="card overflow-hidden">
+                  <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
+                          <tr>
+                            <th className="px-2 md:px-5 py-2 md:py-3">Moment</th>
+                            <th className="px-2 md:px-5 py-2 md:py-3">Ligne</th>
+                            <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Opérateur</th>
+                            <th className="px-2 md:px-5 py-2 md:py-3 text-center">Qté</th>
+                            <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
+                          <AnimatePresence mode="popLayout">
+                            {sortedProdLogs
+                              .filter(log => {
+                                const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+                                const matchDate = !historyDateFilter || log.timestamp.startsWith(historyDateFilter);
+                                return matchLine && matchDate;
+                              })
+                              .slice(0, 100).map(log => (
+                                <motion.tr 
+                                  key={log.id} 
+                                  initial={{ opacity: 1 }}
+                                  exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                                  transition={{ duration: 0.2 }}
+                                  className="hover:bg-gray-50/50"
+                                >
+                                  <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900 whitespace-nowrap">
+                                    {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                  </td>
+                                  <td className="px-2 md:px-5 py-2 md:py-3">
+                                    <p className="font-bold text-gray-700 truncate max-w-[60px] md:max-w-none">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                    <p className="text-[7px] md:text-[9px] font-bold text-gray-400 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                  </td>
+                                  <td className="px-2 md:px-5 py-2 md:py-3 font-medium text-gray-600 hidden sm:table-cell">
+                                    {users.find(u => u.id === log.operatorId)?.name || '—'}
+                                  </td>
+                                  <td className="px-2 md:px-5 py-2 md:py-3 text-center">
+                                    <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-black">{log.count}</span>
+                                  </td>
+                                  <td className="px-2 md:px-5 py-2 md:py-3 text-right">
+                                    <div className="flex justify-end gap-1">
+                                      <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                      <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                    </div>
+                                  </td>
+                                </motion.tr>
+                              ))}
+                          </AnimatePresence>
+                        </tbody>
+                      </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                  <Timer className="text-orange-600" size={16} />
+                  LOG DES ARRÊTS
+                </h3>
+                <div className="card overflow-hidden">
+                  <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
                         <tr>
-                          <th className="px-2 md:px-5 py-2 md:py-3">Moment</th>
-                          <th className="px-2 md:px-5 py-2 md:py-3">Ligne</th>
-                          <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Opérateur</th>
-                          <th className="px-2 md:px-5 py-2 md:py-3 text-center">Qté</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3">Début</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3">Durée</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3">Motif</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
                           <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
                         <AnimatePresence mode="popLayout">
-                          {filteredProdLogs.slice(0, 50).map(log => (
-                            <motion.tr 
-                              key={log.id} 
-                              initial={{ opacity: 1 }}
-                              exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
-                              transition={{ duration: 0.2 }}
-                              className="hover:bg-gray-50/50"
-                            >
-                              <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900">
-                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </td>
-                              <td className="px-2 md:px-5 py-2 md:py-3">
-                                <p className="font-bold text-gray-700 truncate max-w-[60px] md:max-w-none">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                                <p className="text-[7px] md:text-[9px] font-bold text-gray-400 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                              </td>
-                              <td className="px-2 md:px-5 py-2 md:py-3 font-medium text-gray-600 hidden sm:table-cell">
-                                {users.find(u => u.id === log.operatorId)?.name || '—'}
-                              </td>
-                              <td className="px-2 md:px-5 py-2 md:py-3 text-center">
-                                <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-black">{log.count}</span>
-                              </td>
-                              <td className="px-2 md:px-5 py-2 md:py-3 text-right">
-                                <div className="flex justify-end gap-1">
-                                  <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                                  <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                                </div>
-                              </td>
-                            </motion.tr>
-                          ))}
+                          {sortedDownLogs
+                            .filter(log => {
+                              const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+                              const matchDate = !historyDateFilter || log.startTime.startsWith(historyDateFilter);
+                              return matchLine && matchDate;
+                            })
+                            .slice(0, 100).map(log => (
+                              <motion.tr 
+                                key={log.id} 
+                                initial={{ opacity: 1 }}
+                                exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                                transition={{ duration: 0.2 }}
+                                className="hover:bg-gray-50/50"
+                              >
+                                <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900">
+                                  {new Date(log.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                </td>
+                                <td className="px-2 md:px-5 py-2 md:py-3">
+                                  {log.duration ? (
+                                    <span className="font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                                      {formatDuration(log.duration)}
+                                    </span>
+                                  ) : <span className="text-orange-500 font-black uppercase">En cours</span>}
+                                </td>
+                                <td className="px-2 md:px-5 py-2 md:py-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
+                                    <p className="font-bold text-gray-700 leading-tight">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                  </div>
+                                </td>
+                                <td className="px-2 md:px-5 py-2 md:py-3">
+                                  <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                </td>
+                                <td className="px-2 md:px-5 py-2 md:py-3 text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                    <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                  </div>
+                                </td>
+                              </motion.tr>
+                            ))}
                         </AnimatePresence>
                       </tbody>
                     </table>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Downtime History */}
-            <div className="space-y-4">
-              <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                <Timer className="text-orange-600" size={16} />
-                ARRÊTS LOG
-              </h3>
-              <div className="card overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
-                      <tr>
-                        <th className="px-2 md:px-5 py-2 md:py-3">Début</th>
-                        <th className="px-2 md:px-5 py-2 md:py-3">Durée</th>
-                        <th className="px-2 md:px-5 py-2 md:py-3">Motif</th>
-                        <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
-                        <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
-                      <AnimatePresence mode="popLayout">
-                        {filteredDownLogs.slice(0, 50).map(log => (
-                          <motion.tr 
-                            key={log.id} 
-                            initial={{ opacity: 1 }}
-                            exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
-                            transition={{ duration: 0.2 }}
-                            className="hover:bg-gray-50/50"
-                          >
-                            <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900">
-                              {new Date(log.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                            </td>
-                            <td className="px-2 md:px-5 py-2 md:py-3">
-                              {log.duration ? (
-                                <span className="font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
-                                  {formatDuration(log.duration)}
-                                </span>
-                              ) : <span className="text-orange-500 font-black uppercase">En cours</span>}
-                            </td>
-                            <td className="px-2 md:px-5 py-2 md:py-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                <p className="font-bold text-gray-700 leading-tight">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
-                              </div>
-                            </td>
-                            <td className="px-2 md:px-5 py-2 md:py-3">
-                              <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                            </td>
-                            <td className="px-2 md:px-5 py-2 md:py-3 text-right">
-                              <div className="flex justify-end gap-1">
-                                <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                                <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                              </div>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </AnimatePresence>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )
@@ -921,31 +992,57 @@ export default function PilotScreen() {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
           >
-            <div className="p-4 bg-blue-600 text-white space-y-0.5">
-              <h2 className="text-lg font-black tracking-tight uppercase leading-none italic">Assigner Programme</h2>
-              <p className="text-blue-100 text-[8px] font-black uppercase tracking-widest opacity-80 leading-none">
-                Ligne: {lines.find(l => l.id === isAssigning)?.name}
-              </p>
+            <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
+              <div className="space-y-0.5">
+                <h2 className="text-lg font-black tracking-tight uppercase leading-none italic">Assigner Programme</h2>
+                <p className="text-blue-100 text-[8px] font-black uppercase tracking-widest opacity-80 leading-none">
+                  Ligne: {lines.find(l => l.id === isAssigning)?.name}
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  const line = lines.find(l => l.id === isAssigning);
+                  if (line) toggleLineActive(line.id, line.isActive !== false);
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-full font-black text-[8px] uppercase tracking-widest border transition-all active:scale-95",
+                  lines.find(l => l.id === isAssigning)?.isActive !== false 
+                    ? "bg-green-500/20 border-green-500/50 text-green-100" 
+                    : "bg-red-500/20 border-red-500/50 text-red-100"
+                )}
+              >
+                {lines.find(l => l.id === isAssigning)?.isActive !== false ? 'Ligne Active' : 'Ligne Inactive'}
+              </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6">
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
                   <h3 className="text-[10px] font-black text-gray-700 uppercase tracking-widest mb-3">Nouveau Programme</h3>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2">
                     <input 
                       type="text"
                       value={newProgName}
                       onChange={e => setNewProgName(e.target.value)}
-                      placeholder="Nom du nouveau programme..."
-                      className="flex-1 p-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm"
+                      placeholder="Nom du programme..."
+                      className="w-full p-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm"
                     />
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Paramètres Techniques</label>
+                      <textarea 
+                        value={newProgParams}
+                        onChange={e => setNewProgParams(e.target.value)}
+                        placeholder="Vitesse, Pression, etc..."
+                        rows={2}
+                        className="w-full p-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs"
+                      />
+                    </div>
                     <button 
                       disabled={!newProgName}
                       onClick={handleAssignProgramme}
-                      className="px-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                      className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all shadow-md shadow-blue-100"
                     >
-                      CRÉER
+                      SAUVEGARDER & ASSIGNER
                     </button>
                   </div>
                 </div>

@@ -24,6 +24,13 @@ export default function AdminPanel() {
     downtimeLogs: downLogs 
   } = useData();
 
+  const sortedProdLogs = [...prodLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const sortedDownLogs = [...downLogs].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
+  const [historyMachineFilter, setHistoryMachineFilter] = useState<string>('');
+  const [historyLineFilter, setHistoryLineFilter] = useState<string>('');
+  const [historyDateFilter, setHistoryDateFilter] = useState<string>('');
+  const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>('production');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -851,129 +858,211 @@ export default function AdminPanel() {
 
           {activeTab === 'history' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Historique</h2>
+              <div className="flex flex-col gap-4 px-1">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Historique</h2>
+                  
+                  <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
+                    <button 
+                      onClick={() => setHistoryLogType('production')}
+                      className={cn(
+                        "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                        historyLogType === 'production' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                      )}
+                    >
+                      Production
+                    </button>
+                    <button 
+                      onClick={() => setHistoryLogType('downtime')}
+                      className={cn(
+                        "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                        historyLogType === 'downtime' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                      )}
+                    >
+                      Arrêts
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                   <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Machine</p>
+                     <select 
+                      value={historyMachineFilter}
+                      onChange={e => {
+                        setHistoryMachineFilter(e.target.value);
+                        setHistoryLineFilter('');
+                      }}
+                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                     >
+                       <option value="">Toutes les machines</option>
+                       {machines.map(m => (
+                         <option key={m.id} value={m.id}>{m.name}</option>
+                       ))}
+                     </select>
+                   </div>
+
+                   <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Ligne</p>
+                     <select 
+                      value={historyLineFilter}
+                      onChange={e => setHistoryLineFilter(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                     >
+                       <option value="">Toutes les lignes</option>
+                       {lines
+                        .filter(l => !historyMachineFilter || l.machineId === historyMachineFilter)
+                        .map(l => (
+                         <option key={l.id} value={l.id}>{l.name}</option>
+                       ))}
+                     </select>
+                   </div>
+
+                   <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</p>
+                     <input 
+                      type="date"
+                      value={historyDateFilter}
+                      onChange={e => setHistoryDateFilter(e.target.value)}
+                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                     />
+                   </div>
+                </div>
               </div>
 
               <div className="space-y-6 md:space-y-8">
-                {/* Production Logs History */}
-                <div className="space-y-2">
-                  <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                    <Package className="text-blue-600" size={16} />
-                    Production Log
-                  </h3>
-                  <div className="card overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                      <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
-                        <tr>
-                          <th className="px-2 md:px-6 py-2 md:py-3">Heure</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3">Prog.</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3 hidden md:table-cell">Opérateur</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3 text-center">Qté</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
-                        <AnimatePresence mode="popLayout">
-                          {prodLogs.map(log => (
-                            <motion.tr 
-                              key={log.id} 
-                              initial={{ opacity: 1 }}
-                              exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
-                              transition={{ duration: 0.2 }}
-                              className="hover:bg-gray-50/50"
-                            >
-                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900">
-                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
-                                <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 text-blue-600 font-bold truncate max-w-[60px] md:max-w-none">
-                                {programmes.find(p => p.id === log.programmeId)?.name || '—'}
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium hidden md:table-cell">
-                                {users.find(u => u.id === log.operatorId)?.name || '—'}
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 text-center">
-                                <span className="bg-blue-50 text-blue-700 px-1 py-0.5 rounded font-black">{log.count}</span>
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 text-right">
-                                <div className="flex justify-end gap-1">
-                                  <button onClick={() => openModal('production_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                  <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                </div>
-                              </td>
-                              </motion.tr>
-                            ))}
-                          </AnimatePresence>
-                        </tbody>
-                      </table>
+                {historyLogType === 'production' ? (
+                  <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                    <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                      <Package className="text-blue-600" size={16} />
+                      Log de Production
+                    </h3>
+                    <div className="card overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                          <tr>
+                            <th className="px-2 md:px-6 py-2 md:py-3">Date / Heure</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3">Prog.</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3 hidden md:table-cell">Opérateur</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3 text-center">Qté</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
+                          <AnimatePresence mode="popLayout">
+                            {sortedProdLogs
+                              .filter(log => {
+                                const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
+                                const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+                                const matchDate = !historyDateFilter || log.timestamp.startsWith(historyDateFilter);
+                                return matchMachine && matchLine && matchDate;
+                              })
+                              .slice(0, 100).map(log => (
+                                <motion.tr 
+                                  key={log.id} 
+                                  initial={{ opacity: 1 }}
+                                  exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                                  transition={{ duration: 0.2 }}
+                                  className="hover:bg-gray-50/50"
+                                >
+                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900 whitespace-nowrap">
+                                    {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
+                                    <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                    <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 text-blue-600 font-bold truncate max-w-[60px] md:max-w-none">
+                                    {programmes.find(p => p.id === log.programmeId)?.name || '—'}
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium hidden md:table-cell">
+                                    {users.find(u => u.id === log.operatorId)?.name || '—'}
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 text-center">
+                                    <span className="bg-blue-50 text-blue-700 px-1 py-0.5 rounded font-black">{log.count}</span>
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 text-right">
+                                    <div className="flex justify-end gap-1">
+                                      <button onClick={() => openModal('production_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => initiateDelete('production_logs', log.id, `Production de ${log.count} palettes`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                    </div>
+                                  </td>
+                                </motion.tr>
+                              ))}
+                            </AnimatePresence>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Downtime Logs History */}
-                <div className="space-y-2">
-                  <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                    <Timer className="text-orange-600" size={16} />
-                    Arrêts Log
-                  </h3>
-                  <div className="card overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                      <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
-                        <tr>
-                          <th className="px-2 md:px-6 py-2 md:py-3">Heure</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3">Fin</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3">Motif</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
-                          <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
-                        <AnimatePresence mode="popLayout">
-                          {downLogs.map(log => (
-                            <motion.tr 
-                              key={log.id} 
-                              initial={{ opacity: 1 }}
-                              exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
-                              transition={{ duration: 0.2 }}
-                              className="hover:bg-gray-50/50"
-                            >
-                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900">
-                                {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-600">
-                                {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[7px] md:text-[9px]">Active</span>}
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-sm">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                  <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
-                                </div>
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
-                                <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                              </td>
-                              <td className="px-2 md:px-6 py-2 md:py-3 text-right">
-                                <div className="flex justify-end gap-1">
-                                  <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                  <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                </div>
-                              </td>
-                              </motion.tr>
-                            ))}
-                          </AnimatePresence>
-                        </tbody>
-                      </table>
+                ) : (
+                  <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                    <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                      <Timer className="text-orange-600" size={16} />
+                      Log des Arrêts
+                    </h3>
+                    <div className="card overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                          <tr>
+                            <th className="px-2 md:px-6 py-2 md:py-3">Heure Début</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3">Fin</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3">Motif</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
+                            <th className="px-2 md:px-6 py-2 md:py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
+                          <AnimatePresence mode="popLayout">
+                            {sortedDownLogs
+                              .filter(log => {
+                                const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
+                                const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+                                const matchDate = !historyDateFilter || log.startTime.startsWith(historyDateFilter);
+                                return matchMachine && matchLine && matchDate;
+                              })
+                              .slice(0, 100).map(log => (
+                                <motion.tr 
+                                  key={log.id} 
+                                  initial={{ opacity: 1 }}
+                                  exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
+                                  transition={{ duration: 0.2 }}
+                                  className="hover:bg-gray-50/50"
+                                >
+                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900">
+                                    {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-600">
+                                    {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[7px] md:text-[9px]">Active</span>}
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-sm">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
+                                      <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                    </div>
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
+                                    <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                    <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 text-right">
+                                    <div className="flex justify-end gap-1">
+                                      <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => initiateDelete('downtime_logs', log.id, `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                    </div>
+                                  </td>
+                                </motion.tr>
+                              ))}
+                            </AnimatePresence>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -1158,6 +1247,16 @@ export default function AdminPanel() {
                       <option value="FINISHED">CLÔTURÉ</option>
                     </select>
                   )}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Paramètres Techniques</label>
+                    <textarea 
+                      placeholder="Pression, Vitesse, Température..."
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                      rows={3}
+                      value={modalData.parameters || ''}
+                      onChange={e => setModalData({...modalData, parameters: e.target.value})}
+                    />
+                  </div>
                 </>
               )}
 
