@@ -285,6 +285,15 @@ export default function PilotScreen() {
     }
   };
 
+  const toggleLineActive = async (lineId: string, currentStatus: boolean | undefined) => {
+    try {
+      await localApi.updateDoc('lines', lineId, { isActive: !currentStatus });
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors du changement de statut de la ligne');
+    }
+  };
+
   // Filter logs for the selected machine
   const filteredProdLogs = prodLogs.filter(log => log.machineId === selectedMachineId);
   const filteredDownLogs = downLogs.filter(log => log.machineId === selectedMachineId);
@@ -552,11 +561,17 @@ export default function PilotScreen() {
                 key={line.id}
                 variants={item}
                 layout
-                className="card border-l-4 border-slate-200 hover:border-blue-500 transition-colors flex flex-col overflow-hidden"
+                className={cn(
+                  "card transition-colors flex flex-col overflow-hidden",
+                  line.isActive === false ? "border-l-4 border-red-500 bg-red-50/20" : "border-l-4 border-slate-200 hover:border-blue-500"
+                )}
               >
                 <div className="px-2 py-1.5 sm:p-4 flex justify-between items-center border-b border-slate-50 shrink-0">
                   <div className="leading-none">
-                    <h3 className="font-black text-[10px] sm:text-sm text-slate-900">{line.name}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-black text-[10px] sm:text-sm text-slate-900">{line.name}</h3>
+                      {line.isActive === false && <span className="text-[7px] font-black text-red-600 bg-red-100 px-1 rounded uppercase tracking-widest border border-red-200 animate-pulse">Hors Service</span>}
+                    </div>
                     <div className="flex items-center gap-1 mt-0.5 sm:mt-2">
                        <span className={cn(
                         "px-1 py-0.5 rounded-full text-[6px] sm:text-[9px] font-black uppercase tracking-widest flex items-center gap-0.5",
@@ -573,6 +588,19 @@ export default function PilotScreen() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => toggleLineActive(line.id, line.isActive !== false)}
+                      className={cn(
+                        "p-1 sm:p-1.5 rounded-lg active:scale-95 transition-all shadow-sm flex items-center gap-1 border shrink-0 h-6 sm:h-auto",
+                        line.isActive !== false ? "text-orange-600 bg-orange-50 border-orange-100" : "text-green-600 bg-green-50 border-green-100"
+                      )}
+                      title={line.isActive !== false ? "Désactiver la ligne" : "Activer la ligne"}
+                    >
+                      {line.isActive !== false ? <Timer size={10} /> : <Activity size={10} />}
+                      <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-tight">
+                        {line.isActive !== false ? 'Désactiver' : 'Activer'}
+                      </span>
+                    </button>
                     {prog && (
                       <button 
                         onClick={() => handleReleaseLine(line.id)}

@@ -83,7 +83,10 @@ export default function AdminPanel() {
           // If it's explicitly boolean false or number 0, it's 0. Otherwise (true, 1, undefined) it's 1.
           finalData.tracksProduction = (modalData.tracksProduction === false || modalData.tracksProduction === 0) ? 0 : 1;
         }
-        if (!editingId) finalData.status = 'IDLE';
+        if (!editingId) {
+          finalData.status = 'IDLE';
+          finalData.isActive = true;
+        }
       }
 
       if (editingId) {
@@ -616,10 +619,18 @@ export default function AdminPanel() {
                           const op = users.find(u => u.id === l.currentOperatorId);
                           const mach = machines.find(m => m.id === l.machineId);
                           return (
-                            <tr key={l.id} className="text-[9px] md:text-sm hover:bg-gray-50/50 transition-colors">
+                            <tr key={l.id} className={cn(
+                              "text-[9px] md:text-sm hover:bg-gray-50/50 transition-colors",
+                              l.isActive === false && "opacity-40 grayscale-[0.5]"
+                            )}>
                               <td className="px-1 md:px-6 py-2 md:py-5">
-                                <p className="font-black text-gray-900 leading-none mb-0.5 whitespace-nowrap">{l.name}</p>
-                                <p className="text-[7.5px] font-bold text-blue-500 uppercase tracking-tight truncate max-w-[40px] md:max-w-none">{mach?.name}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <div>
+                                    <p className="font-black text-gray-900 leading-none mb-0.5 whitespace-nowrap">{l.name}</p>
+                                    <p className="text-[7.5px] font-bold text-blue-500 uppercase tracking-tight truncate max-w-[40px] md:max-w-none">{mach?.name}</p>
+                                  </div>
+                                  {l.isActive === false && <Timer size={10} className="text-red-500" title="Hors Service" />}
+                                </div>
                               </td>
                               <td className="px-1 md:px-6 py-2 md:py-5">
                                  <span className={cn(
@@ -738,8 +749,21 @@ export default function AdminPanel() {
                         <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Lignes</p>
                         <div className="flex flex-wrap gap-1.5">
                           {lines.filter(l => l.machineId === m.id).map(l => (
-                            <div key={l.id} className="bg-gray-50 border border-gray-100 px-1.5 py-1 rounded flex items-center gap-1.5 group/line transition-all hover:bg-white">
-                              <span className="text-[9px] md:text-xs font-bold text-gray-700">{l.name}</span>
+                            <div 
+                              key={l.id} 
+                              className={cn(
+                                "border px-1.5 py-1 rounded flex items-center gap-1.5 group/line transition-all",
+                                l.isActive === false ? "bg-red-50 border-red-100 opacity-60" : "bg-gray-50 border-gray-100 hover:bg-white"
+                              )}
+                            >
+                              <span className={cn(
+                                "text-[9px] md:text-xs font-bold",
+                                l.isActive === false ? "text-red-700 italic flex items-center gap-1" : "text-gray-700"
+                              )}>
+                                {l.isActive === false && <Timer size={10} className="text-red-400" />}
+                                {l.name}
+                                {l.isActive === false && <span className="text-[7px] uppercase tracking-tighter opacity-50 ml-1">(Hors Service)</span>}
+                              </span>
                               <div className="flex gap-0.5">
                                 <button onClick={() => openModal('line', l)} className="text-gray-300 hover:text-blue-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
                                   <Pencil size={10} />
@@ -1183,15 +1207,27 @@ export default function AdminPanel() {
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   {modalType === 'line' && (
-                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <input 
-                        type="checkbox"
-                        id="tracksProduction"
-                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        checked={modalData.tracksProduction !== false}
-                        onChange={e => setModalData({...modalData, tracksProduction: e.target.checked})}
-                      />
-                      <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700">Suivi de production (Palettes)</label>
+                    <div className="space-y-2">
+                       <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <input 
+                          type="checkbox"
+                          id="isActive"
+                          className="w-5 h-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          checked={modalData.isActive !== false}
+                          onChange={e => setModalData({...modalData, isActive: e.target.checked})}
+                        />
+                        <label htmlFor="isActive" className="text-sm font-bold text-gray-700">Ligne en service (Activée)</label>
+                      </div>
+                      <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <input 
+                          type="checkbox"
+                          id="tracksProduction"
+                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={modalData.tracksProduction !== false}
+                          onChange={e => setModalData({...modalData, tracksProduction: e.target.checked})}
+                        />
+                        <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700">Suivi de production (Palettes)</label>
+                      </div>
                     </div>
                   )}
                 </>

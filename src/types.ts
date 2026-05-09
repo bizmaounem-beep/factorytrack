@@ -23,6 +23,7 @@ export interface Line {
   currentOperatorId?: string;
   activeDowntimeId?: string;
   tracksProduction: boolean;
+  isActive?: boolean;
 }
 
 export interface Programme {
