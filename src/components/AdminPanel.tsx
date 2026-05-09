@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
-import { User as AppUser, Machine, Line, Programme, DowntimeType, ProductionLog, DowntimeLog } from '../types';
+import { useData } from '../contexts/DataContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, Factory, Package, Timer, History, 
@@ -14,6 +14,16 @@ import { saveAs } from 'file-saver';
 
 export default function AdminPanel() {
   const { logout } = useAuth();
+  const { 
+    users, 
+    machines, 
+    lines, 
+    programmes, 
+    downtimeTypes, 
+    productionLogs: prodLogs, 
+    downtimeLogs: downLogs 
+  } = useData();
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,28 +32,6 @@ export default function AdminPanel() {
   const [modalData, setModalData] = useState<any>({});
   const [selectedMachineForLine, setSelectedMachineForLine] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
-  
-  const [users, setUsers] = useState<AppUser[]>([]);
-  const [machines, setMachines] = useState<Machine[]>([]);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [programmes, setProgrammes] = useState<Programme[]>([]);
-  const [downtimeTypes, setDowntimeTypes] = useState<DowntimeType[]>([]);
-  const [prodLogs, setProdLogs] = useState<ProductionLog[]>([]);
-  const [downLogs, setDownLogs] = useState<DowntimeLog[]>([]);
-
-  useEffect(() => {
-    const unsubUsers = localApi.onSnapshot('users', setUsers);
-    const unsubMachines = localApi.onSnapshot('machines', setMachines);
-    const unsubLines = localApi.onSnapshot('lines', setLines);
-    const unsubProgs = localApi.onSnapshot('programmes', setProgrammes);
-    const unsubTypes = localApi.onSnapshot('downtime_types', setDowntimeTypes);
-    const unsubProd = localApi.onSnapshot('production_logs', setProdLogs);
-    const unsubDown = localApi.onSnapshot('downtime_logs', setDownLogs);
-    
-    return () => {
-      unsubUsers(); unsubMachines(); unsubLines(); unsubProgs(); unsubTypes(); unsubProd(); unsubDown();
-    };
-  }, []);
 
   const openModal = (type: typeof modalType, data: any = {}) => {
     setModalType(type);

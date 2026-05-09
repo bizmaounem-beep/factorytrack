@@ -1,24 +1,28 @@
 import { useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
-import { Machine, Line, Programme, User as AppUser, DowntimeType, DowntimeLog, ProductionLog } from '../types';
+import { useData } from '../contexts/DataContext';
+import { DowntimeLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft } from 'lucide-react';
 import { cn, formatDuration } from '../lib/utils';
 
 export default function PilotScreen() {
   const { user, logout } = useAuth();
+  const { 
+    machines, 
+    users, 
+    downtimeTypes, 
+    productionLogs: prodLogs, 
+    downtimeLogs: downLogs, 
+    lines, 
+    programmes 
+  } = useData();
+
   const [activeTab, setActiveTab] = useState<'monitor' | 'history'>('monitor');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
-  const [lines, setLines] = useState<Line[]>([]);
-  const [programmes, setProgrammes] = useState<Programme[]>([]);
-  const [users, setUsers] = useState<AppUser[]>([]);
-  const [downtimeTypes, setDowntimeTypes] = useState<DowntimeType[]>([]);
   const [activeDowntimes, setActiveDowntimes] = useState<Record<string, DowntimeLog>>({});
-  const [prodLogs, setProdLogs] = useState<ProductionLog[]>([]);
-  const [downLogs, setDownLogs] = useState<DowntimeLog[]>([]);
 
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
   const [showCreateNew, setShowCreateNew] = useState(false);
@@ -30,20 +34,6 @@ export default function PilotScreen() {
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
   const [declaringDowntimeLineId, setDeclaringDowntimeLineId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const u1 = localApi.onSnapshot('machines', setMachines);
-    const u2 = localApi.onSnapshot('users', setUsers);
-    const u3 = localApi.onSnapshot('downtime_types', setDowntimeTypes);
-    const u4 = localApi.onSnapshot('production_logs', setProdLogs);
-    const u5 = localApi.onSnapshot('downtime_logs', setDownLogs);
-    const u6 = localApi.onSnapshot('lines', setLines);
-    const u7 = localApi.onSnapshot('programmes', setProgrammes);
-    
-    return () => {
-      u1(); u2(); u3(); u4(); u5(); u6(); u7();
-    };
-  }, []);
 
   // Auto-select machine if pilot is already assigned in DB
   useEffect(() => {

@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
-import { Machine, Line, Programme, DowntimeType, DowntimeLog, User } from '../types';
+import { useData } from '../contexts/DataContext';
+import { Line } from '../types';
 import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
 
 export default function OperatorScreen() {
   const { user, logout } = useAuth();
-  const [machines, setMachines] = useState<Machine[]>([]);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [downtimeTypes, setDowntimeTypes] = useState<DowntimeType[]>([]);
-  const [availableProgrammes, setAvailableProgrammes] = useState<Programme[]>([]);
-  const [downtimeLogs, setDowntimeLogs] = useState<DowntimeLog[]>([]);
+  const { 
+    machines, 
+    lines, 
+    users, 
+    downtimeTypes, 
+    programmes: availableProgrammes, 
+    downtimeLogs 
+  } = useData();
   
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -35,25 +38,6 @@ export default function OperatorScreen() {
     ? downtimeLogs.find(d => d.lineId === activeLine.id && d.operatorId === user?.id && d.typeId === 'PENDING' && d.endTime) || null 
     : null;
   const categorizingLogId = categorizingLog?.id || null;
-
-  // Initialize data
-  useEffect(() => {
-    const unsubMachines = localApi.onSnapshot('machines', setMachines);
-    const unsubDowntimeTypes = localApi.onSnapshot('downtime_types', setDowntimeTypes);
-    const unsubLines = localApi.onSnapshot('lines', setLines);
-    const unsubProgs = localApi.onSnapshot('programmes', setAvailableProgrammes);
-    const unsubDown = localApi.onSnapshot('downtime_logs', setDowntimeLogs);
-    const unsubUsers = localApi.onSnapshot('users', setUsers);
-    
-    return () => {
-      unsubMachines();
-      unsubDowntimeTypes();
-      unsubLines();
-      unsubProgs();
-      unsubDown();
-      unsubUsers();
-    };
-  }, []);
 
   const [flashFeedback, setFlashFeedback] = useState(false);
 
@@ -91,7 +75,8 @@ export default function OperatorScreen() {
 
   const handleLogout = async () => {
     try {
-      const heldLines = lines.filter(l => l.currentOperatorId === user?.id && l.status === 'IDLE');
+      // Release any line held by this operator that isn't actively running
+      const heldLines = lines.filter(l => l.currentOperatorId === user?.id && l.status !== 'RUNNING');
       for (const line of heldLines) {
         await localApi.updateDoc('lines', line.id, {
           currentOperatorId: null
@@ -101,6 +86,39 @@ export default function OperatorScreen() {
       console.error("Error releasing lines on logout:", e);
     }
     logout();
+  };
+
+  const handleSelectLine = async (line: Line) => {
+    if (!user) return;
+    
+    try {
+      // Claim the line in the DB so others see it as occupied
+      await localApi.updateDoc('lines', line.id, {
+        currentOperatorId: user.id
+      });
+      setSelectedLineId(line.id);
+    } catch (e) {
+      console.error("Error claiming line:", e);
+      // Still set it locally in case of minor network issues, or handle error
+      setSelectedLineId(line.id);
+    }
+  };
+
+  const handleGoBackFromLine = async () => {
+    if (selectedLineId && user) {
+      const line = lines.find(l => l.id === selectedLineId);
+      // Only release if it's currently IDLE (not running, not stopped)
+      if (line && line.status === 'IDLE') {
+        try {
+          await localApi.updateDoc('lines', selectedLineId, {
+            currentOperatorId: null
+          });
+        } catch (e) {
+          console.error("Error releasing line on back:", e);
+        }
+      }
+    }
+    setSelectedLineId(null);
   };
 
   const handleStartProduction = async () => {
@@ -353,7 +371,10 @@ export default function OperatorScreen() {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col">
         <header className="h-10 bg-slate-900 text-white flex items-center justify-between px-3 border-b border-white/10 shrink-0">
-          <button onClick={() => setSelectedMachineId(null)} className="hover:text-blue-400 transition-colors">
+          <button onClick={() => {
+            if (selectedLineId) handleGoBackFromLine();
+            else setSelectedMachineId(null);
+          }} className="hover:text-blue-400 transition-colors">
             <ArrowLeft size={16} />
           </button>
           <span className="text-[10px] font-black uppercase tracking-widest">{machines.find(m => m.id === selectedMachineId)?.name}</span>
@@ -365,14 +386,16 @@ export default function OperatorScreen() {
              <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-200 pb-1.5">Sélectionner Ligne</h2>
              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).map(l => {
-                const isBusy = (l.status !== 'IDLE' || !!l.currentOperatorId) && l.currentOperatorId !== user?.id;
+                // A line is ONLY busy if it is actively RUNNING or in an ARRÊT (STOPPED) by someone else
+                // If it's IDLE, anyone can take it, even if someone else's ID is still there (stale session)
+                const isBusy = l.status !== 'IDLE' && l.currentOperatorId !== user?.id;
                 const operatorName = users.find(u => u.id === l.currentOperatorId)?.name;
 
                 return (
                   <button
                     key={l.id}
                     disabled={isBusy}
-                    onClick={() => setSelectedLineId(l.id)}
+                    onClick={() => handleSelectLine(l)}
                     className={cn(
                       "p-4 bg-white rounded-xl border-2 transition-all shadow-sm flex flex-col items-center justify-center gap-1.5 relative group",
                       isBusy ? "opacity-40 cursor-not-allowed bg-slate-50 border-slate-100" : "hover:border-blue-500 border-slate-100"
@@ -411,10 +434,7 @@ export default function OperatorScreen() {
         <div className="flex items-center gap-1 overflow-hidden">
           {!activeLine?.status || activeLine?.status === 'IDLE' ? (
             <button 
-              onClick={() => {
-                if (selectedLineId) setSelectedLineId(null);
-                else setSelectedMachineId(null);
-              }}
+              onClick={handleGoBackFromLine}
               className="p-0.5 hover:bg-gray-100 rounded text-gray-500 transition-colors shrink-0"
             >
               <ArrowLeft size={12} />
