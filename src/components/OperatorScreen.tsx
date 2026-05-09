@@ -152,9 +152,11 @@ export default function OperatorScreen() {
         status: 'FINISHED'
       });
 
-      // Clear the line's current programme so it's ready for the next one
+      // Clear the line's current programme and operator so it's ready for the next one
       await localApi.updateDoc('lines', selectedLineId, {
-        currentProgrammeId: null
+        currentProgrammeId: null,
+        currentOperatorId: null,
+        status: 'IDLE'
       });
 
       setPalletInput('1');
@@ -372,14 +374,25 @@ export default function OperatorScreen() {
                     disabled={isBusy}
                     onClick={() => setSelectedLineId(l.id)}
                     className={cn(
-                      "p-4 bg-white rounded border border-slate-200 transition-all shadow-sm flex flex-col items-center gap-1.5",
-                      isBusy ? "opacity-30 cursor-not-allowed" : "hover:border-blue-500 group"
+                      "p-4 bg-white rounded-xl border-2 transition-all shadow-sm flex flex-col items-center justify-center gap-1.5 relative group",
+                      isBusy ? "opacity-40 cursor-not-allowed bg-slate-50 border-slate-100" : "hover:border-blue-500 border-slate-100"
                     )}
                   >
-                    <Monitor size={24} className={cn("text-slate-300", !isBusy && "group-hover:text-blue-500")} />
+                    <div className="absolute top-2 right-2">
+                      <span className={cn(
+                        "w-2 h-2 rounded-full",
+                        l.status === 'RUNNING' ? "bg-green-500 animate-pulse" : 
+                        l.status === 'STOPPED' ? "bg-red-500" : "bg-slate-300"
+                      )} />
+                    </div>
+                    <Monitor size={24} className={cn("text-slate-300", !isBusy && "group-hover:text-blue-500 transition-colors")} />
                     <div className="text-center">
-                      <p className="text-[11px] font-black text-slate-800 uppercase truncate">{l.name}</p>
-                      {isBusy && operatorName && <p className="text-[8px] font-bold text-red-500 uppercase mt-0.5">{operatorName}</p>}
+                      <p className="text-[11px] font-black text-slate-800 uppercase truncate max-w-[100px]">{l.name}</p>
+                      {isBusy && (
+                        <p className="text-[8px] font-bold text-red-500 uppercase mt-0.5 animate-in fade-in">
+                          {operatorName || (l.status === 'STOPPED' ? 'Arrêt Machine' : 'Occupé')}
+                        </p>
+                      )}
                     </div>
                   </button>
                 );

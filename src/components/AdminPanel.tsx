@@ -120,7 +120,9 @@ export default function AdminPanel() {
             }
           } else if (dataToSave.lineId) {
             await localApi.updateDoc('lines', dataToSave.lineId, {
-              currentProgrammeId: editingId
+              currentProgrammeId: editingId,
+              currentOperatorId: null,
+              status: 'IDLE'
             });
           }
         }
@@ -136,7 +138,8 @@ export default function AdminPanel() {
           if (finalData.lineId) {
             await localApi.updateDoc('lines', finalData.lineId, {
               currentProgrammeId: progRef.id,
-              status: 'IDLE'
+              status: 'IDLE',
+              currentOperatorId: null
             });
           }
         } else {
