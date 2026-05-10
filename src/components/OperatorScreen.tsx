@@ -156,10 +156,32 @@ export default function OperatorScreen() {
     if (!selectedLineId) return;
 
     try {
+      const count = parseInt(palletInput) || 0;
+      if (count > 0 && activeProgramme && user) {
+        // Log production
+        await localApi.addDoc('production_logs', {
+          programmeId: activeProgramme.id,
+          operatorId: user.id,
+          machineId: activeLine?.machineId,
+          lineId: activeLine?.id,
+          shiftId: currentShiftId,
+          count,
+          timestamp: new Date().toISOString()
+        });
+
+        // Update programme total
+        await localApi.updateDoc('programmes', activeProgramme.id, {
+          producedPallets: (activeProgramme.producedPallets || 0) + count,
+        });
+      }
+
       await localApi.updateDoc('lines', selectedLineId, {
         status: 'IDLE',
       });
       setIsPostProduction(true);
+      setPalletInput('0');
+      setFlashFeedback(true);
+      setTimeout(() => setFlashFeedback(false), 500);
     } catch (e) {
       console.error(e);
       const errorMessage = e instanceof Error ? e.message : String(e);
@@ -768,40 +790,31 @@ export default function OperatorScreen() {
                   </div>
 
                   <div className="flex-1 flex flex-col justify-center gap-2 py-1">
-                    {/* MANUAL ENTRY: WRITE NUMBERS AND VERIFY */}
+                    {/* MANUAL ENTRY & STOP PRODUCTION MERGED */}
                     {(activeLine?.status === 'RUNNING' || activeLine?.status === 'STOPPED') && (
-                      <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-2 animate-in zoom-in-95 duration-300">
-                        <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest text-center">{t('register_production')}</p>
-                        <div className="flex items-stretch gap-2 h-10">
+                      <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-3 animate-in zoom-in-95 duration-300">
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest text-center">{t('register_production')}</p>
                           <input 
                             type="number"
-                            className="flex-1 bg-white border-2 border-purple-100 rounded-lg px-2 text-base font-black text-purple-900 text-center font-mono outline-none focus:border-purple-500 transition-all"
+                            className="w-full bg-white border-2 border-purple-100 rounded-lg px-2 py-2 text-xl font-black text-purple-900 text-center font-mono outline-none focus:border-purple-500 transition-all shadow-inner"
                             value={palletInput}
                             onChange={e => setPalletInput(e.target.value)}
                             placeholder="0"
                           />
-                          <button 
-                            onClick={() => handleAddPallets()}
-                            className={cn(
-                              "aspect-square h-full bg-green-500 hover:bg-green-600 text-white rounded-lg shadow-sm active:scale-90 transition-all flex items-center justify-center",
-                              flashFeedback && "bg-green-400"
-                            )}
-                          >
-                            <Check size={20} strokeWidth={3} />
-                          </button>
                         </div>
+                        
+                        <button 
+                          onClick={handleStopProduction}
+                          className="w-full py-3 bg-slate-800 hover:bg-black text-white rounded-lg font-black text-xs uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                        >
+                          <Square size={16} fill="currentColor" /> {t('stop_prod')}
+                        </button>
                       </div>
                     )}
 
                     <div className="space-y-2">
-                      {activeLine?.status === 'RUNNING' ? (
-                        <button 
-                          onClick={handleStopProduction}
-                          className="w-full py-2 bg-slate-800 hover:bg-black text-white rounded-lg font-black text-[10px] uppercase tracking-widest shadow active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                        >
-                          <Square size={12} fill="currentColor" /> {t('stop_prod')}
-                        </button>
-                      ) : activeLine?.status === 'IDLE' ? (
+                      {activeLine?.status === 'IDLE' ? (
                         <div className="flex flex-col gap-2 px-1">
                           {isPostProduction && (
                             <div className="flex flex-col items-center gap-0.5 animate-in fade-in slide-in-from-top-1 duration-300">
