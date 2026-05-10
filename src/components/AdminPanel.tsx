@@ -30,12 +30,24 @@ export default function AdminPanel() {
   const sortedProdLogs = [...prodLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   const sortedDownLogs = [...downLogs].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
-  const [historyMachineFilter, setHistoryMachineFilter] = useState<string>('');
-  const [historyLineFilter, setHistoryLineFilter] = useState<string>('');
-  const [historyShiftFilter, setHistoryShiftFilter] = useState<string>('');
-  const [historyDateFilter, setHistoryDateFilter] = useState<string>('');
-  const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>('production');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [historyMachineFilter, setHistoryMachineFilter] = useState<string>(() => sessionStorage.getItem('admin_history_machine') || '');
+  const [historyLineFilter, setHistoryLineFilter] = useState<string>(() => sessionStorage.getItem('admin_history_line') || '');
+  const [historyShiftFilter, setHistoryShiftFilter] = useState<string>(() => sessionStorage.getItem('admin_history_shift') || '');
+  const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('admin_history_date') || '');
+  const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('admin_history_type') as any) || 'production');
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('admin_active_tab') || 'dashboard');
+
+  useEffect(() => {
+    sessionStorage.setItem('admin_active_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    sessionStorage.setItem('admin_history_machine', historyMachineFilter);
+    sessionStorage.setItem('admin_history_line', historyLineFilter);
+    sessionStorage.setItem('admin_history_shift', historyShiftFilter);
+    sessionStorage.setItem('admin_history_date', historyDateFilter);
+    sessionStorage.setItem('admin_history_type', historyLogType);
+  }, [historyMachineFilter, historyLineFilter, historyShiftFilter, historyDateFilter, historyLogType]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

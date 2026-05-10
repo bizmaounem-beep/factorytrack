@@ -23,12 +23,26 @@ export default function PilotScreen() {
     shifts 
   } = useData();
 
-  const [historyLineFilter, setHistoryLineFilter] = useState<string>('');
-  const [historyDateFilter, setHistoryDateFilter] = useState<string>('');
-  const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>('production');
-  const [activeTab, setActiveTab] = useState<'monitor' | 'history'>('monitor');
+  const [historyLineFilter, setHistoryLineFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_line') || '');
+  const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_date') || '');
+  const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('pilot_history_type') as any) || 'production');
+  const [activeTab, setActiveTab] = useState<'monitor' | 'history'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'monitor');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [selectedMachineId, setSelectedMachineId] = useState<string>('');
+  const [selectedMachineId, setSelectedMachineId] = useState<string>(() => sessionStorage.getItem('pilot_selected_machine') || '');
+
+  useEffect(() => {
+    sessionStorage.setItem('pilot_active_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    sessionStorage.setItem('pilot_selected_machine', selectedMachineId);
+  }, [selectedMachineId]);
+
+  useEffect(() => {
+    sessionStorage.setItem('pilot_history_line', historyLineFilter);
+    sessionStorage.setItem('pilot_history_date', historyDateFilter);
+    sessionStorage.setItem('pilot_history_type', historyLogType);
+  }, [historyLineFilter, historyDateFilter, historyLogType]);
   const [activeDowntimes, setActiveDowntimes] = useState<Record<string, DowntimeLog>>({});
 
   const [isAssigning, setIsAssigning] = useState<string | null>(null);

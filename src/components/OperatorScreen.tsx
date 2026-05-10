@@ -21,8 +21,18 @@ export default function OperatorScreen() {
     shifts 
   } = useData();
   
-  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
-  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(() => sessionStorage.getItem('op_selected_machine') || null);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(() => sessionStorage.getItem('op_selected_line') || null);
+
+  useEffect(() => {
+    if (selectedMachineId) sessionStorage.setItem('op_selected_machine', selectedMachineId);
+    else sessionStorage.removeItem('op_selected_machine');
+  }, [selectedMachineId]);
+
+  useEffect(() => {
+    if (selectedLineId) sessionStorage.setItem('op_selected_line', selectedLineId);
+    else sessionStorage.removeItem('op_selected_line');
+  }, [selectedLineId]);
   
   const [selectedStopType, setSelectedStopType] = useState<string | null>(null);
   const [showManualStopModal, setShowManualStopModal] = useState(false);
