@@ -137,7 +137,8 @@ export default function OperatorScreen() {
       setIsPostProduction(false);
     } catch (e) {
       console.error(e);
-      alert('Erreur lors du lancement de la production. Réessayez.');
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      alert(`${t('error_saving')}\n\n${errorMessage}`);
     }
   };
 
@@ -151,7 +152,8 @@ export default function OperatorScreen() {
       setIsPostProduction(true);
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de l\'arrêt de la production.');
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      alert(`${t('error_saving')}\n\n${errorMessage}`);
     }
   };
 
@@ -188,6 +190,8 @@ export default function OperatorScreen() {
       setIsPostProduction(false);
     } catch (e) {
       console.error(e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      alert(`${t('error_saving')}\n\n${errorMessage}`);
     }
   };
 
@@ -218,7 +222,8 @@ export default function OperatorScreen() {
       setDowntimeDescription('');
     } catch (error) {
       console.error('Error starting downtime:', error);
-      alert('Erreur: Impossible de démarrer l\'arrêt.');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Erreur: Impossible de démarrer l'arrêt.\n\n${errorMessage}`);
     }
   };
 
@@ -795,6 +800,17 @@ export default function OperatorScreen() {
           </div>
         </div>
       </main>
+
+      {/* DEBUG INFO - Visually subtle but accessible for troubleshooting */}
+      <div className="absolute bottom-1 right-1 opacity-10 hover:opacity-100 transition-opacity pointer-events-none">
+        <div className="bg-black/50 text-[6px] text-white p-1 rounded font-mono pointer-events-auto flex gap-2">
+          <span>L:{activeLine?.id}</span>
+          <span>S:{activeLine?.status}</span>
+          <span>D:{activeLine?.activeDowntimeId || 'None'}</span>
+          <span>U:{user?.id}</span>
+          <span>SH:{currentShiftId || 'None'}</span>
+        </div>
+      </div>
 
       {/* FOOTER ALERT */}
       {(activeLine?.status === 'STOPPED' || (timer > 15 * 60 * 1000)) && (
