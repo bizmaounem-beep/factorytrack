@@ -86,6 +86,7 @@ export const translations: Translation = {
   stop_prod: { fr: 'Arrêt Prod' },
   start_prod: { fr: 'Démarrer Production' },
   finish_mission: { fr: 'Terminer & Clôturer Mission' },
+  stop_prod_caution: { fr: 'Machine en arrêt : Saisie possible' },
   qualify_stop: { fr: 'Qualifier l\'Arrêt' },
   indicate_cause: { fr: 'Indiquer la cause' },
   manual_add: { fr: 'Ajout manuel' },

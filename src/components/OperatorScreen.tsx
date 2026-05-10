@@ -167,6 +167,33 @@ export default function OperatorScreen() {
     }
   };
 
+  const handlePalletTick = async () => {
+    if (!activeProgramme || !user || !selectedLineId) return;
+    try {
+      // Log production
+      await localApi.addDoc('production_logs', {
+        programmeId: activeProgramme.id,
+        operatorId: user.id,
+        machineId: activeLine?.machineId,
+        lineId: activeLine?.id,
+        shiftId: currentShiftId,
+        count: 1,
+        timestamp: new Date().toISOString()
+      });
+
+      // Update programme total (don't finish)
+      await localApi.updateDoc('programmes', activeProgramme.id, {
+        producedPallets: (activeProgramme.producedPallets || 0) + 1
+      });
+      
+      // Visual feedback
+      setFlashFeedback(true);
+      setTimeout(() => setFlashFeedback(false), 500);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleAddPallets = async (overrideCount?: number) => {
     let count = typeof overrideCount === 'number' ? overrideCount : parseInt(palletInput);
     if (isNaN(count) || !activeProgramme || !user || !selectedLineId) return;
@@ -740,69 +767,85 @@ export default function OperatorScreen() {
                     <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saisie Production</h2>
                   </div>
 
-                  <div className="flex-1 flex flex-col justify-center gap-1 py-1">
-                    {activeLine?.status === 'RUNNING' ? (
+                  <div className="flex-1 flex flex-col justify-center gap-2 py-1">
+                    {/* QUICK ACTION: ADD 1 PALLET */}
+                    {(activeLine?.status === 'RUNNING' || activeLine?.status === 'STOPPED') && (
                       <button 
-                        onClick={handleStopProduction}
-                        className="w-full py-2 bg-slate-800 hover:bg-black text-white rounded-lg font-black text-[10px] uppercase tracking-widest shadow active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        onClick={handlePalletTick}
+                        className={cn(
+                          "w-full py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-purple-100 active:scale-[0.95] transition-all flex items-center justify-center gap-3",
+                          flashFeedback && "ring-4 ring-purple-300 scale-105"
+                        )}
                       >
-                        <Square size={12} fill="currentColor" /> {t('stop_prod')}
+                        <Plus size={20} strokeWidth={3} />
+                        <span>+1 {t('pallets')}</span>
                       </button>
-                    ) : activeLine?.status === 'IDLE' ? (
-                      <div className="flex flex-col gap-2 px-1">
-                        {isPostProduction && (
-                          <div className="flex flex-col items-center gap-0.5 animate-in fade-in slide-in-from-top-1 duration-300">
-                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Déclarer Palettes</p>
-                            <div className="flex items-center gap-1.5 w-full max-w-[110px]">
-                              <button 
-                                onClick={() => setPalletInput((parseInt(palletInput) - 1).toString())}
-                                className="w-6 h-6 bg-slate-50 hover:bg-slate-100 rounded flex items-center justify-center text-slate-400 transition-all border"
-                              >
-                                <Minus size={10} />
-                              </button>
-                              <input 
-                                type="number"
-                                className="flex-1 bg-white border-b border-slate-100 p-0 text-[10px] font-black text-slate-900 text-center font-mono outline-none focus:border-purple-500 transition-all leading-none"
-                                value={palletInput}
-                                onChange={e => setPalletInput(e.target.value)}
-                              />
-                              <button 
-                                onClick={() => setPalletInput((parseInt(palletInput) + 1).toString())}
-                                className="w-6 h-6 bg-slate-50 hover:bg-slate-100 rounded flex items-center justify-center text-purple-600 transition-all border"
-                              >
-                                <Plus size={10} />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        <button 
-                          onClick={handleStartProduction}
-                          disabled={!activeProgramme}
-                          className={cn(
-                            "w-full py-2.5 rounded-lg font-black text-[11px] shadow active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
-                            !activeProgramme 
-                              ? "bg-slate-100 text-slate-300 cursor-not-allowed" 
-                              : "bg-green-600 hover:bg-green-700 text-white"
-                          )}
-                        >
-                          <Play size={14} fill="currentColor" /> {t('start_prod')}
-                        </button>
-                        
-                        {isPostProduction && (
-                          <button 
-                            onClick={() => handleAddPallets()}
-                            className="text-purple-600 font-black text-[8px] uppercase tracking-widest text-center hover:opacity-70 transition-opacity animate-in fade-in slide-in-from-bottom-1 duration-300"
-                          >
-                            {t('finish_mission')}
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center opacity-30 py-2">
-                         <p className="text-[7px] font-black text-slate-400 uppercase italic">Ligne à l'arrêt...</p>
-                      </div>
                     )}
+
+                    <div className="space-y-2">
+                      {activeLine?.status === 'RUNNING' ? (
+                        <button 
+                          onClick={handleStopProduction}
+                          className="w-full py-2 bg-slate-800 hover:bg-black text-white rounded-lg font-black text-[10px] uppercase tracking-widest shadow active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        >
+                          <Square size={12} fill="currentColor" /> {t('stop_prod')}
+                        </button>
+                      ) : activeLine?.status === 'IDLE' ? (
+                        <div className="flex flex-col gap-2 px-1">
+                          {isPostProduction && (
+                            <div className="flex flex-col items-center gap-0.5 animate-in fade-in slide-in-from-top-1 duration-300">
+                              <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">{t('register_production')}</p>
+                              <div className="flex items-center gap-1.5 w-full max-w-[110px]">
+                                <button 
+                                  onClick={() => setPalletInput((parseInt(palletInput) - 1).toString())}
+                                  className="w-6 h-6 bg-slate-50 hover:bg-slate-100 rounded flex items-center justify-center text-slate-400 transition-all border"
+                                >
+                                  <Minus size={10} />
+                                </button>
+                                <input 
+                                  type="number"
+                                  className="flex-1 bg-white border-b border-slate-100 p-0 text-[10px] font-black text-slate-900 text-center font-mono outline-none focus:border-purple-500 transition-all leading-none"
+                                  value={palletInput}
+                                  onChange={e => setPalletInput(e.target.value)}
+                                />
+                                <button 
+                                  onClick={() => setPalletInput((parseInt(palletInput) + 1).toString())}
+                                  className="w-6 h-6 bg-slate-50 hover:bg-slate-100 rounded flex items-center justify-center text-purple-600 transition-all border"
+                                >
+                                  <Plus size={10} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <button 
+                            onClick={handleStartProduction}
+                            disabled={!activeProgramme}
+                            className={cn(
+                              "w-full py-2.5 rounded-lg font-black text-[11px] shadow active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
+                              !activeProgramme 
+                                ? "bg-slate-100 text-slate-300 cursor-not-allowed" 
+                                : "bg-green-600 hover:bg-green-700 text-white"
+                            )}
+                          >
+                            <Play size={14} fill="currentColor" /> {t('start_prod')}
+                          </button>
+                          
+                          {isPostProduction && (
+                            <button 
+                              onClick={() => handleAddPallets()}
+                              className="text-purple-600 font-black text-[8px] uppercase tracking-widest text-center hover:opacity-70 transition-opacity animate-in fade-in slide-in-from-bottom-1 duration-300"
+                            >
+                              {t('finish_mission')}
+                            </button>
+                          )}
+                        </div>
+                      ) : activeLine?.status === 'STOPPED' && (
+                        <div className="flex flex-col items-center gap-1 opacity-80 mt-1">
+                           <p className="text-[7px] font-black text-orange-400 uppercase tracking-widest italic">{t('stop_prod_caution')}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
