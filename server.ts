@@ -102,6 +102,17 @@ async function startServer() {
       );
     `);
 
+    // Migrations for existing databases
+    const logTables = ['production_logs', 'downtime_logs'];
+    for (const table of logTables) {
+      const pragma = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
+      const columns = pragma.map(p => p.name);
+      if (!columns.includes('shiftId')) {
+        console.log(`Migration: Adding shiftId column to ${table}...`);
+        db.exec(`ALTER TABLE ${table} ADD COLUMN shiftId TEXT;`);
+      }
+    }
+
     // Seed default data if empty
     const countRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
     if (countRow.count === 0) {

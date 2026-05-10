@@ -801,17 +801,6 @@ export default function OperatorScreen() {
         </div>
       </main>
 
-      {/* DEBUG INFO - Visually subtle but accessible for troubleshooting */}
-      <div className="absolute bottom-1 right-1 opacity-10 hover:opacity-100 transition-opacity pointer-events-none">
-        <div className="bg-black/50 text-[6px] text-white p-1 rounded font-mono pointer-events-auto flex gap-2">
-          <span>L:{activeLine?.id}</span>
-          <span>S:{activeLine?.status}</span>
-          <span>D:{activeLine?.activeDowntimeId || 'None'}</span>
-          <span>U:{user?.id}</span>
-          <span>SH:{currentShiftId || 'None'}</span>
-        </div>
-      </div>
-
       {/* FOOTER ALERT */}
       {(activeLine?.status === 'STOPPED' || (timer > 15 * 60 * 1000)) && (
         <div className="bg-red-600 text-white flex items-center justify-center py-1 gap-2 shrink-0">
