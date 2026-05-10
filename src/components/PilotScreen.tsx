@@ -387,15 +387,6 @@ export default function PilotScreen() {
     }
   };
 
-  const toggleLineActive = async (lineId: string, currentStatus: boolean) => {
-    try {
-      await localApi.updateDoc('lines', lineId, { isActive: currentStatus ? 0 : 1 });
-    } catch (e) {
-      console.error(e);
-      alert('Erreur lors du changement de statut de la ligne');
-    }
-  };
-
   const calculateManualDuration = () => {
     const start = new Date(manualStopForm.startTime).getTime();
     const end = new Date(manualStopForm.endTime).getTime();
@@ -670,23 +661,17 @@ export default function PilotScreen() {
             const op = users.find(u => u.id === line.currentOperatorId);
             const down = activeDowntimes[line.id];
             const downType = downtimeTypes.find(t => t.id === down?.typeId);
-            const isInactive = line.isActive === false || line.isActive === 0;
-
             return (
               <motion.div 
                 key={line.id}
                 variants={item}
                 layout
-                className={cn(
-                  "card transition-colors flex flex-col overflow-hidden",
-                  isInactive ? "border-l-4 border-red-500 bg-red-50/20" : "border-l-4 border-slate-200 hover:border-blue-500"
-                )}
+                className="card transition-colors flex flex-col overflow-hidden border-l-4 border-slate-200 hover:border-blue-500"
               >
                 <div className="px-2 py-1.5 sm:p-4 flex justify-between items-center border-b border-slate-50 shrink-0">
                   <div className="leading-none">
                     <div className="flex items-center gap-1.5">
                       <h3 className="font-black text-[10px] sm:text-sm text-slate-900">{line.name}</h3>
-                      {isInactive && <span className="text-[7px] font-black text-red-600 bg-red-100 px-1 rounded uppercase tracking-widest border border-red-200 animate-pulse">{t('out_of_service')}</span>}
                     </div>
                     <div className="flex items-center gap-1 mt-0.5 sm:mt-2">
                        <span className={cn(
@@ -745,19 +730,6 @@ export default function PilotScreen() {
                       )}
                     </div>
 
-                    <button 
-                      onClick={() => toggleLineActive(line.id, !isInactive)}
-                      className={cn(
-                        "p-1 sm:p-1.5 rounded-lg active:scale-95 transition-all shadow-sm flex items-center gap-1 border shrink-0 h-6 sm:h-auto",
-                        !isInactive ? "text-orange-600 bg-orange-50 border-orange-100" : "text-green-600 bg-green-50 border-green-100"
-                      )}
-                      title={!isInactive ? t('deactivate') : t('activate')}
-                    >
-                      {!isInactive ? <Timer size={10} /> : <Activity size={10} />}
-                      <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-tight">
-                        {!isInactive ? t('deactivate') : t('activate')}
-                      </span>
-                    </button>
                     {prog && (
                       <button 
                         onClick={() => handleReleaseLine(line.id)}
@@ -1156,20 +1128,6 @@ export default function PilotScreen() {
                   {t('line')}: {lines.find(l => l.id === isAssigning)?.name}
                 </p>
               </div>
-              <button 
-                onClick={() => {
-                  const line = lines.find(l => l.id === isAssigning);
-                  if (line) toggleLineActive(line.id, line.isActive !== false);
-                }}
-                className={cn(
-                  "px-3 py-1.5 rounded-full font-black text-[8px] uppercase tracking-widest border transition-all active:scale-95",
-                  lines.find(l => l.id === isAssigning)?.isActive !== false 
-                    ? "bg-green-500/20 border-green-500/50 text-green-100" 
-                    : "bg-red-500/20 border-red-500/50 text-red-100"
-                )}
-              >
-                {lines.find(l => l.id === isAssigning)?.isActive !== false ? t('active_line') : t('inactive_line')}
-              </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6">
