@@ -50,7 +50,8 @@ async function startServer() {
         currentProgrammeId TEXT,
         currentOperatorId TEXT,
         activeDowntimeId TEXT,
-        tracksProduction INTEGER DEFAULT 1
+        tracksProduction INTEGER DEFAULT 1,
+        isActive INTEGER DEFAULT 1
       );
 
       CREATE TABLE IF NOT EXISTS programmes (
@@ -113,6 +114,10 @@ async function startServer() {
         if (!columns.includes('shiftId')) {
           console.log(`Migration: Adding shiftId column to ${table}...`);
           db.exec(`ALTER TABLE ${table} ADD COLUMN shiftId TEXT;`);
+        }
+        if (table === 'lines' && !columns.includes('isActive')) {
+          console.log(`Migration: Adding isActive column to lines...`);
+          db.exec(`ALTER TABLE lines ADD COLUMN isActive INTEGER DEFAULT 1;`);
         }
       } catch (err) {
         console.error(`Migration failed for ${table}:`, err);

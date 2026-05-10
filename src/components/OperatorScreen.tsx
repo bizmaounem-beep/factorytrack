@@ -60,7 +60,7 @@ export default function OperatorScreen() {
   // Session Persistence
   useEffect(() => {
     if (!user || selectedLineId || lines.length === 0) return;
-    const activeLines = lines.filter(l => l.isActive !== false);
+    const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0);
     const myActiveLine = activeLines.find(l => l.currentOperatorId === user.id);
     if (myActiveLine) {
       setSelectedMachineId(myActiveLine.machineId);
@@ -473,7 +473,7 @@ export default function OperatorScreen() {
           <div className="max-w-full mx-auto space-y-4">
              <h2 className="text-[14px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-200 pb-2">{t('line_select')}</h2>
              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).map(l => {
+              {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).map(l => {
                 // A line is ONLY busy if it is actively RUNNING or in an ARRÊT (STOPPED) by someone else
                 // If it's IDLE, anyone can take it, even if someone else's ID is still there (stale session)
                 const isBusy = l.status !== 'IDLE' && l.currentOperatorId !== user?.id;

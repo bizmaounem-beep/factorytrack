@@ -5,7 +5,7 @@ import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { DowntimeLog, Shift } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft } from 'lucide-react';
+import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft, Clock, Square, Play } from 'lucide-react';
 import { cn, formatDuration } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
 
@@ -56,6 +56,14 @@ export default function PilotScreen() {
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
   const [declaringDowntimeLineId, setDeclaringDowntimeLineId] = useState<string | null>(null);
+  const [showManualStopModal, setShowManualStopModal] = useState(false);
+  const [manualStopForm, setManualStopForm] = useState({
+    typeId: '',
+    startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
+    endTime: new Date().toISOString().slice(0, 16),
+    description: '',
+    lineId: ''
+  });
 
   // Auto-select machine if pilot is already assigned in DB
   useEffect(() => {
@@ -270,46 +278,131 @@ export default function PilotScreen() {
     }
   };
 
-  const handleStartDowntime = async (lineId: string | null, typeId: string) => {
+  const handleStopSpecificDowntime = async (lineId: string) => {
+    try {
+      const line = lines.find(l => l.id === lineId);
+      if (line && line.activeDowntimeId) {
+        const log = downLogs.find(l => l.id === line.activeDowntimeId);
+        if (log && !log.endTime) {
+          const endTime = new Date().toISOString();
+          const duration = Math.floor((new Date(endTime).getTime() - new Date(log.startTime).getTime()) / 1000);
+          await localApi.updateDoc('downtime_logs', log.id, { endTime, duration });
+        }
+        await localApi.updateDoc('lines', line.id, {
+          activeDowntimeId: null,
+          status: 'IDLE'
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors du redémarrage de la ligne');
+    }
+  };
+
+  const handleStartDowntime = async (lineId: string | null | 'global', typeId: string) => {
     if (!user || !selectedMachineId) return;
     try {
-      const machineLines = lines.filter(l => l.machineId === selectedMachineId);
       const startTime = new Date().toISOString();
       const currentShiftId = getCurrentShiftId(shifts);
 
-      for (const line of machineLines) {
+      if (lineId && lineId !== 'global') {
+        // Specific line stop
         const log = await localApi.addDoc('downtime_logs', {
           machineId: selectedMachineId,
-          lineId: line.id,
+          lineId: lineId,
           typeId,
           operatorId: user.id,
           shiftId: currentShiftId,
           startTime,
         });
 
-        await localApi.updateDoc('lines', line.id, {
+        await localApi.updateDoc('lines', lineId, {
           activeDowntimeId: log.id,
           status: 'STOPPED'
         });
+      } else {
+        // Global machine stop (all lines)
+        const machineLines = lines.filter(l => l.machineId === selectedMachineId);
+        for (const line of machineLines) {
+          const log = await localApi.addDoc('downtime_logs', {
+            machineId: selectedMachineId,
+            lineId: line.id,
+            typeId,
+            operatorId: user.id,
+            shiftId: currentShiftId,
+            startTime,
+          });
+
+          await localApi.updateDoc('lines', line.id, {
+            activeDowntimeId: log.id,
+            status: 'STOPPED'
+          });
+        }
       }
       
       setDeclaringDowntimeLineId(null);
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de la déclaration de l\'arrêt machine');
+      alert('Erreur lors de la déclaration de l\'arrêt');
     }
   };
 
-  const toggleLineActive = async (lineId: string, currentStatus: boolean | undefined) => {
+  const handleManualStop = async (data: typeof manualStopForm) => {
+    if (!user || !selectedMachineId || !data.lineId) return;
+
     try {
-      await localApi.updateDoc('lines', lineId, { isActive: !currentStatus });
+      const start = new Date(data.startTime).getTime();
+      const end = new Date(data.endTime).getTime();
+      const durationMs = end - start;
+
+      if (durationMs <= 0) {
+        alert('L\'heure de fin doit être après l\'heure de début.');
+        return;
+      }
+
+      const currentShiftId = getCurrentShiftId(shifts);
+
+      await localApi.addDoc('downtime_logs', {
+        machineId: selectedMachineId,
+        lineId: data.lineId,
+        typeId: data.typeId,
+        description: data.description,
+        operatorId: user.id,
+        shiftId: currentShiftId,
+        startTime: new Date(data.startTime).toISOString(),
+        endTime: new Date(data.endTime).toISOString(),
+        duration: Math.floor(durationMs / 1000)
+      });
+      
+      setShowManualStopModal(false);
+      setManualStopForm({
+        ...manualStopForm,
+        typeId: '',
+        description: '',
+        lineId: ''
+      });
+    } catch (error) {
+      console.error('Error adding manual downtime:', error);
+      alert('Erreur lors de l\'ajout de l\'arrêt manuel');
+    }
+  };
+
+  const toggleLineActive = async (lineId: string, currentStatus: boolean) => {
+    try {
+      await localApi.updateDoc('lines', lineId, { isActive: currentStatus ? 0 : 1 });
     } catch (e) {
       console.error(e);
       alert('Erreur lors du changement de statut de la ligne');
     }
   };
 
-  // Sort and filter logs for the selected machine
+  const calculateManualDuration = () => {
+    const start = new Date(manualStopForm.startTime).getTime();
+    const end = new Date(manualStopForm.endTime).getTime();
+    const diff = end - start;
+    if (diff <= 0) return '00:00:00';
+    return formatDuration(Math.floor(diff / 1000));
+  };
   const sortedProdLogs = [...prodLogs]
     .filter(log => log.machineId === selectedMachineId)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -577,6 +670,7 @@ export default function PilotScreen() {
             const op = users.find(u => u.id === line.currentOperatorId);
             const down = activeDowntimes[line.id];
             const downType = downtimeTypes.find(t => t.id === down?.typeId);
+            const isInactive = line.isActive === false || line.isActive === 0;
 
             return (
               <motion.div 
@@ -585,14 +679,14 @@ export default function PilotScreen() {
                 layout
                 className={cn(
                   "card transition-colors flex flex-col overflow-hidden",
-                  line.isActive === false ? "border-l-4 border-red-500 bg-red-50/20" : "border-l-4 border-slate-200 hover:border-blue-500"
+                  isInactive ? "border-l-4 border-red-500 bg-red-50/20" : "border-l-4 border-slate-200 hover:border-blue-500"
                 )}
               >
                 <div className="px-2 py-1.5 sm:p-4 flex justify-between items-center border-b border-slate-50 shrink-0">
                   <div className="leading-none">
                     <div className="flex items-center gap-1.5">
                       <h3 className="font-black text-[10px] sm:text-sm text-slate-900">{line.name}</h3>
-                      {line.isActive === false && <span className="text-[7px] font-black text-red-600 bg-red-100 px-1 rounded uppercase tracking-widest border border-red-200 animate-pulse">{t('out_of_service')}</span>}
+                      {isInactive && <span className="text-[7px] font-black text-red-600 bg-red-100 px-1 rounded uppercase tracking-widest border border-red-200 animate-pulse">{t('out_of_service')}</span>}
                     </div>
                     <div className="flex items-center gap-1 mt-0.5 sm:mt-2">
                        <span className={cn(
@@ -610,17 +704,58 @@ export default function PilotScreen() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    {/* STOP/RESUME BUTTONS PER LINE */}
+                    <div className="flex items-center gap-1">
+                      {line.status === 'STOPPED' || down ? (
+                        <button 
+                          onClick={() => handleStopSpecificDowntime(line.id)}
+                          className="p-1 sm:p-2 text-green-600 bg-green-50 rounded-lg active:scale-95 hover:bg-green-100 transition-all shadow-sm flex items-center gap-1 border border-green-100 shrink-0 h-6 sm:h-auto"
+                          title={t('resume')}
+                        >
+                          <Play className="w-2.5 h-2.5 sm:w-4 sm:h-4" strokeWidth={3} />
+                          <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight">RELANCER</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => setDeclaringDowntimeLineId(line.id)}
+                            className="p-1 sm:p-2 text-red-600 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all shadow-sm flex items-center gap-1 border border-red-100 shrink-0 h-6 sm:h-auto"
+                            title="Arrêt Auto (Immédiat)"
+                          >
+                            <Square size={10} fill="currentColor" />
+                            <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight leading-none text-center">ARRÊT<br/>AUTO</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                               setManualStopForm({
+                                 ...manualStopForm,
+                                 lineId: line.id,
+                                 startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
+                                 endTime: new Date().toISOString().slice(0, 16)
+                               });
+                               setShowManualStopModal(true);
+                            }}
+                            className="p-1 sm:p-2 text-slate-600 bg-slate-50 rounded-lg active:scale-95 hover:bg-slate-100 transition-all shadow-sm flex items-center gap-1 border border-slate-200 shrink-0 h-6 sm:h-auto"
+                            title="Saisie Manuelle (Durée)"
+                          >
+                            <Clock size={10} />
+                            <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight leading-none text-center">SAISIE<br/>MANUELLE</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <button 
-                      onClick={() => toggleLineActive(line.id, line.isActive !== false)}
+                      onClick={() => toggleLineActive(line.id, !isInactive)}
                       className={cn(
                         "p-1 sm:p-1.5 rounded-lg active:scale-95 transition-all shadow-sm flex items-center gap-1 border shrink-0 h-6 sm:h-auto",
-                        line.isActive !== false ? "text-orange-600 bg-orange-50 border-orange-100" : "text-green-600 bg-green-50 border-green-100"
+                        !isInactive ? "text-orange-600 bg-orange-50 border-orange-100" : "text-green-600 bg-green-50 border-green-100"
                       )}
-                      title={line.isActive !== false ? t('deactivate') : t('activate')}
+                      title={!isInactive ? t('deactivate') : t('activate')}
                     >
-                      {line.isActive !== false ? <Timer size={10} /> : <Activity size={10} />}
+                      {!isInactive ? <Timer size={10} /> : <Activity size={10} />}
                       <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-tight">
-                        {line.isActive !== false ? t('deactivate') : t('activate')}
+                        {!isInactive ? t('deactivate') : t('activate')}
                       </span>
                     </button>
                     {prog && (
@@ -1131,14 +1266,14 @@ export default function PilotScreen() {
             <div className="p-6 bg-orange-600 text-white">
               <h2 className="text-xl font-black tracking-tight uppercase italic">{t('machine_stop')}</h2>
               <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80">
-                {t('general_stop')}
+                {declaringDowntimeLineId === 'global' ? t('general_stop') : `${t('line')} ${lines.find(l => l.id === declaringDowntimeLineId)?.name}`}
               </p>
             </div>
             <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
               {downtimeTypes.map(type => (
                 <button
                   key={type.id}
-                  onClick={() => handleStartDowntime(null, type.id)}
+                  onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id)}
                   className="p-4 border border-orange-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-50 transition-all group shadow-sm bg-white"
                 >
                   <span className="text-2xl group-hover:scale-110 transition-transform">{type.icon}</span>
@@ -1152,6 +1287,88 @@ export default function PilotScreen() {
                 className="w-full py-4 text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 rounded-2xl"
               >
                 Annuler
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MANUAL STOP MODAL */}
+      {showManualStopModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+          >
+            <div className="p-6 bg-slate-900 text-white">
+              <h2 className="text-xl font-black tracking-tight uppercase italic">Saisie Manuelle</h2>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-none mt-1">
+                Ligne: {lines.find(l => l.id === manualStopForm.lineId)?.name}
+              </p>
+            </div>
+            <div className="p-4 space-y-4">
+               <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Début</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      value={manualStopForm.startTime}
+                      onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Fin</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      value={manualStopForm.endTime}
+                      onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
+                    />
+                  </div>
+               </div>
+
+               <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100">
+                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none">Durée totale</p>
+                  <p className="text-sm font-black text-blue-900 font-mono italic">{calculateManualDuration()}</p>
+               </div>
+
+               <div className="space-y-1">
+                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Motif de l'arrêt</label>
+                 <select 
+                   className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                   value={manualStopForm.typeId}
+                   onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
+                 >
+                   <option value="">Sélectionner un motif...</option>
+                   {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                 </select>
+               </div>
+
+               <div className="space-y-1">
+                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Description / Commentaire</label>
+                 <textarea 
+                   className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                   placeholder="..."
+                   rows={2}
+                   value={manualStopForm.description}
+                   onChange={e => setManualStopForm({...manualStopForm, description: e.target.value})}
+                 />
+               </div>
+            </div>
+            <div className="p-4 bg-gray-50 flex gap-3">
+              <button 
+                onClick={() => setShowManualStopModal(false)}
+                className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 rounded-2xl transition-all"
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={() => handleManualStop(manualStopForm)}
+                className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-200 uppercase text-xs tracking-widest active:scale-95 transition-all"
+              >
+                Valider Saisie
               </button>
             </div>
           </motion.div>
