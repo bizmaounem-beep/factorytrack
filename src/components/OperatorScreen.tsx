@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Line, Shift } from '../types';
-import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock } from 'lucide-react';
+import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock, Check } from 'lucide-react';
 import { formatDuration, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
 
@@ -768,18 +768,29 @@ export default function OperatorScreen() {
                   </div>
 
                   <div className="flex-1 flex flex-col justify-center gap-2 py-1">
-                    {/* QUICK ACTION: ADD 1 PALLET */}
+                    {/* MANUAL ENTRY: WRITE NUMBERS AND VERIFY */}
                     {(activeLine?.status === 'RUNNING' || activeLine?.status === 'STOPPED') && (
-                      <button 
-                        onClick={handlePalletTick}
-                        className={cn(
-                          "w-full py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-purple-100 active:scale-[0.95] transition-all flex items-center justify-center gap-3",
-                          flashFeedback && "ring-4 ring-purple-300 scale-105"
-                        )}
-                      >
-                        <Plus size={20} strokeWidth={3} />
-                        <span>+1 {t('pallets')}</span>
-                      </button>
+                      <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-2 animate-in zoom-in-95 duration-300">
+                        <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest text-center">{t('register_production')}</p>
+                        <div className="flex items-stretch gap-2 h-10">
+                          <input 
+                            type="number"
+                            className="flex-1 bg-white border-2 border-purple-100 rounded-lg px-2 text-base font-black text-purple-900 text-center font-mono outline-none focus:border-purple-500 transition-all"
+                            value={palletInput}
+                            onChange={e => setPalletInput(e.target.value)}
+                            placeholder="0"
+                          />
+                          <button 
+                            onClick={() => handleAddPallets()}
+                            className={cn(
+                              "aspect-square h-full bg-green-500 hover:bg-green-600 text-white rounded-lg shadow-sm active:scale-90 transition-all flex items-center justify-center",
+                              flashFeedback && "bg-green-400"
+                            )}
+                          >
+                            <Check size={20} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </div>
                     )}
 
                     <div className="space-y-2">
