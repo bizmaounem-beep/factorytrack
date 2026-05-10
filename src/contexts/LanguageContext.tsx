@@ -107,6 +107,8 @@ export const translations: Translation = {
   machines: { fr: 'Machines' },
   lines: { fr: 'Lignes' },
   programmes: { fr: 'Programmes' },
+  active_programmes: { fr: 'Programmes en Cours' },
+  finished_programmes: { fr: 'Programmes Clôturés' },
   downtime_types: { fr: 'Types d\'Arrêt' },
   pallets_per_day: { fr: 'Palettes / Jour' },
   active_lines: { fr: 'Lignes Actives' },

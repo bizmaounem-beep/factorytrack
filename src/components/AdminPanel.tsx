@@ -824,46 +824,87 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'programmes' && (
-            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+            <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Programmes</h2>
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('programmes')}</h2>
                 <button 
                   onClick={() => openModal('programme')}
                   className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
                 >
-                  <Plus size={12} strokeWidth={3} /> NOUVEAU
+                  <Plus size={12} strokeWidth={3} /> {t('new').toUpperCase()}
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
-                {programmes.map(p => (
-                  <div key={p.id} className={cn(
-                    "card p-3 md:p-4 border-l-4 transition-all",
-                    p.status === 'ACTIVE' ? "border-blue-500" : "border-gray-300 opacity-60"
-                  )}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{machines.find(m => m.id === p.machineId)?.name} • {lines.find(l => l.id === p.lineId)?.name}</p>
-                        <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight">{p.name}</h3>
+
+              {/* ACTIVE PROGRAMMES */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                  <Activity size={16} className="text-blue-600" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-blue-600">{t('active_programmes')}</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+                  {programmes.filter(p => p.status === 'ACTIVE').map(p => (
+                    <div key={p.id} className="card p-3 md:p-4 border-l-4 border-blue-500 transition-all">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{machines.find(m => m.id === p.machineId)?.name} • {lines.find(l => l.id === p.lineId)?.name}</p>
+                          <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight">{p.name}</h3>
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter bg-blue-100 text-blue-700">ACTIVE</span>
                       </div>
-                      <span className={cn(
-                        "px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter",
-                        p.status === 'ACTIVE' ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
-                      )}>{p.status}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] md:text-xs font-bold">
-                        <span className="text-gray-500">{p.producedPallets} palettes</span>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] md:text-xs font-bold">
+                          <span className="text-gray-500">{p.producedPallets} {t('pallets').toLowerCase()}</span>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-gray-50 flex justify-between items-center">
+                         <p className="text-[8px] font-bold text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</p>
+                         <div className="flex gap-1">
+                            <button onClick={() => openModal('programme', p)} className="text-gray-300 hover:text-blue-500 p-1"><Pencil size={12} /></button>
+                            <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} /></button>
+                         </div>
                       </div>
                     </div>
-                    <div className="mt-3 pt-2 border-t border-gray-50 flex justify-between items-center">
-                       <p className="text-[8px] font-bold text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</p>
-                       <div className="flex gap-1">
-                          <button onClick={() => openModal('programme', p)} className="text-gray-300 hover:text-blue-500 p-1"><Pencil size={12} /></button>
-                          <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} /></button>
-                       </div>
+                  ))}
+                  {programmes.filter(p => p.status === 'ACTIVE').length === 0 && (
+                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-300 bg-white/50 rounded-[32px] border-2 border-dashed border-gray-100">
+                      <Package size={40} strokeWidth={1} className="mb-2 opacity-50" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">{t('no_prog_available')}</p>
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+              </div>
+
+              {/* FINISHED PROGRAMMES */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                  <History size={16} className="text-gray-400" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">{t('finished_programmes')}</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3">
+                  {programmes.filter(p => p.status === 'FINISHED').map(p => (
+                    <div key={p.id} className="card p-2 md:p-3 bg-gray-50/50 border-gray-200 transition-all opacity-80 hover:opacity-100 group">
+                      <div className="flex justify-between items-start mb-1.5">
+                        <div className="truncate flex-1">
+                          <p className="text-[7px] font-black text-gray-400 uppercase tracking-tighter truncate">{lines.find(l => l.id === p.lineId)?.name || '—'}</p>
+                          <h3 className="font-black text-[10px] md:text-xs text-gray-700 leading-tight truncate">{p.name}</h3>
+                        </div>
+                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                          <button onClick={() => openModal('programme', p)} className="text-gray-300 hover:text-blue-500 p-0.5"><Pencil size={10} /></button>
+                          <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 hover:text-red-500 p-0.5"><Trash2 size={10} /></button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center mt-2 pt-1 border-t border-gray-100">
+                        <span className="text-[9px] font-black text-gray-500">{p.producedPallets} <span className="text-[7px] uppercase tracking-tighter opacity-60">Pal</span></span>
+                        <p className="text-[7px] font-bold text-gray-400 italic">{new Date(p.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {programmes.filter(p => p.status === 'FINISHED').length === 0 && (
+                     <div className="col-span-full py-6 text-center text-gray-300 font-bold text-[9px] uppercase tracking-widest">
+                       — Aucun programme terminé —
+                     </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
