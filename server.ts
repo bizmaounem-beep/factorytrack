@@ -61,6 +61,7 @@ async function startServer() {
         producedPallets INTEGER,
         status TEXT,
         parameters TEXT,
+        shiftId TEXT,
         createdAt TEXT
       );
 
@@ -103,15 +104,21 @@ async function startServer() {
     `);
 
     // Migrations for existing databases
-    const logTables = ['production_logs', 'downtime_logs'];
+    console.log('Running database migrations...');
+    const logTables = ['production_logs', 'downtime_logs', 'programmes', 'lines'];
     for (const table of logTables) {
-      const pragma = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
-      const columns = pragma.map(p => p.name);
-      if (!columns.includes('shiftId')) {
-        console.log(`Migration: Adding shiftId column to ${table}...`);
-        db.exec(`ALTER TABLE ${table} ADD COLUMN shiftId TEXT;`);
+      try {
+        const pragma = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
+        const columns = pragma.map(p => p.name);
+        if (!columns.includes('shiftId')) {
+          console.log(`Migration: Adding shiftId column to ${table}...`);
+          db.exec(`ALTER TABLE ${table} ADD COLUMN shiftId TEXT;`);
+        }
+      } catch (err) {
+        console.error(`Migration failed for ${table}:`, err);
       }
     }
+    console.log('Database migrations completed.');
 
     // Seed default data if empty
     const countRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
