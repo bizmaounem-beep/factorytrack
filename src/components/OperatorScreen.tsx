@@ -357,9 +357,11 @@ export default function OperatorScreen() {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col">
         <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-6 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-4">
-            <Factory size={22} className="text-slate-400" />
-            <span className="text-[15px] font-black uppercase tracking-widest italic">FACTORYTRACK <span className="text-blue-500 font-bold">OPERATOR</span></span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
+              A
+            </div>
+            <span className="text-[14px] font-black uppercase tracking-widest italic">FACTORY<span className="text-blue-400">CLOUD</span></span>
           </div>
           <div className="flex items-center gap-4">
             <button onClick={handleLogout} className="bg-white/10 hover:bg-red-600 px-4 py-1.5 rounded font-black text-[12px] uppercase tracking-widest transition-colors">{t('logout')}</button>

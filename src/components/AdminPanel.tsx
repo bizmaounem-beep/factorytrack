@@ -56,6 +56,32 @@ export default function AdminPanel() {
 
   const handleModalSubmit = async () => {
     try {
+      // Basic validation
+      if (modalType === 'shift') {
+        if (!modalData.name || !modalData.startTime || !modalData.endTime) {
+          alert(t('fill_all_fields'));
+          return;
+        }
+      }
+      if (modalType === 'user') {
+        if (!modalData.name || !modalData.pin || !modalData.role) {
+          alert(t('fill_all_fields'));
+          return;
+        }
+      }
+      if (modalType === 'machine') {
+        if (!modalData.name) {
+          alert(t('fill_all_fields'));
+          return;
+        }
+      }
+      if (modalType === 'line') {
+        if (!modalData.name || (!selectedMachineForLine && !modalData.machineId)) {
+          alert(t('fill_all_fields'));
+          return;
+        }
+      }
+
       const collectionName = 
         modalType === 'user' ? 'users' : 
         modalType === 'machine' ? 'machines' : 
@@ -150,7 +176,8 @@ export default function AdminPanel() {
       setEditingId(null);
     } catch (error) {
       console.error('Error saving item:', error);
-      alert(t('error_saving'));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`${t('error_saving')}\n\n${errorMessage}`);
     }
   };
 
@@ -472,8 +499,8 @@ export default function AdminPanel() {
             {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
           <div className="flex items-center gap-1">
-            <div className="bg-blue-600 p-1 rounded-md text-white">
-              <Terminal size={12} />
+            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
+              A
             </div>
             <h1 className="font-black text-sm tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
           </div>
@@ -515,8 +542,8 @@ export default function AdminPanel() {
               )}
             >
               <div className="flex items-center gap-2 px-1">
-                <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-                  <Terminal size={16} />
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-200">
+                  A
                 </div>
                 <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none capitalize italic">FACTORY<br/><span className="text-blue-600">CLOUD</span></h1>
               </div>

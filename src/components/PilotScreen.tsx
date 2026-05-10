@@ -347,8 +347,8 @@ export default function PilotScreen() {
             </button>
           )}
           <div className="flex items-center gap-1">
-            <div className="bg-blue-600 p-1 rounded-md text-white">
-              <Monitor size={10} />
+            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
+              A
             </div>
             <h1 className="font-black text-xs tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
           </div>
@@ -385,8 +385,8 @@ export default function PilotScreen() {
               className="fixed inset-y-0 left-0 w-[260px] bg-white z-[70] p-4 flex flex-col gap-6 shadow-2xl sm:hidden"
             >
               <div className="flex items-center gap-2 px-1">
-                <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-                  <Monitor size={16} />
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-200">
+                  A
                 </div>
                 <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none capitalize italic">PILOT<span className="text-blue-600">CLOUD</span></h1>
               </div>

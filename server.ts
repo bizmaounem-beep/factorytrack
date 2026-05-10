@@ -196,19 +196,31 @@ async function startServer() {
   app.post('/api/db/:collection', (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
-      const data = req.body;
+      const data = { ...req.body };
       if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
       
-      const keys = Object.keys(data);
-      const values = Object.values(data);
+      // Get valid columns for safety
+      const pragma = db.prepare(`PRAGMA table_info(${req.params.collection})`).all() as any[];
+      const validColumns = pragma.map(p => p.name);
+      
+      const filteredData: any = {};
+      for (const col of validColumns) {
+        if (data[col] !== undefined) {
+          filteredData[col] = data[col];
+        }
+      }
+
+      const keys = Object.keys(filteredData);
+      const values = Object.values(filteredData);
       const placeholders = keys.map(() => '?').join(',');
       
       const stmt = db.prepare(`INSERT INTO ${req.params.collection} (${keys.join(',')}) VALUES (${placeholders})`);
       stmt.run(...values);
       
       notifyChange(req.params.collection);
-      res.json(data);
+      res.json(filteredData);
     } catch (e) {
+      console.error('POST Error:', e);
       res.status(500).json({ error: (e as Error).message });
     }
   });
@@ -216,17 +228,34 @@ async function startServer() {
   app.put('/api/db/:collection/:id', (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
-      const data = req.body;
-      const keys = Object.keys(data);
-      const values = Object.values(data);
+      const data = { ...req.body };
+      
+      // Get valid columns for safety
+      const pragma = db.prepare(`PRAGMA table_info(${req.params.collection})`).all() as any[];
+      const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
+      
+      const filteredData: any = {};
+      for (const col of validColumns) {
+        if (data[col] !== undefined) {
+          filteredData[col] = data[col];
+        }
+      }
+
+      const keys = Object.keys(filteredData);
+      const values = Object.values(filteredData);
       const sets = keys.map(k => `${k} = ?`).join(',');
       
+      if (keys.length === 0) {
+        return res.json({ success: true, message: 'No fields to update' });
+      }
+
       const stmt = db.prepare(`UPDATE ${req.params.collection} SET ${sets} WHERE id = ?`);
       stmt.run(...values, req.params.id);
       
       notifyChange(req.params.collection);
       res.json({ success: true });
     } catch (e) {
+      console.error('PUT Error:', e);
       res.status(500).json({ error: (e as Error).message });
     }
   });

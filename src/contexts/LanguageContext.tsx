@@ -119,6 +119,7 @@ export const translations: Translation = {
   release: { fr: 'Libérer' },
   parc_machine: { fr: 'Parc Machine' },
   connected: { fr: 'Connecté' },
+  fill_all_fields: { fr: 'Veuillez remplir tous les champs obligatoires.' },
   line_short: { fr: 'Ligne' },
   stat_short: { fr: 'Stat.' },
   pal_short: { fr: 'Pal.' },
