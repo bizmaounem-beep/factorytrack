@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Line, Shift } from '../types';
+import { format, parseISO } from 'date-fns';
 import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock, Check } from 'lucide-react';
 import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -57,6 +58,14 @@ export default function OperatorScreen() {
   const categorizingLogId = categorizingLog?.id || null;
 
   const [flashFeedback, setFlashFeedback] = useState(false);
+
+  // Manual Stop Form State
+  const [manualStopForm, setManualStopForm] = useState({
+    typeId: '',
+    startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
+    endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+    description: ''
+  });
 
   // Session Persistence
   useEffect(() => {
@@ -378,15 +387,15 @@ export default function OperatorScreen() {
         description: data.description,
         operatorId: user.id,
         shiftId: currentShiftId,
-        startTime: data.startTime,
-        endTime: data.endTime,
+        startTime: new Date(data.startTime).toISOString(),
+        endTime: new Date(data.endTime).toISOString(),
         duration: Math.floor(durationMs / 1000)
       });
       setShowManualStopModal(false);
       setManualStopForm({
         typeId: '',
-        startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
-        endTime: new Date().toISOString().slice(0, 16),
+        startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
+        endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
         description: ''
       });
     } catch (error) {
@@ -394,13 +403,6 @@ export default function OperatorScreen() {
       alert('Erreur lors de l\'ajout manuel.');
     }
   };
-
-  const [manualStopForm, setManualStopForm] = useState({
-    typeId: '',
-    startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
-    endTime: new Date().toISOString().slice(0, 16),
-    description: ''
-  });
 
   const calculateManualDuration = () => {
     const start = new Date(manualStopForm.startTime).getTime();

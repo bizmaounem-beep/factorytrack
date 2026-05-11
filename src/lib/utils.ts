@@ -30,10 +30,15 @@ export function formatDowntimeDisplay(seconds: number) {
 }
 
 export function getLogDurationSec(log: { startTime: string; endTime?: string; duration?: number }) {
-  if (log.endTime && log.duration) {
-    return log.duration > 1000000 ? Math.floor(log.duration / 1000) : log.duration;
-  }
   const start = new Date(log.startTime).getTime();
   if (isNaN(start)) return 0;
+  
+  if (log.endTime) {
+    const end = new Date(log.endTime).getTime();
+    if (!isNaN(end)) {
+      return Math.max(0, Math.floor((end - start) / 1000));
+    }
+  }
+  
   return Math.max(0, Math.floor((Date.now() - start) / 1000));
 }

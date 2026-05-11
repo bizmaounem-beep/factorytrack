@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { DowntimeLog, Shift } from '../types';
+import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft, Clock, Square, Play } from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
@@ -59,8 +60,8 @@ export default function PilotScreen() {
   const [showManualStopModal, setShowManualStopModal] = useState(false);
   const [manualStopForm, setManualStopForm] = useState({
     typeId: '',
-    startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
-    endTime: new Date().toISOString().slice(0, 16),
+    startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
+    endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     description: '',
     lineId: ''
   });
@@ -405,6 +406,8 @@ export default function PilotScreen() {
       setManualStopForm({
         ...manualStopForm,
         typeId: '',
+        startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
+        endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
         description: '',
         lineId: ''
       });
@@ -1113,11 +1116,17 @@ export default function PilotScreen() {
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={editModalData.startTime ? new Date(editModalData.startTime).toISOString().slice(0, 16) : ''}
+                      value={editModalData.startTime ? format(new Date(editModalData.startTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
-                        const newStart = new Date(e.target.value).toISOString();
-                        const dur = editModalData.endTime ? (new Date(editModalData.endTime).getTime() - new Date(newStart).getTime()) : editModalData.duration;
-                        setEditModalData({...editModalData, startTime: newStart, duration: dur});
+                        try {
+                          const localVal = e.target.value;
+                          if (!localVal) return;
+                          const newStart = new Date(localVal).toISOString();
+                          const durMs = editModalData.endTime ? (new Date(editModalData.endTime).getTime() - new Date(newStart).getTime()) : (editModalData.duration * 1000 || 0);
+                          setEditModalData({...editModalData, startTime: newStart, duration: Math.floor(durMs / 1000)});
+                        } catch (err) {
+                          console.error('Invalid date', err);
+                        }
                       }}
                     />
                   </div>
@@ -1126,11 +1135,17 @@ export default function PilotScreen() {
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={editModalData.endTime ? new Date(editModalData.endTime).toISOString().slice(0, 16) : ''}
+                      value={editModalData.endTime ? format(new Date(editModalData.endTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
-                        const newEnd = new Date(e.target.value).toISOString();
-                        const dur = new Date(newEnd).getTime() - new Date(editModalData.startTime).getTime();
-                        setEditModalData({...editModalData, endTime: newEnd, duration: dur});
+                        try {
+                          const localVal = e.target.value;
+                          if (!localVal) return;
+                          const newEnd = new Date(localVal).toISOString();
+                          const durMs = new Date(newEnd).getTime() - new Date(editModalData.startTime).getTime();
+                          setEditModalData({...editModalData, endTime: newEnd, duration: Math.floor(durMs / 1000)});
+                        } catch (err) {
+                          console.error('Invalid date', err);
+                        }
                       }}
                     />
                   </div>

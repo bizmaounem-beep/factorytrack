@@ -1493,8 +1493,16 @@ export default function AdminPanel() {
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={modalData.timestamp ? new Date(modalData.timestamp).toISOString().slice(0, 16) : ''}
-                      onChange={e => setModalData({...modalData, timestamp: new Date(e.target.value).toISOString()})}
+                      value={modalData.timestamp ? format(new Date(modalData.timestamp), "yyyy-MM-dd'T'HH:mm") : ''}
+                      onChange={e => {
+                        try {
+                          const val = e.target.value;
+                          if (!val) return;
+                          setModalData({...modalData, timestamp: new Date(val).toISOString()});
+                        } catch (err) {
+                           console.error('Invalid date', err);
+                        }
+                      }}
                     />
                   </div>
                 </>
@@ -1518,11 +1526,17 @@ export default function AdminPanel() {
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={modalData.startTime ? new Date(modalData.startTime).toISOString().slice(0, 16) : ''}
+                      value={modalData.startTime ? format(new Date(modalData.startTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
-                        const newStart = new Date(e.target.value).toISOString();
-                        const duration = modalData.endTime ? (new Date(modalData.endTime).getTime() - new Date(newStart).getTime()) : modalData.duration;
-                        setModalData({...modalData, startTime: newStart, duration});
+                        try {
+                          const localVal = e.target.value;
+                          if (!localVal) return;
+                          const newStart = new Date(localVal).toISOString();
+                          const durationMs = modalData.endTime ? (new Date(modalData.endTime).getTime() - new Date(newStart).getTime()) : (modalData.duration * 1000 || 0);
+                          setModalData({...modalData, startTime: newStart, duration: Math.floor(durationMs / 1000)});
+                        } catch (err) {
+                          console.error('Invalid date', err);
+                        }
                       }}
                     />
                   </div>
@@ -1531,11 +1545,17 @@ export default function AdminPanel() {
                     <input 
                       type="datetime-local"
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={modalData.endTime ? new Date(modalData.endTime).toISOString().slice(0, 16) : ''}
+                      value={modalData.endTime ? format(new Date(modalData.endTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
-                        const newEnd = new Date(e.target.value).toISOString();
-                        const duration = new Date(newEnd).getTime() - new Date(modalData.startTime).getTime();
-                        setModalData({...modalData, endTime: newEnd, duration});
+                        try {
+                          const localVal = e.target.value;
+                          if (!localVal) return;
+                          const newEnd = new Date(localVal).toISOString();
+                          const durationMs = new Date(newEnd).getTime() - new Date(modalData.startTime).getTime();
+                          setModalData({...modalData, endTime: newEnd, duration: Math.floor(durationMs / 1000)});
+                        } catch (err) {
+                          console.error('Invalid date', err);
+                        }
                       }}
                     />
                   </div>
