@@ -83,6 +83,7 @@ export default function AdminPanel() {
   const [historyMachineFilter, setHistoryMachineFilter] = useState<string>(() => sessionStorage.getItem('admin_history_machine') || '');
   const [historyLineFilter, setHistoryLineFilter] = useState<string>(() => sessionStorage.getItem('admin_history_line') || '');
   const [historyShiftFilter, setHistoryShiftFilter] = useState<string>(() => sessionStorage.getItem('admin_history_shift') || '');
+  const [historyOperatorFilter, setHistoryOperatorFilter] = useState<string>(() => sessionStorage.getItem('admin_history_operator') || '');
   const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('admin_history_date') || '');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('admin_history_type') as any) || 'production');
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('admin_active_tab') || 'dashboard');
@@ -95,9 +96,10 @@ export default function AdminPanel() {
     sessionStorage.setItem('admin_history_machine', historyMachineFilter);
     sessionStorage.setItem('admin_history_line', historyLineFilter);
     sessionStorage.setItem('admin_history_shift', historyShiftFilter);
+    sessionStorage.setItem('admin_history_operator', historyOperatorFilter);
     sessionStorage.setItem('admin_history_date', historyDateFilter);
     sessionStorage.setItem('admin_history_type', historyLogType);
-  }, [historyMachineFilter, historyLineFilter, historyShiftFilter, historyDateFilter, historyLogType]);
+  }, [historyMachineFilter, historyLineFilter, historyShiftFilter, historyOperatorFilter, historyDateFilter, historyLogType]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -385,6 +387,7 @@ export default function AdminPanel() {
         { header: 'Date', key: 'date', width: 12 },
         { header: 'Machine', key: 'machine', width: 20 },
         { header: 'Ligne', key: 'line', width: 15 },
+        { header: 'Opérateur', key: 'operator', width: 20 },
         { header: 'Shift', key: 'shift', width: 15 },
         { header: 'Type', key: 'type', width: 20 },
         { header: 'Description', key: 'desc', width: 30 },
@@ -397,12 +400,13 @@ export default function AdminPanel() {
       downLogs.forEach(log => {
         const start = new Date(log.startTime);
         const end = log.endTime ? new Date(log.endTime) : null;
-        const durationMin = log.duration ? Math.round(log.duration / 60000) : 0;
+        const durationMin = log.duration ? Math.round(log.duration / 60) : 0;
         
         dataSheet.addRow({
           date: start.toLocaleDateString(),
           machine: machines.find(m => m.id === log.machineId)?.name || '—',
           line: lines.find(l => l.id === log.lineId)?.name || '—',
+          operator: users.find(u => u.id === log.operatorId)?.name || '—',
           shift: shifts.find(s => s.id === log.shiftId)?.name || '—',
           type: downtimeTypes.find(t => t.id === log.typeId)?.name || '—',
           desc: log.description || '—',
@@ -1145,7 +1149,7 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                    <div className="space-y-1">
                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('machine')}</p>
                      <select 
@@ -1194,6 +1198,20 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Opérateur</p>
+                     <select 
+                      value={historyOperatorFilter}
+                      onChange={e => setHistoryOperatorFilter(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                     >
+                       <option value="">{t('all_operators') || 'Tous'}</option>
+                       {users.map(u => (
+                         <option key={u.id} value={u.id}>{u.name}</option>
+                       ))}
+                     </select>
+                   </div>
+
+                   <div className="space-y-1">
                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</p>
                      <input 
                       type="date"
@@ -1233,8 +1251,9 @@ export default function AdminPanel() {
                                 const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
                                 const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
                                 const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
+                                const matchOperator = !historyOperatorFilter || log.operatorId === historyOperatorFilter;
                                 const matchDate = !historyDateFilter || log.timestamp.startsWith(historyDateFilter);
-                                return matchMachine && matchLine && matchShift && matchDate;
+                                return matchMachine && matchLine && matchShift && matchOperator && matchDate;
                               })
                               .slice(0, 100).map(log => (
                                 <motion.tr 
@@ -1307,8 +1326,9 @@ export default function AdminPanel() {
                                 const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
                                 const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
                                 const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
+                                const matchOperator = !historyOperatorFilter || log.operatorId === historyOperatorFilter;
                                 const matchDate = !historyDateFilter || log.startTime.startsWith(historyDateFilter);
-                                return matchMachine && matchLine && matchShift && matchDate;
+                                return matchMachine && matchLine && matchShift && matchOperator && matchDate;
                               })
                               .slice(0, 100).map(log => (
                                 <motion.tr 
@@ -1342,7 +1362,7 @@ export default function AdminPanel() {
                                       <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-[8px] font-black uppercase text-gray-500 border border-gray-200">
                                         {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
                                       </div>
-                                      <span className="font-black text-gray-600 truncate max-w-[80px]">
+                                      <span className="font-black text-gray-600 truncate max-w-[80px] md:max-w-none">
                                         {users.find(u => u.id === log.operatorId)?.name || '—'}
                                       </span>
                                     </div>
@@ -1558,6 +1578,17 @@ export default function AdminPanel() {
                         }
                       }}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Opérateur</label>
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={modalData.operatorId || ''}
+                      onChange={e => setModalData({...modalData, operatorId: e.target.value})}
+                    >
+                      <option value="">Sélectionner un opérateur</option>
+                      {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('description_comment')}</label>

@@ -1011,7 +1011,7 @@ export default function PilotScreen() {
                                     <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-black uppercase text-gray-500 border border-gray-200">
                                       {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
                                     </div>
-                                    <span className="font-black text-gray-600 truncate max-w-[80px]">
+                                    <span className="font-black text-gray-600 truncate max-w-[80px] md:max-w-none">
                                       {users.find(u => u.id === log.operatorId)?.name || '—'}
                                     </span>
                                   </div>

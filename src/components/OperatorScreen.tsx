@@ -338,12 +338,18 @@ export default function OperatorScreen() {
     }
 
     try {
-      await localApi.updateDoc('downtime_logs', categorizingLogId, {
+      const updateData: any = {
         typeId,
         description: isChangeProg 
           ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
           : (downtimeDescription.trim() || categorizingLog?.description || undefined)
-      });
+      };
+
+      if (user) {
+        updateData.operatorId = user.id;
+      }
+
+      await localApi.updateDoc('downtime_logs', categorizingLogId, updateData);
 
       if (isChangeProg && selectedProgrammeForChange && selectedLineId) {
         // Mark old programme as finished
