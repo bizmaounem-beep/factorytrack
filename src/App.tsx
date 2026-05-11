@@ -4,19 +4,38 @@ import Login from './components/Login';
 import OperatorScreen from './components/OperatorScreen';
 import PilotScreen from './components/PilotScreen';
 import AdminPanel from './components/AdminPanel';
-import { localApi } from './lib/localApi';
 import { useEffect, useState } from 'react';
-import { Terminal } from 'lucide-react';
+import { Terminal, Download, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const { user, loading } = useAuth();
   const { t } = useLanguage();
-  const [initializing, setInitializing] = useState(false);
+  const [initializing] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
-  // Auto-bootstrap check removed - Handled by server seeding
   useEffect(() => {
-    // We could still check if DB is ready here if needed
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
+    }
+  };
 
   if (loading || initializing) {
     return (
@@ -30,22 +49,65 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return <Login />;
-  }
+  const renderContent = () => {
+    if (!user) return <Login />;
 
-  switch (user.role) {
-    case 'ADMIN':
-      return <AdminPanel />;
-    case 'PILOT':
-      return <PilotScreen />;
-    case 'OPERATOR':
-      return <OperatorScreen />;
-    default:
-      return (
-        <div className="p-8 text-center bg-red-50 rounded-2xl m-4 text-red-600 font-bold border-2 border-red-100">
-           {t('access_denied')}
-        </div>
-      );
-  }
+    switch (user.role) {
+      case 'ADMIN':
+        return <AdminPanel />;
+      case 'PILOT':
+        return <PilotScreen />;
+      case 'OPERATOR':
+        return <OperatorScreen />;
+      default:
+        return (
+          <div className="p-8 text-center bg-red-50 rounded-2xl m-4 text-red-600 font-bold border-2 border-red-100">
+             {t('access_denied')}
+          </div>
+        );
+    }
+  };
+
+  return (
+    <>
+      {renderContent()}
+
+      <AnimatePresence>
+        {showInstallBanner && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md"
+          >
+            <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-inner">
+                  <Download size={20} className="text-white" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold leading-tight">Installer Factorycloud</h4>
+                  <p className="text-[10px] text-gray-400 font-medium">Pour un accès rapide et hors-ligne</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={handleInstall}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-lg transition-colors shadow-lg shadow-blue-900/20"
+                >
+                  INSTALLER
+                </button>
+                <button 
+                  onClick={() => setShowInstallBanner(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
 }
