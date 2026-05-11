@@ -10,7 +10,7 @@ import {
   Box, Terminal, Activity, Pencil, Menu, X, Clock,
   TrendingUp, AlertTriangle, CheckCircle2
 } from 'lucide-react';
-import { cn, formatDuration, formatMinutes, formatDowntimeDisplay } from '../lib/utils';
+import { cn, formatDuration, formatMinutes, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { format, startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-fns';
@@ -46,7 +46,7 @@ export default function AdminPanel() {
     }
 
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
-    const totalDowntimeSec = todayDown.reduce((acc, l) => acc + (l.duration || 0), 0);
+    const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
     // OEE Approximation (Availability focuses on running vs stopped)
     // We'll calculate it for the last 8 hours as a baseline if we don't have a better window
@@ -61,7 +61,7 @@ export default function AdminPanel() {
         .reduce((acc, l) => acc + l.count, 0);
       const downtime = downLogs
         .filter(l => l.shiftId === s.id && isWithinInterval(parseISO(logDate(l.startTime)), { start, end }))
-        .reduce((acc, l) => acc + (l.duration || 0), 0);
+        .reduce((acc, l) => acc + getLogDurationSec(l), 0);
       
       return {
         name: s.name,
@@ -1325,9 +1325,9 @@ export default function AdminPanel() {
                                     {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[7px] md:text-[9px]">Active</span>}
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3">
-                                    {log.duration ? (
+                                    {log.duration || !log.endTime ? (
                                       <span className="font-mono text-[9px] md:text-[10px] text-blue-700 font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                        {formatDowntimeDisplay(log.duration)}
+                                        {formatDowntimeDisplay(getLogDurationSec(log))}
                                       </span>
                                     ) : <span className="text-orange-500 font-bold text-[8px] uppercase">En cours</span>}
                                   </td>

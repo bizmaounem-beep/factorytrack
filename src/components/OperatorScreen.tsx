@@ -380,7 +380,7 @@ export default function OperatorScreen() {
         shiftId: currentShiftId,
         startTime: data.startTime,
         endTime: data.endTime,
-        duration: durationMs
+        duration: Math.floor(durationMs / 1000)
       });
       setShowManualStopModal(false);
       setManualStopForm({

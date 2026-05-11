@@ -196,6 +196,30 @@ async function startServer() {
   };
 
   // API Endpoints
+  const getServerShiftId = () => {
+    try {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const shifts = db.prepare('SELECT * FROM shifts').all() as any[];
+      
+      for (const shift of shifts) {
+        const [startH, startM] = shift.startTime.split(':').map(Number);
+        const [endH, endM] = shift.endTime.split(':').map(Number);
+        const startMin = startH * 60 + startM;
+        const endMin = endH * 60 + endM;
+
+        if (endMin < startMin) {
+          if (currentMinutes >= startMin || currentMinutes < endMin) return shift.id;
+        } else {
+          if (currentMinutes >= startMin && currentMinutes < endMin) return shift.id;
+        }
+      }
+    } catch (e) {
+      console.error('Error getting server shift ID:', e);
+    }
+    return null;
+  };
+
   app.get('/api/db/:collection', (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
@@ -221,6 +245,12 @@ async function startServer() {
       if (!db) throw new Error('Database not initialized');
       const data = { ...req.body };
       if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
+      
+      // Auto-populate shiftId for logs if missing
+      const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
+      if (logCollections.includes(req.params.collection) && !data.shiftId) {
+        data.shiftId = getServerShiftId();
+      }
       
       // Get valid columns for safety
       const pragma = db.prepare(`PRAGMA table_info(${req.params.collection})`).all() as any[];
@@ -252,6 +282,17 @@ async function startServer() {
     try {
       if (!db) throw new Error('Database not initialized');
       const data = { ...req.body };
+
+      // Auto-populate shiftId for logs if missing/null during update
+      const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
+      if (logCollections.includes(req.params.collection) && !data.shiftId) {
+        // Only fetch if it's not already in the DB? 
+        // Actually if we are validating (categorizing) a stop, we might want to ensure it has a shiftId.
+        const current = db.prepare(`SELECT shiftId FROM ${req.params.collection} WHERE id = ?`).get(req.params.id) as any;
+        if (!current || !current.shiftId) {
+          data.shiftId = getServerShiftId();
+        }
+      }
       
       // Get valid columns for safety
       const pragma = db.prepare(`PRAGMA table_info(${req.params.collection})`).all() as any[];
