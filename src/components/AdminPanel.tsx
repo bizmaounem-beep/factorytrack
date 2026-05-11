@@ -1174,6 +1174,7 @@ export default function AdminPanel() {
                             <tr>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('start_time')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('end_time')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-left">Durée</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('reason')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">Opérateur</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('line_short')}</th>
@@ -1206,12 +1207,16 @@ export default function AdminPanel() {
                                     {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[7px] md:text-[9px]">Active</span>}
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3">
+                                    {log.duration ? (
+                                      <span className="font-mono text-[9px] md:text-[10px] text-blue-700 font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                        {formatDuration(log.duration)}
+                                      </span>
+                                    ) : <span className="text-orange-500 font-bold text-[8px] uppercase">En cours</span>}
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3">
                                     <div className="flex items-center gap-1">
                                       <span className="text-sm">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                      <div>
-                                        <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
-                                        <p className="font-mono text-[8px] text-blue-600 font-bold bg-blue-50 px-1 rounded inline-block">{log.duration ? formatDuration(log.duration) : '—'}</p>
-                                      </div>
+                                      <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
                                     </div>
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 italic">
