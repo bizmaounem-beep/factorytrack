@@ -62,7 +62,7 @@ export default function AdminPanel() {
     // Downtime by Type Distribution
     const downByType = downtimeTypes.map(type => {
       const duration = todayDown
-        .filter(l => l.typeId === type.id)
+        .filter(l => l.typeId === type.id && l.duration > 0)
         .reduce((acc, l) => acc + (l.duration || 0), 0);
       return {
         name: type.name,
@@ -903,7 +903,7 @@ export default function AdminPanel() {
                           </tr>
                         </thead>
                        <tbody className="divide-y divide-gray-50">
-                          {lines.map(l => {
+                          {lines.filter(l => l.isActive !== false).map(l => {
                             const prog = programmes.find(p => p.id === l.currentProgrammeId);
                             const op = users.find(u => u.id === l.currentOperatorId);
                             const mach = machines.find(m => m.id === l.machineId);
