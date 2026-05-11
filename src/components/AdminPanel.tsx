@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
@@ -27,8 +27,8 @@ export default function AdminPanel() {
     downtimeLogs: downLogs 
   } = useData();
 
-  const sortedProdLogs = [...prodLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  const sortedDownLogs = [...downLogs].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  const sortedProdLogs = useMemo(() => [...prodLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), [prodLogs]);
+  const sortedDownLogs = useMemo(() => [...downLogs].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()), [downLogs]);
 
   const [historyMachineFilter, setHistoryMachineFilter] = useState<string>(() => sessionStorage.getItem('admin_history_machine') || '');
   const [historyLineFilter, setHistoryLineFilter] = useState<string>(() => sessionStorage.getItem('admin_history_line') || '');
@@ -1175,6 +1175,7 @@ export default function AdminPanel() {
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('start_time')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('end_time')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('reason')}</th>
+                              <th className="px-2 md:px-6 py-2 md:py-3 text-left">Opérateur</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('line_short')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('shift')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-right">{t('actions')}</th>
@@ -1207,7 +1208,20 @@ export default function AdminPanel() {
                                   <td className="px-2 md:px-6 py-2 md:py-3">
                                     <div className="flex items-center gap-1">
                                       <span className="text-sm">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                      <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                      <div>
+                                        <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                        <p className="font-mono text-[8px] text-blue-600 font-bold bg-blue-50 px-1 rounded inline-block">{log.duration ? formatDuration(log.duration) : '—'}</p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-2 md:px-6 py-2 md:py-3 italic">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-[8px] font-black uppercase text-gray-500 border border-gray-200">
+                                        {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
+                                      </div>
+                                      <span className="font-black text-gray-600 truncate max-w-[80px]">
+                                        {users.find(u => u.id === log.operatorId)?.name || '—'}
+                                      </span>
                                     </div>
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">

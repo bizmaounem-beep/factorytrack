@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
@@ -421,20 +421,20 @@ export default function PilotScreen() {
     if (diff <= 0) return '00:00:00';
     return formatDuration(Math.floor(diff / 1000));
   };
-  const sortedProdLogs = [...prodLogs]
+  const sortedProdLogs = useMemo(() => [...prodLogs]
     .filter(log => log.machineId === selectedMachineId)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), [prodLogs, selectedMachineId]);
 
-  const sortedDownLogs = [...downLogs]
+  const sortedDownLogs = useMemo(() => [...downLogs]
     .filter(log => log.machineId === selectedMachineId)
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()), [downLogs, selectedMachineId]);
 
   // Filter machines available for this pilot (not assigned or assigned to them)
-  const availableMachines = machines.filter(m => !m.currentPilotId || m.currentPilotId === user?.id);
+  const availableMachines = useMemo(() => machines.filter(m => !m.currentPilotId || m.currentPilotId === user?.id), [machines, user]);
 
   // Filter programmes that are already assigned to other lines
-  const assignedProgIds = lines.map(l => l.currentProgrammeId).filter(Boolean);
-  const availableProgs = programmes.filter(p => p.machineId === selectedMachineId && p.status === 'ACTIVE' && !assignedProgIds.includes(p.id));
+  const assignedProgIds = useMemo(() => lines.map(l => l.currentProgrammeId).filter(Boolean), [lines]);
+  const availableProgs = useMemo(() => programmes.filter(p => p.machineId === selectedMachineId && p.status === 'ACTIVE' && !assignedProgIds.includes(p.id)), [programmes, selectedMachineId, assignedProgIds]);
 
   const container = {
     hidden: { opacity: 0 },
@@ -971,6 +971,7 @@ export default function PilotScreen() {
                         <tr>
                           <th className="px-2 md:px-5 py-2 md:py-3">Début</th>
                           <th className="px-2 md:px-5 py-2 md:py-3">Durée</th>
+                          <th className="px-2 md:px-5 py-2 md:py-3">Opérateur</th>
                           <th className="px-2 md:px-5 py-2 md:py-3">Motif</th>
                           <th className="px-2 md:px-5 py-2 md:py-3 hidden sm:table-cell">Ligne</th>
                           <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
@@ -997,10 +998,20 @@ export default function PilotScreen() {
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3">
                                   {log.duration ? (
-                                    <span className="font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                                    <span className="font-mono font-bold bg-blue-50 px-2 py-0.5 rounded text-blue-700 border border-blue-100">
                                       {formatDuration(log.duration)}
                                     </span>
-                                  ) : <span className="text-orange-500 font-black uppercase">En cours</span>}
+                                  ) : <span className="text-orange-500 font-black uppercase bg-orange-50 px-2 py-0.5 rounded border border-orange-100 animate-pulse">En cours</span>}
+                                </td>
+                                <td className="px-2 md:px-5 py-2 md:py-3 italic">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-black uppercase text-gray-500 border border-gray-200">
+                                      {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
+                                    </div>
+                                    <span className="font-black text-gray-600 truncate max-w-[80px]">
+                                      {users.find(u => u.id === log.operatorId)?.name || '—'}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3">
                                   <div className="flex items-center gap-2">

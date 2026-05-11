@@ -100,7 +100,7 @@ export const localApi = {
 
     function debouncedFetch() {
       if (timeout) clearTimeout(timeout);
-      timeout = setTimeout(fetchAndCallback, 300);
+      timeout = setTimeout(fetchAndCallback, 50);
     }
 
     // Initial fetch
