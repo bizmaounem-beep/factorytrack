@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { DowntimeLog, Shift } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft, Clock, Square, Play } from 'lucide-react';
-import { cn, formatDuration } from '../lib/utils';
+import { cn, formatDuration, formatDowntimeDisplay } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
 
 export default function PilotScreen() {
@@ -418,8 +418,8 @@ export default function PilotScreen() {
     const start = new Date(manualStopForm.startTime).getTime();
     const end = new Date(manualStopForm.endTime).getTime();
     const diff = end - start;
-    if (diff <= 0) return '00:00:00';
-    return formatDuration(Math.floor(diff / 1000));
+    if (diff <= 0) return '0 min';
+    return formatDowntimeDisplay(Math.floor(diff / 1000));
   };
   const sortedProdLogs = useMemo(() => [...prodLogs]
     .filter(log => log.machineId === selectedMachineId)
@@ -999,7 +999,7 @@ export default function PilotScreen() {
                                 <td className="px-2 md:px-5 py-2 md:py-3">
                                   {log.duration ? (
                                     <span className="font-mono font-bold bg-blue-50 px-2 py-0.5 rounded text-blue-700 border border-blue-100">
-                                      {formatDuration(log.duration)}
+                                      {formatDowntimeDisplay(log.duration)}
                                     </span>
                                   ) : <span className="text-orange-500 font-black uppercase bg-orange-50 px-2 py-0.5 rounded border border-orange-100 animate-pulse">En cours</span>}
                                 </td>

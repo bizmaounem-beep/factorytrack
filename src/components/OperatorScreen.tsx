@@ -5,7 +5,7 @@ import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Line, Shift } from '../types';
 import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock, Check } from 'lucide-react';
-import { formatDuration, cn } from '../lib/utils';
+import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
 
 export default function OperatorScreen() {
@@ -407,9 +407,7 @@ export default function OperatorScreen() {
     const end = new Date(manualStopForm.endTime).getTime();
     const diff = end - start;
     if (diff <= 0) return '0 min';
-    const mins = Math.floor(diff / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    return `${mins} min ${secs}s`;
+    return formatDowntimeDisplay(Math.floor(diff / 1000));
   };
 
   const handleSelectProgramme = async (progId: string) => {
@@ -691,7 +689,7 @@ export default function OperatorScreen() {
                          <div className="flex flex-col items-center gap-0">
                             <p className="text-[7px] uppercase font-black text-orange-300 tracking-widest leading-none">{t('stopped')}</p>
                             <p className="text-xl sm:text-3xl font-mono font-black text-orange-600 tabular-nums leading-none tracking-tighter">
-                             {formatDuration(timer)}
+                              {formatDowntimeDisplay(timer)}
                             </p>
                          </div>
                     </div>

@@ -6,19 +6,14 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, Factory, Package, Timer, History, 
-  Download, Plus, Trash2, PieChart, LayoutDashboard,
+  Download, Plus, Trash2, LayoutDashboard,
   Box, Terminal, Activity, Pencil, Menu, X, Clock,
   TrendingUp, AlertTriangle, CheckCircle2
 } from 'lucide-react';
-import { cn, formatDuration, formatMinutes } from '../lib/utils';
+import { cn, formatDuration, formatMinutes, formatDowntimeDisplay } from '../lib/utils';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, LineChart, Line, AreaChart, Area,
-  ReferenceArea
-} from 'recharts';
-import { format, startOfDay, endOfDay, subDays, isWithinInterval, parseISO, differenceInMinutes, startOfHour, addHours } from 'date-fns';
+import { format, startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-fns';
 
 export default function AdminPanel() {
   const { logout } = useAuth();
@@ -59,41 +54,6 @@ export default function AdminPanel() {
     const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
     const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
 
-    // Downtime by Type Distribution - Use ALL time logs to show "real" history of patterns
-    const downByType = downtimeTypes.map(type => {
-      const totalDurationSec = downLogs
-        .filter(l => l.typeId === type.id && (l.duration || 0) > 0)
-        .reduce((acc, l) => acc + (l.duration || 0), 0);
-      
-      return {
-        name: type.name,
-        value: totalDurationSec / 60, // use float for more precise distribution
-      };
-    }).filter(d => d.value > 0)
-      .sort((a, b) => b.value - a.value); // Sort by highest duration
-
-    // Timeline Data (Production vs Stops in the last 24h)
-    const hours = Array.from({ length: 24 }).map((_, i) => {
-      const h = startOfHour(addHours(startOfDay(today), i));
-      const hEnd = endOfDay(h); // Simplified: just looking at the hour slot
-      
-      const prodInHour = todayProd.some(l => {
-        const d = parseISO(logDate(l.timestamp));
-        return d >= h && d < addHours(h, 1);
-      });
-
-      const downInHour = todayDown.some(l => {
-        const s = parseISO(logDate(l.startTime));
-        const e = l.endTime ? parseISO(logDate(l.endTime)) : today;
-        return (s < addHours(h, 1) && e > h);
-      });
-
-      return {
-        time: format(h, 'HH:mm'),
-        status: downInHour ? 'stop' : (prodInHour ? 'prod' : 'idle')
-      };
-    });
-
     // Shift Performance
     const shiftPerf = shifts.map(s => {
       const pallets = prodLogs
@@ -114,8 +74,6 @@ export default function AdminPanel() {
       totalPallets,
       totalDowntimeSec,
       availability,
-      downByType,
-      hours,
       shiftPerf
     };
   }, [prodLogs, downLogs, lines, shifts, downtimeTypes]);
@@ -713,7 +671,7 @@ export default function AdminPanel() {
                  {[
                    { label: 'Efficacité (OEE)', val: `${analytics.availability.toFixed(1)}%`, sub: 'Disponibilité Lignes', icon: TrendingUp, color: 'blue', trend: '+2.1%' },
                    { label: 'Total Palettes', val: analytics.totalPallets, sub: 'Aujourd\'hui', icon: Box, color: 'green', trend: '+12' },
-                   { label: 'Temps d\'Arrêt', val: `${formatMinutes(analytics.totalDowntimeSec)} min`, sub: 'Minutes Perdues', icon: Timer, color: 'orange', trend: '-5%' },
+                   { label: 'Temps d\'Arrêt', val: formatDowntimeDisplay(analytics.totalDowntimeSec), sub: 'Minutes Perdues', icon: Timer, color: 'orange', trend: '-5%' },
                    { label: 'Arrets Actifs', val: lines.filter(l => !!l.activeDowntimeId).length, sub: 'Incidents en cours', icon: AlertTriangle, color: 'red', trend: 'Critical' },
                  ].map(stat => (
                    <motion.div 
@@ -755,97 +713,6 @@ export default function AdminPanel() {
                    </motion.div>
                  ))}
               </motion.div>
-
-              {/* CHARTS GRID */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* DOWNTIME ANALYSIS */}
-                <motion.div variants={item} className="card p-4 flex flex-col h-[300px]">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
-                       <PieChart size={16} className="text-orange-500" /> Analyse des Causes d'Arrêt
-                    </h3>
-                    <span className="text-[8px] font-black bg-orange-50 text-orange-600 px-2 py-0.5 rounded border border-orange-100 uppercase">Top 5</span>
-                  </div>
-                  <div className="flex-1 w-full flex items-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RePieChart>
-                        <Pie
-                          data={analytics.downByType}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {analytics.downByType.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: 'bold' }}
-                        />
-                        <Legend iconType="circle" />
-                      </RePieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </motion.div>
-
-                {/* TIMELINE VIEW */}
-                <motion.div variants={item} className="card p-4 flex flex-col h-[300px]">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
-                       <Activity size={16} className="text-blue-500" /> Chronologie d'Activité (24h)
-                    </h3>
-                    <div className="flex gap-2 text-[8px] font-black uppercase">
-                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> PROD</div>
-                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> STOP</div>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex flex-col gap-1 items-stretch justify-center">
-                    <div className="flex h-12 gap-0.5 rounded-xl overflow-hidden border border-gray-100 bg-gray-50 p-1">
-                      {analytics.hours.map((h, i) => (
-                        <div 
-                          key={i} 
-                          title={`${h.time}: ${h.status}`}
-                          className={cn(
-                            "flex-1 transition-all hover:scale-x-110 cursor-help rounded-sm",
-                            h.status === 'prod' ? "bg-green-500" : 
-                            h.status === 'stop' ? "bg-red-500" : "bg-gray-200"
-                          )} 
-                        />
-                      ))}
-                    </div>
-                    <div className="flex justify-between text-[7px] font-black text-gray-400 uppercase tracking-widest mt-1 px-1">
-                      <span>00:00</span>
-                      <span>06:00</span>
-                      <span>12:00</span>
-                      <span>18:00</span>
-                      <span>23:59</span>
-                    </div>
-                    
-                    <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100 border-dashed">
-                       <div className="flex items-start gap-3">
-                          <CheckCircle2 size={24} className="text-blue-600 shrink-0" />
-                          <div>
-                            <p className="text-[10px] font-black text-blue-900 uppercase">Analyse de Performance</p>
-                            <p className="text-[9px] font-bold text-blue-700 mt-0.5 italic">Le rythme de production est stable. Pic d'activité entre 14h et 16h.</p>
-                            <div className="mt-2 flex gap-4">
-                               <div>
-                                 <p className="text-[7px] font-black text-blue-400 uppercase">Uptime</p>
-                                 <p className="text-xs font-black text-blue-800">18.5h</p>
-                               </div>
-                               <div>
-                                 <p className="text-[7px] font-black text-blue-400 uppercase">Incidents</p>
-                                 <p className="text-xs font-black text-blue-800">{analytics.downByType.length}</p>
-                               </div>
-                            </div>
-                          </div>
-                       </div>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
 
               {/* BOTTOM ROW: SHIFT PERF & LIVE MONITOR */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -904,7 +771,7 @@ export default function AdminPanel() {
                           </tr>
                         </thead>
                        <tbody className="divide-y divide-gray-50">
-                          {lines.filter(l => l.isActive !== false).map(l => {
+                          {lines.filter(l => l.isActive !== false && l.status !== 'IDLE').map(l => {
                             const prog = programmes.find(p => p.id === l.currentProgrammeId);
                             const op = users.find(u => u.id === l.currentOperatorId);
                             const mach = machines.find(m => m.id === l.machineId);
@@ -1460,7 +1327,7 @@ export default function AdminPanel() {
                                   <td className="px-2 md:px-6 py-2 md:py-3">
                                     {log.duration ? (
                                       <span className="font-mono text-[9px] md:text-[10px] text-blue-700 font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                        {formatDuration(log.duration)}
+                                        {formatDowntimeDisplay(log.duration)}
                                       </span>
                                     ) : <span className="text-orange-500 font-bold text-[8px] uppercase">En cours</span>}
                                   </td>
