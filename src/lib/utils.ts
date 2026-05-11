@@ -5,10 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDuration(ms: number) {
-  const seconds = Math.floor((ms / 1000) % 60);
-  const minutes = Math.floor((ms / (1000 * 60)) % 60);
-  const hours = Math.floor((ms / (1000 * 60 * 60)));
+export function formatDuration(seconds: number) {
+  const s = Math.floor(seconds % 60);
+  const minutes = Math.floor((seconds / 60) % 60);
+  const hours = Math.floor(seconds / 3600);
 
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }

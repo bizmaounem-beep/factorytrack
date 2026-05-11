@@ -81,7 +81,7 @@ export default function OperatorScreen() {
     if (activeDowntime && !activeDowntime.endTime) {
       interval = setInterval(() => {
         const start = new Date(activeDowntime.startTime).getTime();
-        setTimer(Date.now() - start);
+        setTimer(Math.floor((Date.now() - start) / 1000));
       }, 1000);
     } else {
       setTimer(0);
@@ -291,7 +291,7 @@ export default function OperatorScreen() {
 
     const endTime = new Date().toISOString();
     const startTime = new Date(activeDowntime.startTime).getTime();
-    const duration = Date.now() - startTime;
+    const duration = Math.floor((Date.now() - startTime) / 1000);
 
     try {
       // Update log
@@ -336,6 +336,13 @@ export default function OperatorScreen() {
       });
 
       if (isChangeProg && selectedProgrammeForChange && selectedLineId) {
+        // Mark old programme as finished
+        if (activeLine?.currentProgrammeId && activeLine.currentProgrammeId !== selectedProgrammeForChange) {
+          await localApi.updateDoc('programmes', activeLine.currentProgrammeId, {
+            status: 'FINISHED'
+          });
+        }
+
         // Find if the operator is currently on this line
         await localApi.updateDoc('lines', selectedLineId, {
           currentProgrammeId: selectedProgrammeForChange
@@ -879,11 +886,11 @@ export default function OperatorScreen() {
       </main>
 
       {/* FOOTER ALERT */}
-      {(activeLine?.status === 'STOPPED' || (timer > 15 * 60 * 1000)) && (
+      {(activeLine?.status === 'STOPPED' || (timer > 15 * 60)) && (
         <div className="bg-red-600 text-white flex items-center justify-center py-1 gap-2 shrink-0">
           <AlertCircle size={14} className="animate-pulse" />
           <span className="font-bold tracking-tight uppercase text-[9px]">
-            {timer > 15 * 60 * 1000 
+            {timer > 15 * 60 
               ? `Alerte : Durée Arrêt > 15m (${formatDuration(timer)})` 
               : t('stopped')}
           </span>

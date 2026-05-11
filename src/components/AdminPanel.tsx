@@ -246,11 +246,10 @@ export default function AdminPanel() {
     setConfirmDelete({ col, id, name });
   };
 
-  const formatDuration = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+  const formatDuration = (secondsInput: number) => {
+    const hours = Math.floor(secondsInput / 3600);
+    const minutes = Math.floor((secondsInput % 3600) / 60);
+    const seconds = Math.floor(secondsInput % 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 

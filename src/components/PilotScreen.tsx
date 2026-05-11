@@ -124,6 +124,15 @@ export default function PilotScreen() {
     if (!isAssigning || !newProgName) return;
 
     try {
+      const line = lines.find(l => l.id === isAssigning);
+      
+      // Mark current programme as finished if it exists
+      if (line?.currentProgrammeId) {
+        await localApi.updateDoc('programmes', line.currentProgrammeId, {
+          status: 'FINISHED'
+        });
+      }
+
       // Create new programme
       const newProg = {
         name: newProgName,
@@ -155,6 +164,15 @@ export default function PilotScreen() {
   const handleSelectExistingProgramme = async (progId: string) => {
     if (!isAssigning) return;
     try {
+      const line = lines.find(l => l.id === isAssigning);
+      
+      // Mark current programme as finished if it exists
+      if (line?.currentProgrammeId && line.currentProgrammeId !== progId) {
+        await localApi.updateDoc('programmes', line.currentProgrammeId, {
+          status: 'FINISHED'
+        });
+      }
+
       await localApi.updateDoc('lines', isAssigning, {
         currentProgrammeId: progId,
         status: 'IDLE',
@@ -169,6 +187,15 @@ export default function PilotScreen() {
 
   const handleReleaseLine = async (lineId: string) => {
     try {
+      const line = lines.find(l => l.id === lineId);
+      
+      // Mark current programme as finished if it exists
+      if (line?.currentProgrammeId) {
+        await localApi.updateDoc('programmes', line.currentProgrammeId, {
+          status: 'FINISHED'
+        });
+      }
+
       await localApi.updateDoc('lines', lineId, {
         currentProgrammeId: null,
         currentOperatorId: null,
@@ -1162,32 +1189,7 @@ export default function PilotScreen() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('or_choose_active')}</h3>
-                  {availableProgs.length > 0 ? (
-                    <div className="grid gap-2">
-                      {availableProgs.map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => handleSelectExistingProgramme(p.id)}
-                          className="w-full p-4 bg-white hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-2xl text-left transition-all group flex justify-between items-center shadow-sm"
-                        >
-                          <div>
-                            <p className="font-bold text-gray-900 group-hover:text-blue-700">{p.name}</p>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">{t('program_ready')}</p>
-                          </div>
-                          <div className="w-8 h-8 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-300 group-hover:text-blue-500 group-hover:border-blue-200 transition-all">
-                            <Plus size={16} />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl italic text-gray-400 text-xs">
-                      {t('no_program_available')}
-                    </div>
-                  )}
-                </div>
+
               </div>
             </div>
 
