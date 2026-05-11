@@ -12,3 +12,8 @@ export function formatDuration(seconds: number) {
 
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
+
+export function formatMinutes(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  return minutes.toString().padStart(2, '0');
+}

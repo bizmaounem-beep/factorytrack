@@ -10,7 +10,7 @@ import {
   Box, Terminal, Activity, Pencil, Menu, X, Clock,
   TrendingUp, AlertTriangle, CheckCircle2
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatDuration, formatMinutes } from '../lib/utils';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { 
@@ -335,13 +335,6 @@ export default function AdminPanel() {
   const initiateDelete = (col: string, id: string | undefined, name: string) => {
     if (!id) return;
     setConfirmDelete({ col, id, name });
-  };
-
-  const formatDuration = (secondsInput: number) => {
-    const hours = Math.floor(secondsInput / 3600);
-    const minutes = Math.floor((secondsInput % 3600) / 60);
-    const seconds = Math.floor(secondsInput % 60);
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const exportToExcel = async (type: 'production' | 'downtime') => {
@@ -719,7 +712,7 @@ export default function AdminPanel() {
                  {[
                    { label: 'Efficacité (OEE)', val: `${analytics.availability.toFixed(1)}%`, sub: 'Disponibilité Lignes', icon: TrendingUp, color: 'blue', trend: '+2.1%' },
                    { label: 'Total Palettes', val: analytics.totalPallets, sub: 'Aujourd\'hui', icon: Box, color: 'green', trend: '+12' },
-                   { label: 'Temps d\'Arrêt', val: `${Math.round(analytics.totalDowntimeSec / 60)} min`, sub: 'Minutes Perdues', icon: Timer, color: 'orange', trend: '-5%' },
+                   { label: 'Temps d\'Arrêt', val: `${formatMinutes(analytics.totalDowntimeSec)} min`, sub: 'Minutes Perdues', icon: Timer, color: 'orange', trend: '-5%' },
                    { label: 'Arrets Actifs', val: lines.filter(l => !!l.activeDowntimeId).length, sub: 'Incidents en cours', icon: AlertTriangle, color: 'red', trend: 'Critical' },
                  ].map(stat => (
                    <motion.div 
