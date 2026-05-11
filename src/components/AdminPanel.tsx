@@ -59,17 +59,18 @@ export default function AdminPanel() {
     const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
     const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
 
-    // Downtime by Type Distribution
+    // Downtime by Type Distribution - Use ALL time logs to show "real" history of patterns
     const downByType = downtimeTypes.map(type => {
-      const duration = todayDown
-        .filter(l => l.typeId === type.id && l.duration > 0)
+      const totalDurationSec = downLogs
+        .filter(l => l.typeId === type.id && (l.duration || 0) > 0)
         .reduce((acc, l) => acc + (l.duration || 0), 0);
+      
       return {
         name: type.name,
-        value: Math.round(duration / 60), // in minutes
-        color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}` // fallback
+        value: totalDurationSec / 60, // use float for more precise distribution
       };
-    }).filter(d => d.value > 0);
+    }).filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value); // Sort by highest duration
 
     // Timeline Data (Production vs Stops in the last 24h)
     const hours = Array.from({ length: 24 }).map((_, i) => {
