@@ -324,8 +324,10 @@ export default function OperatorScreen() {
     if (!categorizingLogId) return;
 
     const selectedType = downtimeTypes.find(t => t.id === typeId);
-    const isChangeProg = selectedType?.name?.toUpperCase().includes('CHANGEMENT') || selectedType?.name?.toUpperCase().includes('PROGRAMME');
-    const isOther = selectedType?.name?.toUpperCase() === 'AUTRE';
+    // Be more specific: only trigger if it's the specific format change type
+    const nameUpper = selectedType?.name?.toUpperCase() || '';
+    const isChangeProg = nameUpper === 'CHANGEMENT FORMAT' || nameUpper === 'CHANGEMENT DE FORMAT' || nameUpper.includes('FORMAT');
+    const isOther = nameUpper === 'AUTRE';
 
     if (isChangeProg && !selectedProgrammeForChange) {
       setSelectedStopType(typeId);

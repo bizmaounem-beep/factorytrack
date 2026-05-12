@@ -6,9 +6,16 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { DowntimeLog, Shift } from '../types';
 import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
-import { Monitor, LayoutGrid, Package, Users, Activity, ExternalLink, Plus, History, Timer, Pencil, Trash2, Menu, X, ArrowLeft, Clock, Square, Play } from 'lucide-react';
+import { 
+  Monitor, LayoutGrid, Package, Users, Activity, 
+  ExternalLink, Plus, History, Timer, Pencil, 
+  Trash2, Menu, X, ArrowLeft, Clock, Square, 
+  Play, TrendingUp, AlertTriangle, CheckCircle2,
+  Box, LayoutDashboard
+} from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
+import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 
 export default function PilotScreen() {
   const { user, logout } = useAuth();
@@ -27,9 +34,53 @@ export default function PilotScreen() {
   const [historyLineFilter, setHistoryLineFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_line') || '');
   const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_date') || '');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('pilot_history_type') as any) || 'production');
-  const [activeTab, setActiveTab] = useState<'monitor' | 'history'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'monitor');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'monitor' | 'history'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => sessionStorage.getItem('pilot_selected_machine') || '');
+
+  // Analytics Calculations (Copy from AdminPanel)
+  const analytics = useMemo(() => {
+    const today = new Date();
+    const start = startOfDay(today);
+    const end = endOfDay(today);
+
+    function logDate(iso: string) {
+      return iso.includes('T') ? iso : new Date(iso).toISOString();
+    }
+
+    const todayProd = prodLogs.filter(l => isWithinInterval(parseISO(logDate(l.timestamp)), { start, end }));
+    const todayDown = downLogs.filter(l => isWithinInterval(parseISO(logDate(l.startTime)), { start, end }));
+
+    const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
+    const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
+    
+    const activeLines = lines.filter(l => l.isActive !== false);
+    const totalPossibleTime = activeLines.length * 8 * 60 * 60; 
+    const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
+    const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
+
+    const shiftPerf = shifts.map(s => {
+      const pallets = prodLogs
+        .filter(l => l.shiftId === s.id && isWithinInterval(parseISO(logDate(l.timestamp)), { start, end }))
+        .reduce((acc, l) => acc + l.count, 0);
+      const downtime = downLogs
+        .filter(l => l.shiftId === s.id && isWithinInterval(parseISO(logDate(l.startTime)), { start, end }))
+        .reduce((acc, l) => acc + getLogDurationSec(l), 0);
+      
+      return {
+        name: s.name,
+        pallets,
+        downtime: Math.round(downtime / 60)
+      };
+    });
+
+    return {
+      totalPallets,
+      totalDowntimeSec,
+      availability,
+      shiftPerf
+    };
+  }, [prodLogs, downLogs, lines, shifts]);
 
   useEffect(() => {
     sessionStorage.setItem('pilot_active_tab', activeTab);
@@ -521,6 +572,16 @@ export default function PilotScreen() {
               
               <nav className="flex flex-col gap-1.5 flex-1">
                 <button
+                  onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"
+                  )}
+                >
+                  <LayoutDashboard size={16} />
+                  Dashboard
+                </button>
+                <button
                   onClick={() => { setActiveTab('monitor'); setIsMobileMenuOpen(false); }}
                   className={cn(
                     "flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
@@ -564,14 +625,34 @@ export default function PilotScreen() {
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button 
-              onClick={() => setActiveTab(activeTab === 'monitor' ? 'history' : 'monitor')}
+              onClick={() => setActiveTab('dashboard')}
+              className={cn(
+                "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              )}
+            >
+              <LayoutDashboard size={14} />
+              {t('dashboard')}
+            </button>
+            <button 
+              onClick={() => setActiveTab('monitor')}
+              className={cn(
+                "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                activeTab === 'monitor' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              )}
+            >
+              <Monitor size={14} />
+              {t('monitor')}
+            </button>
+            <button 
+              onClick={() => setActiveTab('history')}
               className={cn(
                 "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
                 activeTab === 'history' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               )}
             >
-              {activeTab === 'monitor' ? <History size={14} /> : <Monitor size={14} />}
-              {activeTab === 'monitor' ? t('history') : t('monitor')}
+              <History size={14} />
+              {t('history')}
             </button>
             <button onClick={handleLogout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">{t('logout')}</button>
           </div>
@@ -671,7 +752,190 @@ export default function PilotScreen() {
         </div>
       )}
 
-      {activeTab === 'monitor' ? (
+      {activeTab === 'dashboard' ? (
+        <div className="p-2 sm:p-6 space-y-4 md:space-y-6 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-1">
+            <div>
+              <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 leading-none">
+                {t('dashboard')} <span className="text-blue-600 uppercase text-[10px] md:text-xs tracking-widest ml-1">Analytical</span>
+              </h2>
+              <p className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase mt-1 italic">Dernières 24 heures • Mise à jour en temps réel</p>
+            </div>
+            <div className="text-right flex flex-col items-end">
+              <div className="flex items-center gap-1.5 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <p className="text-[8px] md:text-[10px] font-black text-green-700 uppercase tracking-tight">{t('connected')}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI CARDS */}
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4"
+          >
+             {[
+               { label: 'Efficacité (OEE)', val: `${analytics.availability.toFixed(1)}%`, sub: 'Disponibilité Lignes', icon: TrendingUp, color: 'blue', trend: '+2.1%' },
+               { label: 'Total Palettes', val: analytics.totalPallets, sub: 'Aujourd\'hui', icon: Box, color: 'green', trend: '+12' },
+               { label: 'Temps d\'Arrêt', val: formatDowntimeDisplay(analytics.totalDowntimeSec), sub: 'Minutes Perdues', icon: Timer, color: 'orange', trend: '-5%' },
+               { label: 'Arrets Actifs', val: lines.filter(l => !!l.activeDowntimeId).length, sub: 'Incidents en cours', icon: AlertTriangle, color: 'red', trend: 'Critical' },
+             ].map(stat => (
+               <motion.div 
+                variants={item}
+                key={stat.label} 
+                className="card p-2 md:p-4 flex flex-col gap-2 md:gap-3 hover:shadow-xl transition-all group relative overflow-hidden bg-white"
+               >
+                 <div className={cn(
+                   "absolute -right-2 -top-2 w-16 h-16 opacity-5 transition-transform group-hover:scale-150 rotate-12",
+                   stat.color === 'blue' ? "text-blue-600" :
+                   stat.color === 'green' ? "text-green-600" :
+                   stat.color === 'orange' ? "text-orange-600" : "text-red-600"
+                 )}>
+                   <stat.icon className="w-full h-full" />
+                 </div>
+                 <div className="flex justify-between items-start">
+                   <div className={cn(
+                     "w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-white/20 shrink-0",
+                     stat.color === 'blue' ? "bg-blue-600 text-white shadow-blue-200" :
+                     stat.color === 'green' ? "bg-green-600 text-white shadow-green-200" :
+                     stat.color === 'orange' ? "bg-orange-600 text-white shadow-orange-200" : "bg-red-600 text-white shadow-red-200"
+                   )}>
+                     <stat.icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
+                   </div>
+                   <span className={cn(
+                     "text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded italic",
+                     stat.color === 'blue' ? "bg-blue-50 text-blue-600" :
+                     stat.color === 'green' ? "bg-green-50 text-green-600" :
+                     stat.color === 'orange' ? "bg-orange-50 text-orange-600" : "bg-red-50 text-red-600"
+                   )}>
+                     {stat.trend}
+                   </span>
+                 </div>
+                 <div>
+                   <p className="text-[7px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
+                   <p className="text-sm md:text-2xl font-black text-slate-900 leading-none mt-1 tabular-nums">{stat.val}</p>
+                   <p className="text-[7px] md:text-[9px] font-bold text-slate-400 mt-1">{stat.sub}</p>
+                 </div>
+               </motion.div>
+             ))}
+          </motion.div>
+
+          {/* BOTTOM ROW: SHIFT PERF & LIVE MONITOR */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* SHIFT PERFORMANCE */}
+            <motion.div variants={item} className="card p-4 lg:col-span-1 bg-white">
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 mb-4 flex items-center gap-2">
+                <TrendingUp size={16} className="text-green-500" /> Performance Équipes
+              </h3>
+              <div className="space-y-3">
+                {analytics.shiftPerf.map(s => (
+                  <div key={s.name} className="p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:bg-white transition-all">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-black text-gray-900 uppercase italic">{s.name}</span>
+                      <span className="text-[9px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded italic">#{analytics.shiftPerf.indexOf(s) + 1}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                       <div>
+                          <p className="text-[7px] font-black text-gray-400 uppercase">Production</p>
+                          <p className="text-xs font-black text-gray-800">{s.pallets} <span className="opacity-50">Pal.</span></p>
+                       </div>
+                       <div className="text-right">
+                          <p className="text-[7px] font-black text-gray-400 uppercase">Arrets</p>
+                          <p className="text-xs font-black text-red-600">{s.downtime} <span className="opacity-50">min</span></p>
+                       </div>
+                    </div>
+                    <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                       <div 
+                        className="h-full bg-blue-600 rounded-full" 
+                        style={{ width: `${Math.min(100, (s.pallets / (analytics.totalPallets || 1)) * 100)}%` }} 
+                       />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* LIVE MONITOR (REFRACHED VERSION) */}
+            <div className="card overflow-hidden lg:col-span-2 bg-white">
+               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                 <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
+                    <Activity size={16} className="text-green-500 animate-pulse" /> {t('live_monitor')}
+                 </h3>
+                 <div className="flex gap-2">
+                    <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Running</span></div>
+                    <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Stopped</span></div>
+                 </div>
+               </div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left">
+                    <thead className="bg-white text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] border-b border-gray-100">
+                      <tr>
+                        <th className="px-6 py-5">{t('line_short')}</th>
+                        <th className="px-6 py-5">{t('stat_short')}</th>
+                        <th className="px-6 py-5">{t('pal_short')}</th>
+                        <th className="px-6 py-5">{t('op_short')}</th>
+                      </tr>
+                    </thead>
+                   <tbody className="divide-y divide-gray-50">
+                      {lines.filter(l => l.isActive !== false && l.status !== 'IDLE').map(l => {
+                        const prog = programmes.find(p => p.id === l.currentProgrammeId);
+                        const op = users.find(u => u.id === l.currentOperatorId);
+                        const mach = machines.find(m => m.id === l.machineId);
+                        return (
+                          <tr key={l.id} className={cn(
+                            "text-sm hover:bg-gray-50/50 transition-all group/line",
+                            l.isActive === false && "opacity-40 grayscale-[0.5]"
+                          )}>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={cn(
+                                  "w-8 h-8 rounded-lg flex items-center justify-center transition-all group-hover/line:scale-110",
+                                  l.status === 'RUNNING' ? "bg-green-50 text-green-600" :
+                                  l.status === 'STOPPED' ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-500"
+                                )}>
+                                  <Box size={16} />
+                                </div>
+                                <div>
+                                  <p className="font-black text-gray-900 leading-none mb-1 whitespace-nowrap">{l.name}</p>
+                                  <p className="text-[9px] font-bold text-blue-500 uppercase tracking-tight italic">{mach?.name}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                               <span className={cn(
+                                 "px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tight border",
+                                 l.status === 'RUNNING' ? "bg-green-50 text-green-700 border-green-200" :
+                                 l.status === 'STOPPED' ? "bg-red-50 text-red-700 border-red-200" : "bg-gray-50 text-gray-600 border-gray-200"
+                               )}>{l.status === 'RUNNING' ? 'Running' : l.status}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col">
+                                <p className="text-sm font-black text-blue-600 italic leading-none">{prog?.producedPallets || 0}</p>
+                                <div className="w-16 h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                                   <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (prog?.producedPallets || 0) / 10)}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 bg-white rounded-full border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500 shadow-sm group-hover/line:border-blue-200 transition-colors">
+                                  {op?.name?.substring(0, 1).toUpperCase() || '—'}
+                                </div>
+                                <span className="text-gray-600 font-black text-[10px] uppercase truncate max-w-[80px]">{(op?.name || '—').split(' ')[0]}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'monitor' ? (
         !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">
           <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
