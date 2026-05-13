@@ -4,8 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Line, Shift } from '../types';
-import { format, parseISO } from 'date-fns';
-import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock, Check } from 'lucide-react';
+import { format, parseISO, isToday } from 'date-fns';
+import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock, Check, Edit, Trash2, History } from 'lucide-react';
 import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
 
@@ -36,6 +36,8 @@ export default function OperatorScreen() {
   }, [selectedLineId]);
   
   const [selectedStopType, setSelectedStopType] = useState<string | null>(null);
+  const [isInitialSelection, setIsInitialSelection] = useState(false);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [showManualStopModal, setShowManualStopModal] = useState(false);
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [selectedProgrammeForChange, setSelectedProgrammeForChange] = useState<string | null>(null);
@@ -273,26 +275,53 @@ export default function OperatorScreen() {
     }
 
     try {
-      const docRef = await localApi.addDoc('downtime_logs', {
+      setIsInitialSelection(true);
+    } catch (error) {
+      console.error('Error starting downtime flow:', error);
+    }
+  };
+
+  const handleConfirmStartDowntime = async (typeId: string) => {
+    if (!selectedLineId || !user || !activeLine) return;
+
+    const selectedType = downtimeTypes.find(t => t.id === typeId);
+    const nameUpper = selectedType?.name?.toUpperCase() || '';
+    const isChangeProg = nameUpper === 'CHANGEMENT FORMAT' || nameUpper === 'CHANGEMENT DE FORMAT' || nameUpper.includes('FORMAT');
+    const isOther = nameUpper === 'AUTRE';
+
+    // If change format or other and not yet filled, just step through
+    if ((isChangeProg && !selectedProgrammeForChange) || (isOther && !downtimeDescription.trim())) {
+      setSelectedStopType(typeId);
+      return;
+    }
+
+    try {
+      const logData: any = {
         machineId: activeLine.machineId,
         lineId: activeLine.id,
-        typeId: 'PENDING',
-        description: downtimeDescription,
+        typeId,
+        description: isChangeProg 
+          ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
+          : (downtimeDescription.trim() || undefined),
         operatorId: user.id,
         shiftId: currentShiftId,
         startTime: new Date().toISOString()
-      });
+      };
+
+      const docRef = await localApi.addDoc('downtime_logs', logData);
 
       await localApi.updateDoc('lines', selectedLineId, {
         status: 'STOPPED',
         activeDowntimeId: docRef.id
       });
       
+      setIsInitialSelection(false);
+      setSelectedStopType(null);
+      setSelectedProgrammeForChange(null);
       setDowntimeDescription('');
     } catch (error) {
-      console.error('Error starting downtime:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      alert(`Erreur: Impossible de démarrer l'arrêt.\n\n${errorMessage}`);
+      console.error('Error starting qualified downtime:', error);
+      alert('Erreur: Impossible de démarrer l\'arrêt.');
     }
   };
 
@@ -388,7 +417,7 @@ export default function OperatorScreen() {
         return;
       }
 
-      await localApi.addDoc('downtime_logs', {
+      const payload = {
         machineId: activeLine.machineId,
         lineId: activeLine.id,
         typeId: data.typeId,
@@ -398,8 +427,16 @@ export default function OperatorScreen() {
         startTime: new Date(data.startTime).toISOString(),
         endTime: new Date(data.endTime).toISOString(),
         duration: Math.floor(durationMs / 1000)
-      });
+      };
+
+      if (editingLogId) {
+        await localApi.updateDoc('downtime_logs', editingLogId, payload);
+      } else {
+        await localApi.addDoc('downtime_logs', payload);
+      }
+
       setShowManualStopModal(false);
+      setEditingLogId(null);
       setManualStopForm({
         typeId: '',
         startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
@@ -407,9 +444,29 @@ export default function OperatorScreen() {
         description: ''
       });
     } catch (error) {
-      console.error('Error adding manual stop:', error);
-      alert('Erreur lors de l\'ajout manuel.');
+      console.error('Error adding/updating manual stop:', error);
+      alert('Erreur lors de l\'enregistrement.');
     }
+  };
+
+  const handleDeleteStop = async (id: string) => {
+    if (!window.confirm('Supprimer cet arrêt ?')) return;
+    try {
+      await localApi.deleteDoc('downtime_logs', id);
+    } catch (error) {
+      console.error('Error deleting stop:', error);
+    }
+  };
+
+  const handleEditStopRequest = (log: any) => {
+    setEditingLogId(log.id);
+    setManualStopForm({
+      typeId: log.typeId,
+      startTime: format(parseISO(log.startTime), "yyyy-MM-dd'T'HH:mm"),
+      endTime: log.endTime ? format(parseISO(log.endTime), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+      description: log.description || ''
+    });
+    setShowManualStopModal(true);
   };
 
   const calculateManualDuration = () => {
@@ -606,24 +663,32 @@ export default function OperatorScreen() {
                   )}
                 </div>
 
-                {activeLine?.status !== 'RUNNING' && !activeDowntime && !categorizingLogId && (
+                {activeLine?.status !== 'RUNNING' && !activeDowntime && !categorizingLogId && !isInitialSelection && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-3 space-y-1 bg-slate-50 rounded border border-dashed border-slate-200">
                     <AlertCircle size={16} className="text-slate-300" />
                     <p className="text-slate-400 font-black text-[8px] uppercase tracking-widest">{t('waiting_start')}</p>
                   </div>
                 )}
 
-                {categorizingLogId && (
+                {(categorizingLogId || isInitialSelection) && (
                   <div className="flex-1 flex flex-col gap-4 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                     <div className="flex justify-between items-end border-b border-blue-100 pb-2">
                       <div className="space-y-0.5">
                         <h3 className="text-[11px] sm:text-lg font-black text-blue-900 uppercase italic leading-none">
-                          {selectedStopType ? t('details') : t('qualify_stop')}
+                          {selectedStopType ? t('details') : (isInitialSelection ? 'Démarrer un Arrêt' : t('qualify_stop'))}
                         </h3>
                         <p className="text-[9px] font-bold text-blue-500/80 uppercase tracking-widest leading-none">
                           {selectedStopType ? t('choose_target_prog') : t('indicate_cause')}
                         </p>
                       </div>
+                      {isInitialSelection && !selectedStopType && (
+                        <button 
+                          onClick={() => setIsInitialSelection(false)}
+                          className="text-[8px] font-black text-red-500 uppercase flex items-center gap-1 hover:bg-white px-2 py-1 rounded transition-all"
+                        >
+                          <X size={10} /> Annuler
+                        </button>
+                      )}
                     </div>
 
                     {!selectedStopType ? (
@@ -631,7 +696,7 @@ export default function OperatorScreen() {
                         {downtimeTypes.map((type) => (
                           <button
                             key={type.id}
-                            onClick={() => handleCategorizeStop(type.id)}
+                            onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
                             className="aspect-square border rounded flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 shadow-sm font-black text-center bg-white border-blue-100 hover:bg-blue-600 hover:text-white group"
                           >
                             <span className="text-lg sm:text-xl leading-none">{type.icon || '⚠️'}</span>
@@ -652,7 +717,7 @@ export default function OperatorScreen() {
                               rows={3}
                             />
                             <button 
-                              onClick={() => handleCategorizeStop(selectedStopType!)}
+                              onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
                               disabled={!downtimeDescription.trim()}
                               className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-50"
                             >
@@ -666,7 +731,17 @@ export default function OperatorScreen() {
                                 key={p.id}
                                 onClick={() => {
                                   setSelectedProgrammeForChange(p.id);
-                                  handleCategorizeStop(selectedStopType!);
+                                  if (isInitialSelection) {
+                                    // Need to wait for the state update or pass it directly?
+                                    // React state update is async, so we'll pass it if we can or use a local var
+                                    // For simplicity, we just trigger again
+                                    setTimeout(() => {
+                                      if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
+                                      else handleCategorizeStop(selectedStopType!);
+                                    }, 0);
+                                  } else {
+                                    handleCategorizeStop(selectedStopType!);
+                                  }
                                 }}
                                 className="p-3 bg-white border border-blue-100 rounded font-black text-[10px] text-blue-900 hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-between"
                               >
@@ -891,6 +966,66 @@ export default function OperatorScreen() {
               )}
             </div>
           </div>
+
+          {/* MY STOPS HISTORY */}
+          <div className="mt-4 bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+             <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+               <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+                  <History size={16} className="text-blue-500" /> Mon Historique d'Arrêts
+               </h3>
+               <span className="text-[8px] font-bold text-slate-400 uppercase italic">Aujourd'hui</span>
+             </div>
+             <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto">
+                {downtimeLogs
+                  .filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime)))
+                  .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+                  .map(log => {
+                    const type = downtimeTypes.find(t => t.id === log.typeId);
+                    return (
+                      <div key={log.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-lg">
+                            {type?.icon || '⚠️'}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-800 uppercase leading-none mb-1">
+                              {type?.name || 'Inconnu'}
+                            </p>
+                            <p className="text-[8px] font-mono font-bold text-slate-400 leading-none">
+                              {format(parseISO(log.startTime), 'HH:mm')} - {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '--:--'}
+                              <span className="ml-2 text-blue-500">
+                                {log.duration ? formatDowntimeDisplay(log.duration) : 'En cours'}
+                              </span>
+                            </p>
+                            {log.description && (
+                              <p className="text-[8px] italic text-slate-400 mt-1 max-w-[150px] truncate">{log.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => handleEditStopRequest(log)}
+                            className="p-1.5 hover:bg-blue-50 rounded text-blue-500 transition-colors"
+                          >
+                            <Settings size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteStop(log.id)}
+                            className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
+                  <div className="p-8 text-center bg-slate-50/50">
+                    <p className="text-[9px] font-black uppercase text-slate-300 italic tracking-[0.2em]">Aucun arrêt enregistré aujourd'hui</p>
+                  </div>
+                )}
+             </div>
+          </div>
         </div>
       </main>
 
@@ -950,8 +1085,11 @@ export default function OperatorScreen() {
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2">
           <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-300">
             <div className="bg-slate-900 px-4 py-2 text-white flex justify-between items-center shrink-0">
-               <h3 className="text-[10px] font-black uppercase tracking-widest italic">{t('add_manual_stop')}</h3>
-               <button onClick={() => setShowManualStopModal(false)} className="hover:text-red-400">
+               <h3 className="text-[10px] font-black uppercase tracking-widest italic">{editingLogId ? 'Modifier l\'arrêt' : t('add_manual_stop')}</h3>
+               <button onClick={() => {
+                 setShowManualStopModal(false);
+                 setEditingLogId(null);
+               }} className="hover:text-red-400">
                  <X size={16} />
                </button>
             </div>
@@ -1008,7 +1146,10 @@ export default function OperatorScreen() {
 
               <div className="flex gap-2 pt-2">
                 <button 
-                  onClick={() => setShowManualStopModal(false)}
+                  onClick={() => {
+                    setShowManualStopModal(false);
+                    setEditingLogId(null);
+                  }}
                   className="flex-1 py-2 font-black uppercase text-[10px] text-slate-400 hover:bg-slate-50 rounded tracking-widest"
                 >
                   {t('cancel')}
@@ -1022,7 +1163,7 @@ export default function OperatorScreen() {
                   }}
                   className="flex-[2] bg-blue-600 text-white font-black uppercase py-2 rounded text-[10px] shadow active:scale-95 transition-all tracking-widest hover:bg-blue-700"
                 >
-                  {t('validate')}
+                  {editingLogId ? 'Enregistrer' : t('validate')}
                 </button>
               </div>
             </div>
