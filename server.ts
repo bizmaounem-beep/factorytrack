@@ -24,7 +24,29 @@ async function startServer() {
       }
     }
     
-    db = new Database('data.db', { verbose: console.log });
+    db = new Database('data.db', { 
+      verbose: (message) => {
+        // Obfuscate PIN values in logs for security
+        let safeMsg = message.replace(/(pin\s*=\s*)'[^']+'/gi, "$1'****'");
+        console.log(safeMsg);
+      }
+    });
+
+    // Automatic Daily Backup Function
+    const performBackup = () => {
+      try {
+        const backupPath = 'data_backup.db';
+        fs.copyFileSync('data.db', backupPath);
+        console.log(`[AgroSync] Sauvegarde automatique effectuée : ${backupPath} (${new Date().toLocaleString()})`);
+      } catch (err) {
+        console.error('[AgroSync] Échec de la sauvegarde:', err);
+      }
+    };
+
+    // Run backup every 24 hours (86400000 ms)
+    setInterval(performBackup, 24 * 60 * 60 * 1000);
+    // Also run once at startup
+    performBackup();
     db.pragma('journal_mode = WAL'); // Use WAL mode for better concurrency and write stability
     
     // Initialize database tables
@@ -179,6 +201,22 @@ async function startServer() {
     }
   });
 
+  // Helper to strictly sanitize values for SQLite
+  const sanitizeSqlValue = (val: any) => {
+    if (val === null || val === undefined) return null;
+    const type = typeof val;
+    if (type === 'string' || type === 'number') return val;
+    if (type === 'boolean') return val ? 1 : 0;
+    if (type === 'object') {
+       try {
+         return JSON.stringify(val);
+       } catch {
+         return null;
+       }
+    }
+    return String(val);
+  };
+
   app.use(cors());
   app.use(express.json());
 
@@ -263,13 +301,7 @@ async function startServer() {
       for (const col of validColumns) {
         if (data[col] !== undefined) {
           keys.push(col);
-          let val = data[col];
-          // Sanitize for SQLite
-          if (val !== null && typeof val === 'object') {
-            val = JSON.stringify(val);
-          } else if (typeof val === 'boolean') {
-            val = val ? 1 : 0;
-          }
+          const val = sanitizeSqlValue(data[col]);
           values.push(val);
           filteredData[col] = data[col];
         }
@@ -317,13 +349,7 @@ async function startServer() {
       for (const col of validColumns) {
         if (data[col] !== undefined) {
           keys.push(col);
-          let val = data[col];
-          // Sanitize for SQLite
-          if (val !== null && typeof val === 'object') {
-            val = JSON.stringify(val);
-          } else if (typeof val === 'boolean') {
-            val = val ? 1 : 0;
-          }
+          const val = sanitizeSqlValue(data[col]);
           values.push(val);
         }
       }

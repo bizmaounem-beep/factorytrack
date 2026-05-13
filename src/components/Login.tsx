@@ -5,13 +5,13 @@ import { Lock, Delete, ArrowRight } from 'lucide-react';
 
 export default function Login() {
   const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
 
   const handleKeyPress = (num: string) => {
     if (pin.length < 4) {
       setPin(prev => prev + num);
-      setError(false);
+      setError(null);
     }
   };
 
@@ -21,9 +21,14 @@ export default function Login() {
 
   const handleSubmit = async () => {
     if (pin.length === 4) {
-      const success = await login(pin);
-      if (!success) {
-        setError(true);
+      try {
+        const success = await login(pin);
+        if (!success) {
+          setError('Code PIN incorrect');
+          setPin('');
+        }
+      } catch (err) {
+        setError((err as Error).message);
         setPin('');
       }
     }
@@ -59,7 +64,7 @@ export default function Login() {
 
         {error && (
           <p className="text-center text-red-500 text-[10px] font-black uppercase animate-pulse">
-            PIN INCORRECT
+            {error}
           </p>
         )}
 

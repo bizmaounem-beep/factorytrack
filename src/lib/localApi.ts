@@ -6,69 +6,69 @@ const socket = io();
 
 export const localApi = {
   async getCollection(collection: string) {
-    const res = await fetch(`${API_BASE}/${collection}`);
-    const contentType = res.headers.get('content-type');
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    try {
+      const res = await fetch(`${API_BASE}/${collection}`);
+      const contentType = res.headers.get('content-type');
+      if (!res.ok) {
+        throw new Error('Erreur de connexion');
+      }
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Erreur de serveur');
+      }
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw new Error('Erreur de connexion au serveur');
     }
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(`Expected JSON but got ${contentType || 'unknown'}: ${text.substring(0, 100)}...`);
-    }
-    return res.json();
   },
 
   async addDoc(collection: string, data: any) {
-    const res = await fetch(`${API_BASE}/${collection}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    const contentType = res.headers.get('content-type');
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    try {
+      const res = await fetch(`${API_BASE}/${collection}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        throw new Error('Échec de l\'enregistrement');
+      }
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw new Error('Erreur de connexion');
     }
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(`Expected JSON but got ${contentType || 'unknown'}: ${text.substring(0, 100)}...`);
-    }
-    return res.json();
   },
 
   async updateDoc(collection: string, id: string, data: any) {
-    const res = await fetch(`${API_BASE}/${collection}/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    const contentType = res.headers.get('content-type');
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    try {
+      const res = await fetch(`${API_BASE}/${collection}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        throw new Error('Échec de la mise à jour');
+      }
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw new Error('Erreur de connexion');
     }
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(`Expected JSON but got ${contentType || 'unknown'}: ${text.substring(0, 100)}...`);
-    }
-    return res.json();
   },
 
   async deleteDoc(collection: string, id: string) {
-    const res = await fetch(`${API_BASE}/${collection}/${id}`, {
-      method: 'DELETE'
-    });
-    const contentType = res.headers.get('content-type');
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`API Error [${res.status}]: ${text || res.statusText}`);
+    try {
+      const res = await fetch(`${API_BASE}/${collection}/${id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        throw new Error('Échec de la suppression');
+      }
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw new Error('Erreur de connexion');
     }
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(`Expected JSON but got ${contentType || 'unknown'}: ${text.substring(0, 100)}...`);
-    }
-    return res.json();
   },
 
   // Real-time updates with Socket.io
@@ -124,19 +124,26 @@ export const localApi = {
 };
 
 export const loginLocal = async (pin: string) => {
-  const res = await fetch('/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin })
-  });
-  const contentType = res.headers.get('content-type');
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Login failed [${res.status}]: ${text || res.statusText}`);
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    });
+    if (res.status === 401) {
+      throw new Error('Code PIN incorrect');
+    }
+    if (!res.ok) {
+      throw new Error('Erreur de connexion');
+    }
+    const contentType = res.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Erreur de serveur');
+    }
+    return res.json();
+  } catch (e) {
+    if ((e as Error).message === 'Code PIN incorrect') throw e;
+    console.error('Login error:', e);
+    throw new Error('Erreur de connexion');
   }
-  if (!contentType || !contentType.includes('application/json')) {
-    const text = await res.text();
-    throw new Error(`Expected JSON but got ${contentType || 'unknown'}: ${text.substring(0, 100)}...`);
-  }
-  return res.json();
 };

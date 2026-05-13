@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return false;
     } catch (error) {
-      console.error('Login error:', error);
-      return false;
+      // Re-throw the friendly error message
+      throw error;
     }
   };
 
