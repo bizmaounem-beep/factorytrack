@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     // Cette adresse permet à l'app mobile de contacter votre NUC
-    url: 'http://192.168.31.104:3000',
+    url: 'http://192.168.31.109:3000',
     cleartext: true
   }
 };

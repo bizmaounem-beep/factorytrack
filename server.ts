@@ -257,16 +257,29 @@ async function startServer() {
       const validColumns = pragma.map(p => p.name);
       
       const filteredData: any = {};
+      const values: any[] = [];
+      const keys: string[] = [];
+
       for (const col of validColumns) {
         if (data[col] !== undefined) {
+          keys.push(col);
+          let val = data[col];
+          // Sanitize for SQLite
+          if (val !== null && typeof val === 'object') {
+            val = JSON.stringify(val);
+          } else if (typeof val === 'boolean') {
+            val = val ? 1 : 0;
+          }
+          values.push(val);
           filteredData[col] = data[col];
         }
       }
 
-      const keys = Object.keys(filteredData);
-      const values = Object.values(filteredData);
+      if (keys.length === 0) {
+        return res.status(400).json({ error: 'No valid fields provided' });
+      }
+
       const placeholders = keys.map(() => '?').join(',');
-      
       const stmt = db.prepare(`INSERT INTO ${req.params.collection} (${keys.join(',')}) VALUES (${placeholders})`);
       stmt.run(...values);
       
@@ -298,21 +311,28 @@ async function startServer() {
       const pragma = db.prepare(`PRAGMA table_info(${req.params.collection})`).all() as any[];
       const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
       
-      const filteredData: any = {};
+      const values: any[] = [];
+      const keys: string[] = [];
+
       for (const col of validColumns) {
         if (data[col] !== undefined) {
-          filteredData[col] = data[col];
+          keys.push(col);
+          let val = data[col];
+          // Sanitize for SQLite
+          if (val !== null && typeof val === 'object') {
+            val = JSON.stringify(val);
+          } else if (typeof val === 'boolean') {
+            val = val ? 1 : 0;
+          }
+          values.push(val);
         }
       }
 
-      const keys = Object.keys(filteredData);
-      const values = Object.values(filteredData);
-      const sets = keys.map(k => `${k} = ?`).join(',');
-      
       if (keys.length === 0) {
         return res.json({ success: true, message: 'No fields to update' });
       }
 
+      const sets = keys.map(k => `${k} = ?`).join(',');
       const stmt = db.prepare(`UPDATE ${req.params.collection} SET ${sets} WHERE id = ?`);
       stmt.run(...values, req.params.id);
       
@@ -340,11 +360,19 @@ async function startServer() {
     try {
       if (!db) throw new Error('Database not initialized');
       const { name, pin } = req.body;
+      
+      if (!pin) {
+        return res.status(400).json({ error: 'PIN manquant' });
+      }
+
+      const pinStr = String(pin);
+      const nameStr = name ? String(name) : null;
+      
       let user;
-      if (name) {
-        user = db.prepare('SELECT * FROM users WHERE name = ? AND pin = ?').get(name, pin);
+      if (nameStr) {
+        user = db.prepare('SELECT * FROM users WHERE name = ? AND pin = ?').get(nameStr, pinStr);
       } else {
-        user = db.prepare('SELECT * FROM users WHERE pin = ?').get(pin);
+        user = db.prepare('SELECT * FROM users WHERE pin = ?').get(pinStr);
       }
       
       if (user) {
