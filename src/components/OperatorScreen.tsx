@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Line, Shift } from '../types';
 import { format, parseISO, isToday } from 'date-fns';
-import { Play, Square, Settings, Timer, Package, AlertCircle, CheckCircle, Factory, Monitor, Activity, Plus, Minus, ArrowLeft, X, Clock, Check, Edit, Trash2, History } from 'lucide-react';
+import { 
+  Play, Square, Settings, Timer, Package, AlertCircle, 
+  CheckCircle, Factory, Monitor, Activity, Plus, Minus, 
+  ArrowLeft, X, Clock, Check, Edit, Trash2, History,
+  ChevronRight, ChevronLeft, Info
+} from 'lucide-react';
 import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function OperatorScreen() {
   const { user, logout } = useAuth();
@@ -24,6 +30,15 @@ export default function OperatorScreen() {
   
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(() => sessionStorage.getItem('op_selected_machine') || null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(() => sessionStorage.getItem('op_selected_line') || null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const { scrollLeft, clientWidth } = scrollRef.current;
+      const scrollTo = direction === 'left' ? scrollLeft - clientWidth / 2 : scrollLeft + clientWidth / 2;
+      scrollRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
+    }
+  };
 
   useEffect(() => {
     if (selectedMachineId) sessionStorage.setItem('op_selected_machine', selectedMachineId);
@@ -35,17 +50,16 @@ export default function OperatorScreen() {
     else sessionStorage.removeItem('op_selected_line');
   }, [selectedLineId]);
   
-  const [selectedStopType, setSelectedStopType] = useState<string | null>(null);
+  const [timer, setTimer] = useState(0);
+  const [isPostProduction, setIsPostProduction] = useState(false);
   const [isInitialSelection, setIsInitialSelection] = useState(false);
+  const [selectedStopType, setSelectedStopType] = useState<string | null>(null);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [showManualStopModal, setShowManualStopModal] = useState(false);
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [selectedProgrammeForChange, setSelectedProgrammeForChange] = useState<string | null>(null);
-  
   const [palletInput, setPalletInput] = useState('1');
   const [downtimeDescription, setDowntimeDescription] = useState('');
-  const [timer, setTimer] = useState(0);
-  const [isPostProduction, setIsPostProduction] = useState(false);
 
   const activeLine = lines.find(l => l.id === selectedLineId) || null;
   const activeProgramme = activeLine ? availableProgrammes.find(p => p.id === activeLine.currentProgrammeId) || null : null;
@@ -589,489 +603,472 @@ export default function OperatorScreen() {
   }
 
   return (
-    <div className="h-screen bg-[#F3F4F6] flex flex-col overflow-hidden">
-      {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-row justify-between items-center gap-2 shadow-sm shrink-0">
-        <div className="flex items-center gap-3 overflow-hidden">
-          {!activeLine?.status || activeLine?.status === 'IDLE' ? (
-            <button 
-              onClick={handleGoBackFromLine}
-              className="p-2 hover:bg-gray-100 rounded text-gray-500 transition-colors shrink-0"
-            >
-              <ArrowLeft size={22} />
-            </button>
-          ) : (
-            <div className="p-2 text-gray-100 cursor-not-allowed shrink-0">
-              <ArrowLeft size={22} />
+    <div className="min-h-screen bg-[#0a0c10] text-slate-100 font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden">
+      <header className="sticky top-0 z-50 bg-[#0a0c10]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 shrink-0">
+        <div className="max-w-xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Factory size={22} className="text-white" />
             </div>
-          )}
-          <div className="shrink-0 leading-none">
-            <p className="text-[9px] text-gray-400 uppercase tracking-tight font-semibold">Op</p>
-            <p className="text-[13px] font-black text-gray-900 truncate max-w-[120px]">{user?.name}</p>
+            <div>
+              <h1 className="text-lg font-black tracking-tighter italic leading-none">
+                PILOT<span className="text-blue-500">CLOUD</span>
+              </h1>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Operator Hub</p>
+            </div>
           </div>
-          <div className="h-6 w-px bg-gray-200" />
-          <div className="overflow-hidden leading-none">
-            <p className="text-[9px] text-gray-400 uppercase tracking-tight font-semibold">Poste</p>
-            <p className="text-[13px] font-black text-gray-900 truncate">
-              {machines.find(m => m.id === activeLine?.machineId)?.name} 
-              <span className="text-blue-600"> | {activeLine?.name}</span>
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end leading-none">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{user?.name}</span>
+              <span className="text-[8px] font-bold text-blue-500/80 uppercase tracking-widest">{activeLine?.name}</span>
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <Settings size={20} />
+            </button>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <span className={cn(
-            "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tight flex items-center gap-2",
-            activeLine?.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
-            activeLine?.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : 
-            "bg-status-idle-bg text-status-idle-text"
-          )}>
-            <span className={cn(
-              "w-2 h-2 rounded-full",
-              activeLine?.status === 'RUNNING' ? "bg-green-600 animate-pulse" :
-              activeLine?.status === 'STOPPED' ? "bg-red-600" : "bg-gray-400"
-            )} />
-            {activeLine?.status === 'RUNNING' ? t('production_label_short') : 
-             activeLine?.status === 'STOPPED' ? t('stop_label_short') : t('wait_label_short')}
-          </span>
-          <button onClick={handleLogout} className="p-1.5 bg-red-50 rounded text-red-500 font-black text-[11px] uppercase px-3 border border-red-100">
-             {t('out')}
-          </button>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-1 bg-slate-50/50">
-        <div className="max-w-full mx-auto space-y-1">
-          <div className="grid grid-cols-1 gap-2">
-            
-            {/* MAIN AREA: DOWNTIME */}
-            <div className={cn(
-              "bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden flex flex-col",
-              activeDowntime ? "ring-1 ring-orange-500 border-orange-500 shadow-md" : ""
-            )}>
-              <div className="p-1.5 sm:p-2 flex flex-col gap-1.5">
-                <div className="flex justify-between items-center border-b border-slate-50 pb-1">
-                  <h2 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <Activity size={10} className={activeDowntime ? "text-orange-500" : "text-slate-300"} />
-                    {activeDowntime ? t('stop_label_short') : t('manage_stops')}
-                  </h2>
-                  {activeLine?.status === 'RUNNING' && (
-                    <div className="flex items-center gap-1 bg-green-50 px-1 py-0 rounded border border-green-100">
-                       <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
-                       <span className="text-[6px] font-black text-green-700 uppercase tracking-tight">Prod OK</span>
+      <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+        {!selectedLineId ? (
+          <div className="grid grid-cols-1 gap-4 py-8 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest text-center">{t('select_line')}</h2>
+            {lines.filter(l => l.isActive !== false).map((line) => (
+              <button
+                key={line.id}
+                onClick={() => handleSelectLine(line)}
+                className="group relative overflow-hidden p-6 bg-slate-900/50 border border-white/5 rounded-3xl text-left hover:border-blue-500/50 transition-all hover:bg-slate-900 shadow-2xl"
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl group-hover:bg-blue-600/10 transition-colors" />
+                <div className="flex justify-between items-center relative z-10">
+                  <div>
+                    <h3 className="text-2xl font-black text-white italic tracking-tighter mb-1">{line.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "w-2 h-2 rounded-full animate-pulse",
+                        line.status === 'RUNNING' ? "bg-emerald-500" : "bg-rose-500"
+                      )} />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{line.status}</span>
                     </div>
-                  )}
+                  </div>
+                  <ChevronRight size={24} className="text-slate-600 group-hover:text-blue-500 group-hover:translate-x-2 transition-all" />
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-6 max-w-xl mx-auto animate-in fade-in duration-500">
+            <button 
+              onClick={handleGoBackFromLine}
+              className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors group"
+            >
+              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-widest">{t('back_to_selection')}</span>
+            </button>
+
+            {/* MAIN STATUS CARD */}
+            <div className={cn(
+              "relative overflow-hidden p-8 rounded-[2.5rem] border transition-all duration-700 shadow-2xl",
+              activeLine?.status === 'RUNNING' 
+                ? "bg-emerald-500/10 border-emerald-500/20 shadow-emerald-500/5" 
+                : "bg-rose-500/10 border-rose-500/20 shadow-rose-500/5"
+            )}>
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+              
+              <div className="flex flex-col items-center text-center relative z-10">
+                <div className={cn(
+                  "w-16 h-16 rounded-3xl flex items-center justify-center mb-6 shadow-2xl transform transition-transform duration-500 hover:scale-110",
+                  activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-emerald-500/40" : "bg-rose-500 shadow-rose-500/40"
+                )}>
+                  {activeLine?.status === 'RUNNING' ? <Activity size={32} /> : <AlertCircle size={32} />}
                 </div>
 
-                {activeLine?.status !== 'RUNNING' && !activeDowntime && !categorizingLogId && !isInitialSelection && (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-3 space-y-1 bg-slate-50 rounded border border-dashed border-slate-200">
-                    <AlertCircle size={16} className="text-slate-300" />
-                    <p className="text-slate-400 font-black text-[8px] uppercase tracking-widest">{t('waiting_start')}</p>
-                  </div>
-                )}
-
-                {(categorizingLogId || isInitialSelection) && (
-                  <div className="flex-1 flex flex-col gap-4 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-                    <div className="flex justify-between items-end border-b border-blue-100 pb-2">
-                      <div className="space-y-0.5">
-                        <h3 className="text-[11px] sm:text-lg font-black text-blue-900 uppercase italic leading-none">
-                          {selectedStopType ? t('details') : (isInitialSelection ? 'Démarrer un Arrêt' : t('qualify_stop'))}
-                        </h3>
-                        <p className="text-[9px] font-bold text-blue-500/80 uppercase tracking-widest leading-none">
-                          {selectedStopType ? t('choose_target_prog') : t('indicate_cause')}
-                        </p>
-                      </div>
-                      {isInitialSelection && !selectedStopType && (
-                        <button 
-                          onClick={() => setIsInitialSelection(false)}
-                          className="text-[8px] font-black text-red-500 uppercase flex items-center gap-1 hover:bg-white px-2 py-1 rounded transition-all"
-                        >
-                          <X size={10} /> Annuler
-                        </button>
-                      )}
-                    </div>
-
-                    {!selectedStopType ? (
-                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5 overflow-y-auto max-h-[160px] p-0.5">
-                        {downtimeTypes.map((type) => (
-                          <button
-                            key={type.id}
-                            onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
-                            className="aspect-square border rounded flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 shadow-sm font-black text-center bg-white border-blue-100 hover:bg-blue-600 hover:text-white group"
-                          >
-                            <span className="text-lg sm:text-xl leading-none">{type.icon || '⚠️'}</span>
-                            <span className="text-[7px] uppercase leading-tight tracking-tighter px-0.5 truncate w-full">{type.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase() === 'AUTRE' ? (
-                          <div className="space-y-3">
-                            <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest">{t('describe_reason')}</p>
-                            <textarea 
-                              className="w-full p-4 bg-white border border-blue-200 rounded-2xl text-sm font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="..."
-                              value={downtimeDescription}
-                              onChange={e => setDowntimeDescription(e.target.value)}
-                              rows={3}
-                            />
-                            <button 
-                              onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
-                              disabled={!downtimeDescription.trim()}
-                              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-50"
-                            >
-                              {t('validate')}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
-                              <button 
-                                key={p.id}
-                                onClick={() => {
-                                  setSelectedProgrammeForChange(p.id);
-                                  if (isInitialSelection) {
-                                    // Need to wait for the state update or pass it directly?
-                                    // React state update is async, so we'll pass it if we can or use a local var
-                                    // For simplicity, we just trigger again
-                                    setTimeout(() => {
-                                      if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
-                                      else handleCategorizeStop(selectedStopType!);
-                                    }, 0);
-                                  } else {
-                                    handleCategorizeStop(selectedStopType!);
-                                  }
-                                }}
-                                className="p-3 bg-white border border-blue-100 rounded font-black text-[10px] text-blue-900 hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-between"
-                              >
-                                <span>{p.name}</span>
-                                <Plus size={14} className="text-blue-300" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <button 
-                          onClick={() => {
-                            setSelectedStopType(null);
-                            setSelectedProgrammeForChange(null);
-                          }}
-                          className="self-center px-4 py-1.5 bg-white border border-blue-200 rounded-full text-[9px] font-black text-blue-400 uppercase tracking-widest hover:bg-blue-50"
-                        >
-                          ← {t('back')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <h2 className="text-4xl font-black text-white italic tracking-tighter mb-2 leading-none uppercase">
+                  {activeLine?.name}
+                </h2>
+                <div className="flex items-center gap-2 px-4 py-1.5 bg-black/20 rounded-full border border-white/5 backdrop-blur-md mb-8">
+                  <span className={cn(
+                    "text-[10px] font-black uppercase tracking-[0.2em]",
+                    activeLine?.status === 'RUNNING' ? "text-emerald-400" : "text-rose-400"
+                  )}>
+                    {activeLine?.status === 'RUNNING' ? 'Machine Operationnelle' : 'Ligne à l\'Arrêt'}
+                  </span>
+                </div>
 
                 {activeDowntime ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-1.5 space-y-2">
-                    <div className="flex flex-col items-center gap-1.5">
-                         <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-orange-500 animate-pulse border border-orange-100">
-                           <Timer size={18} />
-                         </div>
-                         <div className="flex flex-col items-center gap-0">
-                            <p className="text-[7px] uppercase font-black text-orange-300 tracking-widest leading-none">{t('stopped')}</p>
-                            <p className="text-xl sm:text-3xl font-mono font-black text-orange-600 tabular-nums leading-none tracking-tighter">
-                              {formatDowntimeDisplay(timer)}
-                            </p>
-                         </div>
+                  <div className="space-y-4 w-full">
+                    <div className="bg-black/40 rounded-[2rem] p-6 border border-white/5 backdrop-blur-3xl shadow-inner">
+                      <div className="flex items-center justify-center gap-3 text-rose-500 mb-2">
+                        <Timer size={20} className="animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Temps Écoulé</span>
+                      </div>
+                      <p className="text-5xl font-black tracking-tighter tabular-nums text-white">
+                        {formatDowntimeDisplay(timer)}
+                      </p>
+                      {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
+                        <p className="mt-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-white/5 py-1 px-3 rounded-full inline-block">
+                           {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
+                        </p>
+                      )}
                     </div>
-
-                    <div className="w-full max-w-sm">
-                      <button 
-                        onClick={handleStopDowntime}
-                        className="w-full bg-orange-600 hover:bg-orange-700 text-white py-1.5 rounded font-black text-[10px] sm:text-xs shadow active:scale-95 transition-all uppercase tracking-widest flex items-center justify-center gap-1.5"
-                      >
-                        <Square size={12} fill="currentColor" /> {t('stop')}
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleStopDowntime}
+                      className="w-full py-5 bg-white text-black rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-emerald-50"
+                    >
+                      <Play size={20} /> Relancer la Ligne
+                    </button>
                   </div>
-                ) : !categorizingLogId && (
-                  <div className="flex-1 flex flex-col justify-center items-center py-1 sm:py-2">
-                    {activeLine?.status === 'RUNNING' ? (
-                      <div className="flex flex-col items-center gap-2 w-full max-w-lg">
-                        <button 
-                          onClick={handleStartDowntime}
-                          className="w-full h-16 sm:h-20 bg-white border border-orange-500 text-orange-600 rounded-lg font-black text-sm sm:text-base shadow-sm active:scale-[0.98] transition-all uppercase tracking-widest flex flex-col items-center justify-center gap-1 hover:bg-orange-50/20"
-                        >
-                          <AlertCircle size={24} />
-                          {t('declare_downtime')}
-                        </button>
-                        
-                        <button 
-                          onClick={() => setShowManualStopModal(true)}
-                          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-full text-[8px] font-black text-slate-500 uppercase tracking-widest transition-all flex items-center gap-1 shadow-sm"
-                        >
-                          <Plus size={10} /> {t('manual_add')}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 opacity-30">
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] italic">{t('waiting_start')}...</p>
-                      </div>
+                ) : (
+                  <div className="w-full flex flex-col gap-3">
+                    <button
+                      onClick={handleStartDowntime}
+                      disabled={isInitialSelection}
+                      className="w-full py-5 bg-rose-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl shadow-rose-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-rose-500 disabled:opacity-50"
+                    >
+                      <Square size={20} /> Arrêt Machine
+                    </button>
+                    {!activeLine?.currentProgrammeId && (
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mt-2">
+                        {t('no_programme')}
+                      </p>
                     )}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* SECONDARY AREA: PRODUCTION & PROGRAMME */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {/* PROGRAMME CARD */}
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 sm:p-3 flex flex-col gap-2 border-l-4 border-blue-500">
-                <div className="flex items-center gap-2 border-b border-slate-50 pb-1">
-                  <Package size={14} className="text-blue-500" />
-                  <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('programmes')}</h2>
+            {/* DOWNTIME CHOICES SLIDER */}
+            <AnimatePresence mode="wait">
+              {(isInitialSelection || categorizingLogId) && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="bg-slate-900 rounded-[2.5rem] p-6 border border-white/5 shadow-3xl"
+                >
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-2">
+                       <Info size={14} className="text-blue-500" />
+                       <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                         {isInitialSelection ? 'Démarrer l\'arrêt' : 'Qualifier l\'arrêt'}
+                       </h3>
+                    </div>
+                    {isInitialSelection && (
+                      <button 
+                        onClick={() => setIsInitialSelection(false)}
+                        className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {!selectedStopType ? (
+                    <div className="relative group">
+                      <div 
+                        ref={scrollRef}
+                        className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory px-2"
+                      >
+                        {downtimeTypes.map((type) => (
+                          <button
+                            key={type.id}
+                            onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
+                            className="flex-shrink-0 w-[45%] aspect-[4/5] bg-slate-800/50 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-4 transition-all hover:bg-blue-600 hover:border-blue-500 group snap-center"
+                          >
+                            <div className="w-14 h-14 rounded-2xl bg-slate-900/50 flex items-center justify-center text-3xl group-hover:bg-white/20 transition-all shadow-inner">
+                              {type.icon || '⚠️'}
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-center px-4 leading-tight">
+                              {type.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-slate-900 to-transparent pointer-events-none" />
+                      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-slate-900 to-transparent pointer-events-none" />
+                      
+                      <button 
+                        onClick={() => scroll('left')}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-10 h-10 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+                      <button 
+                        onClick={() => scroll('right')}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-10 h-10 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
+                  ) : (
+                    <motion.div 
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="space-y-4"
+                    >
+                      <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <div className="text-2xl">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
+                        <div>
+                           <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Type sélectionné</p>
+                           <p className="text-xs font-black text-white uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
+                        </div>
+                      </div>
+
+                      {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('AUTRE') ? (
+                        <div className="space-y-4">
+                          <textarea 
+                            className="w-full p-6 bg-slate-800/50 border border-white/5 rounded-3xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                            placeholder="Décrivez la raison..."
+                            value={downtimeDescription}
+                            onChange={e => setDowntimeDescription(e.target.value)}
+                            rows={3}
+                          />
+                          <button 
+                            onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
+                            disabled={!downtimeDescription.trim()}
+                            className="w-full py-5 bg-blue-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            Confirmer
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid gap-2">
+                           <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest px-2">Choisir le programme cible</p>
+                           {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                            <button 
+                              key={p.id}
+                              onClick={() => {
+                                setSelectedProgrammeForChange(p.id);
+                                setTimeout(() => {
+                                  if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
+                                  else handleCategorizeStop(selectedStopType!);
+                                }, 0);
+                              }}
+                              className="p-4 bg-slate-800/50 hover:bg-blue-600 border border-white/5 rounded-2xl font-black text-[10px] text-white transition-all flex items-center justify-between group"
+                            >
+                              <span className="uppercase italic tracking-tight">{p.name}</span>
+                              <Plus size={14} className="text-slate-500 group-hover:text-white" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <button 
+                         onClick={() => {
+                           setSelectedStopType(null);
+                           setSelectedProgrammeForChange(null);
+                         }}
+                         className="w-full py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
+                      >
+                         ← Retour aux catégories
+                      </button>
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* PRODUCTION CONTROLS */}
+            <div className="grid grid-cols-1 gap-4">
+              <div className="bg-slate-900 rounded-[2.5rem] p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-3xl" />
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center gap-2">
+                    <Package size={16} className="text-purple-500" />
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Production</h3>
+                  </div>
+                  {activeLine?.status === 'RUNNING' && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">En Cours</span>
+                    </div>
+                  )}
                 </div>
+
                 {!activeProgramme ? (
-                  <div className="space-y-2">
-                    <p className="text-slate-300 text-[8px] font-black uppercase tracking-widest text-center py-3 bg-slate-50 rounded-lg border border-dashed border-slate-100">{t('no_programme')}</p>
-                    <div className="grid gap-1">
+                  <div className="text-center py-8 bg-black/20 rounded-3xl border border-dashed border-white/5">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('no_programme')}</p>
+                    <div className="grid grid-cols-1 gap-2 mt-4 px-4">
                       {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
                         <button
                           key={p.id}
-                          disabled={activeLine?.status === 'RUNNING'}
                           onClick={() => handleSelectProgramme(p.id)}
-                          className={cn(
-                            "w-full p-2 border rounded-lg text-left transition-all group flex items-center justify-between",
-                            activeLine?.status === 'RUNNING' 
-                              ? "bg-slate-50 border-slate-100 opacity-50 cursor-not-allowed" 
-                              : "bg-white hover:bg-blue-50 border-slate-100 hover:border-blue-200"
-                          )}
+                          className="w-full p-4 bg-slate-800 rounded-2xl border border-white/5 text-left flex justify-between items-center group/btn hover:bg-blue-600 transition-all font-black"
                         >
-                          <span className="text-[10px] font-black text-slate-800 uppercase group-hover:text-blue-700 truncate mr-1">{p.name}</span>
-                          <Play size={12} className="text-blue-200 group-hover:text-blue-500" fill="currentColor" />
+                          <span className="text-[10px] uppercase italic tracking-tight">{p.name}</span>
+                          <Play size={14} className="text-slate-600 group-hover/btn:text-white" fill="currentColor" />
                         </button>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded border border-blue-100">
-                      <div className="space-y-0.5">
-                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest leading-none">Produit Actuel</p>
-                        <h1 className="text-[10px] font-black text-blue-900 uppercase tracking-tight italic leading-none truncate max-w-[120px]">{activeProgramme.name}</h1>
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-end">
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Programme Actuel</p>
+                        <h4 className="text-xl font-black text-white italic tracking-tighter truncate max-w-[200px]">{activeProgramme.name}</h4>
                       </div>
                       <div className="text-right">
-                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">Palettes</p>
-                        <p className="text-sm font-black text-blue-600 font-mono italic leading-none">{activeProgramme.producedPallets || 0}</p>
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Palettes</p>
+                        <p className="text-3xl font-black text-white font-mono">{activeProgramme.producedPallets || 0}</p>
                       </div>
                     </div>
-                    
-                    {activeLine?.status !== 'RUNNING' && (
-                      <button 
-                        onClick={() => handleSelectProgramme('')} 
-                        className="w-full mt-1 py-1 text-slate-300 hover:text-blue-500 font-black uppercase text-[7px] tracking-widest transition-all"
-                      >
-                        {t('error_change_prog')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
 
-              {/* SAISIE CARD */}
-              {activeProgramme && (
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 sm:p-3 flex flex-col gap-2 border-l-4 border-purple-500">
-                  <div className="flex items-center gap-2 border-b border-slate-50 pb-1">
-                    <Monitor size={14} className="text-purple-500" />
-                    <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saisie Production</h2>
-                  </div>
-
-                  <div className="flex-1 flex flex-col justify-center gap-2 py-1">
-                    {/* MANUAL ENTRY & STOP PRODUCTION MERGED */}
                     {(activeLine?.status === 'RUNNING' || activeLine?.status === 'STOPPED') && (
-                      <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-3 animate-in zoom-in-95 duration-300">
-                        <div className="space-y-1">
-                          <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest text-center">{t('register_production')}</p>
+                      <div className="space-y-4 pt-4 border-t border-white/5">
+                        <div className="flex items-center gap-4">
                           <input 
                             type="number"
-                            className="w-full bg-white border-2 border-purple-100 rounded-lg px-2 py-2 text-xl font-black text-purple-900 text-center font-mono outline-none focus:border-purple-500 transition-all shadow-inner"
+                            className="flex-1 bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-2xl font-black text-white text-center font-mono outline-none focus:border-blue-500 transition-all shadow-inner"
                             value={palletInput}
                             onChange={e => setPalletInput(e.target.value)}
                             placeholder="0"
                           />
+                          <button 
+                            onClick={handleAddPallets}
+                            className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+                          >
+                            <Plus size={24} />
+                          </button>
                         </div>
-                        
                         <button 
                           onClick={() => setShowStopConfirmation(true)}
-                          className="w-full py-3 bg-slate-800 hover:bg-black text-white rounded-lg font-black text-xs uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                          className="w-full py-5 bg-slate-800 text-slate-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all group"
                         >
-                          <Square size={16} fill="currentColor" /> {t('stop_prod')}
+                          <Square size={16} fill="currentColor" className="inline-block mr-2" /> {t('stop_prod')}
                         </button>
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                      {activeLine?.status === 'IDLE' ? (
-                        <div className="flex flex-col gap-2 px-1">
-                          {isPostProduction && (
-                            <div className="flex flex-col items-center gap-0.5 animate-in fade-in slide-in-from-top-1 duration-300">
-                              <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">{t('register_production')}</p>
-                              <div className="flex items-center gap-1.5 w-full max-w-[110px]">
-                                <button 
-                                  onClick={() => setPalletInput((parseInt(palletInput) - 1).toString())}
-                                  className="w-6 h-6 bg-slate-50 hover:bg-slate-100 rounded flex items-center justify-center text-slate-400 transition-all border"
-                                >
-                                  <Minus size={10} />
-                                </button>
-                                <input 
-                                  type="number"
-                                  className="flex-1 bg-white border-b border-slate-100 p-0 text-[10px] font-black text-slate-900 text-center font-mono outline-none focus:border-purple-500 transition-all leading-none"
-                                  value={palletInput}
-                                  onChange={e => setPalletInput(e.target.value)}
-                                />
-                                <button 
-                                  onClick={() => setPalletInput((parseInt(palletInput) + 1).toString())}
-                                  className="w-6 h-6 bg-slate-50 hover:bg-slate-100 rounded flex items-center justify-center text-purple-600 transition-all border"
-                                >
-                                  <Plus size={10} />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          <button 
-                            onClick={handleStartProduction}
-                            disabled={!activeProgramme}
-                            className={cn(
-                              "w-full py-2.5 rounded-lg font-black text-[11px] shadow active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest",
-                              !activeProgramme 
-                                ? "bg-slate-100 text-slate-300 cursor-not-allowed" 
-                                : "bg-green-600 hover:bg-green-700 text-white"
-                            )}
-                          >
-                            <Play size={14} fill="currentColor" /> {t('start_prod')}
-                          </button>
-                          
-                          {isPostProduction && (
-                            <button 
-                              onClick={() => handleAddPallets()}
-                              className="text-purple-600 font-black text-[8px] uppercase tracking-widest text-center hover:opacity-70 transition-opacity animate-in fade-in slide-in-from-bottom-1 duration-300"
-                            >
-                              {t('finish_mission')}
-                            </button>
-                          )}
-                        </div>
-                      ) : activeLine?.status === 'STOPPED' && (
-                        <div className="flex flex-col items-center gap-1 opacity-80 mt-1">
-                           <p className="text-[7px] font-black text-orange-400 uppercase tracking-widest italic">{t('stop_prod_caution')}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* MY STOPS HISTORY */}
-          <div className="mt-4 bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-             <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-               <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-                  <History size={16} className="text-blue-500" /> Mon Historique d'Arrêts
-               </h3>
-               <span className="text-[8px] font-bold text-slate-400 uppercase italic">Aujourd'hui</span>
-             </div>
-             <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto">
-                {downtimeLogs
-                  .filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime)))
-                  .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-                  .map(log => {
-                    const type = downtimeTypes.find(t => t.id === log.typeId);
-                    return (
-                      <div key={log.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-lg">
-                            {type?.icon || '⚠️'}
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-slate-800 uppercase leading-none mb-1">
-                              {type?.name || 'Inconnu'}
-                            </p>
-                            <p className="text-[8px] font-mono font-bold text-slate-400 leading-none">
-                              {format(parseISO(log.startTime), 'HH:mm')} - {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '--:--'}
-                              <span className="ml-2 text-blue-500">
-                                {log.duration ? formatDowntimeDisplay(log.duration) : 'En cours'}
-                              </span>
-                            </p>
-                            {log.description && (
-                              <p className="text-[8px] italic text-slate-400 mt-1 max-w-[150px] truncate">{log.description}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => handleEditStopRequest(log)}
-                            className="p-1.5 hover:bg-blue-50 rounded text-blue-500 transition-colors"
-                          >
-                            <Settings size={14} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteStop(log.id)}
-                            className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                    {activeLine?.status === 'IDLE' && (
+                      <div className="space-y-3">
+                         <button 
+                          onClick={handleStartProduction}
+                          className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-600/20 active:scale-95 transition-all"
+                        >
+                          <Play size={20} fill="currentColor" className="inline-block mr-2" /> Démarrer Production
+                        </button>
+                        <button 
+                          onClick={() => handleSelectProgramme('')}
+                          className="w-full text-center text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
+                        >
+                          Changer de Programme
+                        </button>
                       </div>
-                    );
-                  })}
-                {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
-                  <div className="p-8 text-center bg-slate-50/50">
-                    <p className="text-[9px] font-black uppercase text-slate-300 italic tracking-[0.2em]">Aucun arrêt enregistré aujourd'hui</p>
+                    )}
                   </div>
                 )}
-             </div>
+              </div>
+
+              {/* HISTORY SECTION */}
+              <div className="bg-slate-900 rounded-[2.5rem] p-6 border border-white/5 shadow-2xl relative overflow-hidden">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center gap-2">
+                    <History size={16} className="text-blue-500" />
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Historique d'Arrêts</h3>
+                  </div>
+                  <button 
+                    onClick={() => setShowManualStopModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-blue-600/10 text-blue-500 rounded-full border border-blue-500/20 hover:bg-blue-600 hover:text-white transition-all"
+                  >
+                    <Plus size={10} />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Saisie Manuelle</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-hide pr-1">
+                  {downtimeLogs
+                    .filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime)))
+                    .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+                    .map(log => {
+                      const type = downtimeTypes.find(t => t.id === log.typeId);
+                      return (
+                        <div key={log.id} className="group relative bg-black/20 rounded-3xl p-4 border border-white/5 hover:border-blue-500/50 transition-all flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform">
+                              {type?.icon || '⚠️'}
+                            </div>
+                            <div>
+                               <p className="text-[10px] font-black text-white uppercase tracking-tighter italic leading-none mb-1">
+                                 {type?.name || 'Inconnu'}
+                               </p>
+                               <div className="flex items-center gap-2">
+                                 <Clock size={10} className="text-slate-500" />
+                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                   {format(parseISO(log.startTime), 'HH:mm')} - {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '--:--'}
+                                   <span className="ml-2 text-blue-500/80">
+                                     {log.duration ? formatDowntimeDisplay(log.duration) : 'En cours'}
+                                   </span>
+                                 </p>
+                               </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => handleEditStopRequest(log)}
+                              className="p-2 text-slate-500 hover:text-blue-500 hover:bg-blue-500/10 rounded-xl transition-all"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteStop(log.id)}
+                              className="p-2 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
+                    <div className="py-12 text-center">
+                       <Activity size={24} className="mx-auto text-slate-800 mb-2 opacity-20" />
+                       <p className="text-[9px] font-black uppercase text-slate-700 tracking-[0.2em] italic">Aucune donnée</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
-      {/* FOOTER ALERT */}
-      {(activeLine?.status === 'STOPPED' || (timer > 15 * 60)) && (
-        <div className="bg-red-600 text-white flex items-center justify-center py-1 gap-2 shrink-0">
-          <AlertCircle size={14} className="animate-pulse" />
-          <span className="font-bold tracking-tight uppercase text-[9px]">
-            {timer > 15 * 60 
-              ? `Alerte : Durée Arrêt > 15m (${formatDuration(timer)})` 
-              : t('stopped')}
-          </span>
-        </div>
-      )}
-
-      {/* FOOTER STATUS BAR */}
-      <footer className={cn(
-        "shrink-0 h-10 sm:h-12 flex items-center px-4 transition-all duration-300 border-t",
-        activeLine?.status === 'RUNNING' && !activeDowntime ? "bg-green-600 text-white" : 
-        activeLine?.status === 'STOPPED' || activeDowntime ? "bg-red-600 text-white" : "bg-slate-900 text-white"
-      )}>
-        <div className="max-w-4xl mx-auto w-full flex items-center justify-between">
-           <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                 <div className={cn(
-                   "w-2 h-2 rounded-full",
-                   activeLine?.status === 'RUNNING' ? "bg-green-300 animate-pulse" : "bg-white"
-                 )} />
+      {/* FLOATING STATUS BAR */}
+      <AnimatePresence>
+        {selectedLineId && (
+          <motion.footer 
+            initial={{ y: 100 }}
+            animate={{ y: 0 }}
+            className="fixed bottom-0 inset-x-0 bg-black/80 backdrop-blur-2xl border-t border-white/5 px-6 py-4 z-40"
+          >
+            <div className="max-w-xl mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "w-3 h-3 rounded-full animate-pulse",
+                  activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]" : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.5)]"
+                )} />
+                <div className="leading-none">
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Status Ligne</p>
+                  <p className="text-xs font-black text-white uppercase italic tracking-tighter">
+                    {activeLine?.status === 'RUNNING' ? 'Production Active' : 'Arrêt Détecté'}
+                  </p>
+                </div>
               </div>
-              <p className="font-black text-[10px] sm:text-sm uppercase italic tracking-tight">
-                {activeLine?.status === 'RUNNING' && !activeDowntime ? t('active_prod_label') : 
-                 activeLine?.status === 'STOPPED' || activeDowntime ? t('stopped') : t('waiting_label')}
-              </p>
-           </div>
-           
-           <div className="flex items-center gap-4 text-[9px] sm:text-[11px]">
-              <div className="text-right">
-                 <p className="font-black leading-none">{activeLine?.name || '---'}</p>
+              
+              <div className="flex gap-4">
+                 <div className="text-right leading-none">
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Performance</p>
+                    <p className="text-xs font-black text-white italic">94% <span className="text-[8px] text-emerald-500 font-bold ml-1">OEE</span></p>
+                 </div>
               </div>
-              <div className="w-px h-4 bg-white/10" />
-              <div className="text-right">
-                 <p className="font-black leading-none uppercase">{user?.name}</p>
-              </div>
-           </div>
-        </div>
-      </footer>
+            </div>
+          </motion.footer>
+        )}
+      </AnimatePresence>
 
       {/* ADMIN NAV ACCESS */}
       <div className="hidden sm:flex absolute bottom-4 right-4">
@@ -1081,132 +1078,135 @@ export default function OperatorScreen() {
       </div>
 
       {/* MANUAL STOP MODAL */}
-      {showManualStopModal && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2">
-          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-300">
-            <div className="bg-slate-900 px-4 py-2 text-white flex justify-between items-center shrink-0">
-               <h3 className="text-[10px] font-black uppercase tracking-widest italic">{editingLogId ? 'Modifier l\'arrêt' : t('add_manual_stop')}</h3>
-               <button onClick={() => {
-                 setShowManualStopModal(false);
-                 setEditingLogId(null);
-               }} className="hover:text-red-400">
-                 <X size={16} />
-               </button>
-            </div>
+      <AnimatePresence>
+        {showManualStopModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-slate-950 rounded-[3rem] w-full max-w-md shadow-3xl overflow-hidden border border-white/10"
+            >
+              <div className="bg-slate-900 px-8 py-6 border-b border-white/5 flex justify-between items-center">
+                 <h3 className="text-sm font-black uppercase tracking-widest italic">{editingLogId ? 'Modifier l\'arrêt' : t('add_manual_stop')}</h3>
+                 <button onClick={() => {
+                   setShowManualStopModal(false);
+                   setEditingLogId(null);
+                 }} className="text-slate-500 hover:text-white transition-colors">
+                   <X size={20} />
+                 </button>
+              </div>
 
-            <div className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('start_time')}</label>
-                  <input 
-                    type="datetime-local"
-                    className="w-full p-2 bg-slate-50 border rounded text-[10px] font-black text-slate-900 outline-none focus:border-blue-500"
-                    value={manualStopForm.startTime}
-                    onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
-                  />
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('start_time')}</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500"
+                      value={manualStopForm.startTime}
+                      onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('end_time')}</label>
+                    <input 
+                      type="datetime-local"
+                      className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500"
+                      value={manualStopForm.endTime}
+                      onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('end_time')}</label>
-                  <input 
-                    type="datetime-local"
-                    className="w-full p-2 bg-slate-50 border rounded text-[10px] font-black text-slate-900 outline-none focus:border-blue-500"
-                    value={manualStopForm.endTime}
-                    onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
-                  />
+
+                <div className="bg-blue-600/10 p-4 rounded-2xl border border-blue-500/20 flex items-center justify-between">
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{t('total_duration')}</p>
+                  <p className="text-xl font-black text-white font-mono">{calculateManualDuration()}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('reason')}</label>
+                  <select 
+                    className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500 appearance-none"
+                    value={manualStopForm.typeId}
+                    onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
+                  >
+                    <option value="">{t('select_reason')}...</option>
+                    {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => {
+                      if (!manualStopForm.typeId || !manualStopForm.startTime || !manualStopForm.endTime) {
+                        return alert(t('missing_fields'));
+                      }
+                      handleManualStop(manualStopForm);
+                    }}
+                    className="flex-1 bg-blue-600 text-white font-black uppercase py-4 rounded-2xl text-xs shadow-xl active:scale-95 transition-all tracking-widest hover:bg-blue-500"
+                  >
+                    {editingLogId ? 'Enregistrer' : t('validate')}
+                  </button>
                 </div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-              <div className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center justify-between">
-                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">{t('total_duration')}</p>
-                <p className="text-xs font-black text-blue-900 font-mono italic">{calculateManualDuration()}</p>
-              </div>
+      {/* STOP PROD CONFIRMATION */}
+      <AnimatePresence>
+        {showStopConfirmation && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="bg-slate-950 rounded-[3rem] w-full max-w-sm shadow-3xl overflow-hidden border border-white/10"
+            >
+              <div className="p-10 text-center space-y-8">
+                <div className="w-24 h-24 bg-rose-600/10 rounded-full flex items-center justify-center mx-auto text-rose-500 border border-rose-500/20">
+                  <AlertCircle size={48} />
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Arrêter Production ?</h3>
+                  <p className="text-slate-500 font-bold text-sm leading-relaxed">
+                    Cette action va clôturer la session de production actuelle.
+                  </p>
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('reason')}</label>
-                <select 
-                  className="w-full p-2 bg-slate-50 border rounded text-[10px] font-black text-slate-900 outline-none focus:border-blue-500"
-                  value={manualStopForm.typeId}
-                  onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
-                >
-                  <option value="">{t('select_reason')}...</option>
-                  {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={() => {
+                      handleStopProduction();
+                      setShowStopConfirmation(false);
+                    }}
+                    className="w-full bg-rose-600 hover:bg-rose-500 text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                  >
+                    Confirmer l'arrêt
+                  </button>
+                  <button 
+                    onClick={() => setShowStopConfirmation(false)}
+                    className="w-full py-4 text-slate-500 font-black uppercase text-xs tracking-widest hover:text-white transition-colors"
+                  >
+                    Annuler
+                  </button>
+                </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{t('comments')}</label>
-                <textarea 
-                  className="w-full p-2 bg-slate-50 border rounded text-[10px] font-bold text-slate-900 outline-none focus:border-blue-500"
-                  placeholder="..."
-                  rows={2}
-                  value={manualStopForm.description}
-                  onChange={e => setManualStopForm({...manualStopForm, description: e.target.value})}
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button 
-                  onClick={() => {
-                    setShowManualStopModal(false);
-                    setEditingLogId(null);
-                  }}
-                  className="flex-1 py-2 font-black uppercase text-[10px] text-slate-400 hover:bg-slate-50 rounded tracking-widest"
-                >
-                  {t('cancel')}
-                </button>
-                <button 
-                  onClick={() => {
-                    if (!manualStopForm.typeId || !manualStopForm.startTime || !manualStopForm.endTime) {
-                      return alert(t('missing_fields'));
-                    }
-                    handleManualStop(manualStopForm);
-                  }}
-                  className="flex-[2] bg-blue-600 text-white font-black uppercase py-2 rounded text-[10px] shadow active:scale-95 transition-all tracking-widest hover:bg-blue-700"
-                >
-                  {editingLogId ? 'Enregistrer' : t('validate')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* STOP PRODUCTION CONFIRMATION MODAL */}
-      {showStopConfirmation && (
-        <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 text-center space-y-6">
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-600">
-                <AlertCircle size={40} />
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Arrêter la production ?</h3>
-                <p className="text-gray-500 font-bold text-sm leading-relaxed px-4">
-                  Êtes-vous sûr de vouloir arrêter la ligne ? Cette action sera enregistrée dans l'historique.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3 pt-4">
-                <button 
-                  onClick={() => {
-                    handleStopProduction();
-                    setShowStopConfirmation(false);
-                  }}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <Square size={16} fill="currentColor" /> Confirmer l'arrêt
-                </button>
-                <button 
-                  onClick={() => setShowStopConfirmation(false)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-[0.98] transition-all"
-                >
-                  Annuler
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
