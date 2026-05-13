@@ -605,7 +605,7 @@ export default function OperatorScreen() {
   return (
     <div className="min-h-screen bg-[#0a0c10] text-slate-100 font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden">
       <header className="sticky top-0 z-50 bg-[#0a0c10]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 shrink-0">
-        <div className="max-w-xl mx-auto flex justify-between items-center">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Factory size={22} className="text-white" />
@@ -618,24 +618,24 @@ export default function OperatorScreen() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end leading-none">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{user?.name}</span>
-              <span className="text-[8px] font-bold text-blue-500/80 uppercase tracking-widest">{activeLine?.name}</span>
+            <div className="flex flex-col items-end leading-none mr-2">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{user?.name}</span>
+              <span className="text-[8px] font-bold text-blue-500/80 uppercase tracking-widest leading-none mt-1">{activeLine?.name}</span>
             </div>
             <button 
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
+              className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 hover:bg-red-500 hover:text-white"
             >
-              <Settings size={20} />
+              {t('logout')}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-2 space-y-3 pb-16">
+      <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-4 pb-20">
         {!selectedLineId ? (
-          <div className="grid grid-cols-1 gap-2.5 py-4 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-[8px] font-black text-slate-500 uppercase tracking-[0.15em] text-center mb-0.5">{t('select_line')}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 py-4 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="col-span-full text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-center mb-1">{t('select_line')}</h2>
             {lines.filter(l => l.isActive !== false).map((line) => (
               <button
                 key={line.id}
@@ -660,445 +660,446 @@ export default function OperatorScreen() {
             ))}
           </div>
         ) : (
-          <div className="space-y-3 max-w-xl mx-auto animate-in fade-in duration-500">
-            <button 
-              onClick={handleGoBackFromLine}
-              className="flex items-center gap-1 text-slate-500 hover:text-white transition-colors group px-1"
-            >
-              <ArrowLeft size={12} className="group-hover:-translate-x-0.5 transition-transform" />
-              <span className="text-[7px] font-black uppercase tracking-[0.12em] italic">{t('back_to_selection')}</span>
-            </button>
-
-            {/* MAIN STATUS CARD */}
-            <div className={cn(
-              "relative overflow-hidden p-4 rounded-[1.5rem] border transition-all duration-700 shadow-lg",
-              activeLine?.status === 'RUNNING' 
-                ? "bg-emerald-500/5 border-emerald-500/10 shadow-emerald-500/5" 
-                : "bg-rose-500/5 border-rose-500/10 shadow-rose-500/5"
-            )}>
-              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+          <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
+            <div className="flex items-center justify-between mb-4">
+              <button 
+                onClick={handleGoBackFromLine}
+                className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors group px-1"
+              >
+                <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+                <span className="text-[8px] font-black uppercase tracking-[0.15em] italic">{t('back_to_selection')}</span>
+              </button>
               
-              <div className="flex flex-col items-center text-center relative z-10">
-                <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center mb-3 shadow-lg transform transition-transform duration-500 hover:scale-105 active:scale-95",
-                  activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-emerald-500/20" : "bg-rose-500 shadow-rose-500/20"
-                )}>
-                  {activeLine?.status === 'RUNNING' ? <Activity size={24} className="text-white" /> : <AlertCircle size={24} className="text-white" />}
-                </div>
-
-                <h2 className="text-2xl font-black text-white italic tracking-tighter mb-1 leading-none uppercase">
-                  {activeLine?.name}
-                </h2>
-                
-                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-black/30 rounded-full border border-white/5 backdrop-blur-md mb-4">
-                  <span className={cn(
-                    "w-1 h-1 rounded-full",
-                    activeLine?.status === 'RUNNING' ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-                  )} />
-                  <span className={cn(
-                    "text-[7px] font-black uppercase tracking-[0.12em]",
-                    activeLine?.status === 'RUNNING' ? "text-emerald-400" : "text-rose-400"
-                  )}>
-                    {activeLine?.status === 'RUNNING' ? 'Machine Operationnelle' : 'Ligne à l\'Arrêt'}
-                  </span>
-                </div>
-
-                {activeDowntime ? (
-                  <div className="space-y-3 w-full">
-                    <div className="bg-black/40 rounded-xl p-4 border border-white/5 backdrop-blur-3xl shadow-inner group">
-                      <div className="flex items-center justify-center gap-1.5 text-rose-500 mb-1.5">
-                        <Timer size={16} className="animate-pulse" />
-                        <span className="text-[8px] font-black uppercase tracking-[0.12em] opacity-60">Durée d'Arrêt</span>
-                      </div>
-                      <p className="text-3xl font-black tracking-tighter tabular-nums text-white group-hover:scale-105 transition-transform duration-500">
-                        {formatDowntimeDisplay(timer)}
-                      </p>
-                      {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
-                        <div className="mt-2">
-                          <span className="px-3 py-0.5 bg-white/5 border border-white/5 rounded-full text-[7px] font-black text-slate-400 uppercase tracking-widest inline-flex items-center gap-1.5">
-                             {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={handleStopDowntime}
-                      className="w-full py-3 bg-white text-black rounded-xl font-black text-[10px] uppercase tracking-[0.12em] shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-emerald-50"
-                    >
-                      <Play size={16} fill="currentColor" /> Relancer la Ligne
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full flex flex-col gap-2">
-                    <button
-                      onClick={handleStartDowntime}
-                      disabled={isInitialSelection}
-                      className="w-full py-3 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.12em] shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-rose-500 disabled:opacity-50"
-                    >
-                      <Square size={16} fill="currentColor" /> Démarrer l'arrêt
-                    </button>
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">{activeLine?.name}</span>
               </div>
             </div>
 
-            {/* ACTION SECTION: Slider or Production */}
-            <AnimatePresence mode="wait">
-              {(isInitialSelection || categorizingLogId) && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  transition={{ type: "spring", damping: 20, stiffness: 120 }}
-                  className="bg-slate-900 rounded-[1.5rem] p-4 border border-white/5 shadow-xl"
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center gap-1.5">
-                       <div className="w-1 h-5 bg-blue-600 rounded-full" />
-                       <div>
-                         <h3 className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-500 leading-none mb-0.5">
-                           {isInitialSelection ? 'Initialisation' : 'Qualification'}
-                         </h3>
-                         <p className="text-sm font-black text-white italic tracking-tighter uppercase leading-none">
-                            {isInitialSelection ? 'Type d\'arrêt' : 'Cause détectée'}
-                         </p>
-                       </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* LEFT COLUMN: MAIN STATUS & QUALIFICATION */}
+              <div className="lg:col-span-7 space-y-6">
+                {/* MAIN STATUS CARD */}
+                <div className={cn(
+                  "relative overflow-hidden p-6 sm:p-8 rounded-[2rem] border transition-all duration-700 shadow-xl",
+                  activeLine?.status === 'RUNNING' 
+                    ? "bg-emerald-500/5 border-emerald-500/10 shadow-emerald-500/5" 
+                    : "bg-rose-500/5 border-rose-500/10 shadow-rose-500/5"
+                )}>
+                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                  
+                  <div className="flex flex-col items-center text-center relative z-10">
+                    <div className={cn(
+                      "w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-xl transform transition-transform duration-500 hover:scale-105 active:scale-95",
+                      activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-emerald-500/20" : "bg-rose-500 shadow-rose-500/20"
+                    )}>
+                      {activeLine?.status === 'RUNNING' ? <Activity size={28} className="text-white" /> : <AlertCircle size={28} className="text-white" />}
                     </div>
-                    {isInitialSelection && (
-                      <button 
-                        onClick={() => setIsInitialSelection(false)}
-                        className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all active:scale-90"
-                      >
-                        <X size={16} />
-                      </button>
+
+                    <h2 className="text-3xl font-black text-white italic tracking-tighter mb-1.5 leading-none uppercase">
+                      {activeLine?.name}
+                    </h2>
+                    
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-black/30 rounded-full border border-white/5 backdrop-blur-md mb-6">
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full",
+                        activeLine?.status === 'RUNNING' ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                      )} />
+                      <span className={cn(
+                        "text-[8px] font-black uppercase tracking-[0.15em]",
+                        activeLine?.status === 'RUNNING' ? "text-emerald-400" : "text-rose-400"
+                      )}>
+                        {activeLine?.status === 'RUNNING' ? 'Machine Operationnelle' : 'Ligne à l\'Arrêt'}
+                      </span>
+                    </div>
+
+                    {activeDowntime ? (
+                      <div className="space-y-4 w-full max-w-md mx-auto">
+                        <div className="bg-black/40 rounded-2xl p-5 border border-white/5 backdrop-blur-3xl shadow-inner group">
+                          <div className="flex items-center justify-center gap-2 text-rose-500 mb-2">
+                            <Timer size={18} className="animate-pulse" />
+                            <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-60">Durée d'Arrêt</span>
+                          </div>
+                          <p className="text-4xl font-black tracking-tighter tabular-nums text-white group-hover:scale-105 transition-transform duration-500">
+                            {formatDowntimeDisplay(timer)}
+                          </p>
+                          {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
+                            <div className="mt-3">
+                              <span className="px-5 py-1.5 bg-white/5 border border-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest inline-flex items-center gap-2">
+                                 {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleStopDowntime}
+                          className="w-full py-4 bg-white text-black rounded-xl font-black text-xs uppercase tracking-[0.15em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2.5 hover:bg-emerald-50"
+                        >
+                          <Play size={18} fill="currentColor" /> Relancer la Ligne
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-full flex flex-col gap-2.5 max-w-md mx-auto">
+                        <button
+                          onClick={handleStartDowntime}
+                          disabled={isInitialSelection}
+                          className="w-full py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-[0.15em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2.5 hover:bg-rose-500 disabled:opacity-50"
+                        >
+                          <Square size={18} fill="currentColor" /> Démarrer l'arrêt
+                        </button>
+                      </div>
                     )}
                   </div>
-
-                  {!selectedStopType ? (
-                    <div className="relative group">
-                      <div 
-                        ref={scrollRef}
-                        className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide snap-x snap-mandatory px-1 items-center"
-                      >
-                        {downtimeTypes.map((type) => (
-                          <button
-                            key={type.id}
-                            onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
-                            className="flex-shrink-0 w-[35%] sm:w-[25%] aspect-[4/3] bg-slate-800/40 rounded-lg border border-white/5 flex flex-col items-center justify-center gap-1 transition-all hover:bg-blue-600 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-md"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-slate-900/50 flex items-center justify-center text-lg group-hover:bg-white/20 transition-all shadow-inner">
-                              {type.icon || '⚠️'}
-                            </div>
-                            <span className="text-[7px] font-black uppercase tracking-wider text-center px-1 leading-tight text-slate-400 group-hover:text-white">
-                              {type.name}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                      
-                      <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-slate-900 to-transparent pointer-events-none z-10" />
-                      <div className="absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-slate-900 to-transparent pointer-events-none z-10" />
-                      
-                      <button 
-                        onClick={() => scroll('left')}
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-lg z-20 hover:bg-blue-600 transition-colors"
-                      >
-                        <ChevronLeft size={12} />
-                      </button>
-                      <button 
-                        onClick={() => scroll('right')}
-                        className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-lg z-20 hover:bg-blue-600 transition-colors"
-                      >
-                        <ChevronRight size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <motion.div 
-                      initial={{ opacity: 0, x: 15 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="space-y-2.5"
-                    >
-                      <div className="flex items-center gap-1.5 bg-white/5 p-2 rounded-lg border border-white/5">
-                        <div className="text-lg">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
-                        <div>
-                           <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest">Type sélectionné</p>
-                           <p className="text-[9px] font-black text-white uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
-                        </div>
-                      </div>
-
-                      {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('AUTRE') ? (
-                        <div className="space-y-2.5">
-                          <textarea 
-                            className="w-full p-3 bg-slate-800/50 border border-white/5 rounded-xl text-[10px] font-bold text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600"
-                            placeholder="Décrivez la raison..."
-                            value={downtimeDescription}
-                            onChange={e => setDowntimeDescription(e.target.value)}
-                            rows={2}
-                          />
-                          <button 
-                            onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
-                            disabled={!downtimeDescription.trim()}
-                            className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md active:scale-95 transition-all disabled:opacity-50"
-                          >
-                            Confirmer
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="grid gap-1">
-                           <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest px-1">Choisir le programme cible</p>
-                           {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
-                            <button 
-                              key={p.id}
-                              onClick={() => {
-                                setSelectedProgrammeForChange(p.id);
-                                setTimeout(() => {
-                                  if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
-                                  else handleCategorizeStop(selectedStopType!);
-                                }, 0);
-                              }}
-                              className="p-2.5 bg-slate-800/50 hover:bg-blue-600 border border-white/5 rounded-lg font-black text-[8px] text-white transition-all flex items-center justify-between group"
-                            >
-                              <span className="uppercase italic tracking-tight">{p.name}</span>
-                              <Plus size={10} className="text-slate-500 group-hover:text-white" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      
-                      <button 
-                         onClick={() => {
-                           setSelectedStopType(null);
-                           setSelectedProgrammeForChange(null);
-                         }}
-                         className="w-full py-1.5 text-[8px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
-                      >
-                         ← Retour aux catégories
-                      </button>
-                    </motion.div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* PRODUCTION CONTROLS */}
-            <div className="grid grid-cols-1 gap-3">
-              <div className={cn(
-                "bg-slate-900 rounded-[1.5rem] p-4 border border-white/5 shadow-lg relative overflow-hidden group transition-all duration-500",
-                flashFeedback ? "ring-2 ring-emerald-500" : ""
-              )}>
-                <div className="absolute top-0 right-0 w-20 h-20 bg-purple-600/5 blur-[40px]" />
-                
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-7 h-7 bg-purple-600/10 rounded-lg flex items-center justify-center border border-purple-500/20">
-                      <Package size={14} className="text-purple-500" />
-                    </div>
-                    <h3 className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-500">Missions & Saisie</h3>
-                  </div>
-                  {activeLine?.status === 'RUNNING' && (
-                    <motion.div 
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20"
-                    >
-                      <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-[7px] font-black text-emerald-400 uppercase tracking-widest leading-none">Actif</span>
-                    </motion.div>
-                  )}
                 </div>
 
-                {!activeProgramme ? (
-                  <div className="text-center py-5 bg-black/20 rounded-xl border border-dashed border-white/5">
-                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.15em]">{t('no_programme')}</p>
-                    <div className="grid grid-cols-1 gap-1.5 mt-3 px-2.5">
-                      {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => handleSelectProgramme(p.id)}
-                          className="w-full p-3 bg-slate-800 rounded-lg border border-white/5 text-left flex justify-between items-center group/btn hover:bg-blue-600 transition-all font-black active:scale-95"
-                        >
-                          <span className="text-[9px] uppercase italic tracking-tight">{p.name}</span>
-                          <Play size={10} className="text-slate-600 group-hover/btn:text-white" fill="currentColor" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-end bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner">
-                      <div className="space-y-0.5">
-                        <p className="text-[7px] font-black text-slate-500 uppercase tracking-[0.15em]">Programme Actuel</p>
-                        <h4 className="text-base font-black text-white italic tracking-tighter truncate max-w-[140px] uppercase">{activeProgramme.name}</h4>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[7px] font-black text-slate-500 uppercase tracking-[0.15em] mb-0.5">Palettes</p>
-                        <div className="flex items-baseline justify-end gap-1">
-                          <p className="text-xl font-black text-white font-mono tracking-tighter tabular-nums">{activeProgramme.producedPallets || 0}</p>
-                          <span className="text-[7px] font-black text-slate-600 uppercase">Unit</span>
+                {/* QUALIFICATION SECTION */}
+                <AnimatePresence mode="wait">
+                  {(isInitialSelection || categorizingLogId) && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 30 }}
+                      transition={{ type: "spring", damping: 20, stiffness: 100 }}
+                      className="bg-slate-900 rounded-[2rem] p-6 border border-white/5 shadow-2xl"
+                    >
+                      <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-2">
+                           <div className="w-1.5 h-6 bg-blue-600 rounded-full" />
+                           <div>
+                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 leading-none mb-0.5">
+                               {isInitialSelection ? 'Initialisation' : 'Qualification'}
+                             </h3>
+                             <p className="text-base font-black text-white italic tracking-tighter uppercase leading-none">
+                                {isInitialSelection ? 'Type d\'arrêt' : 'Cause détectée'}
+                             </p>
+                           </div>
                         </div>
+                        {isInitialSelection && (
+                          <button 
+                            onClick={() => setIsInitialSelection(false)}
+                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+                          >
+                            <X size={20} />
+                          </button>
+                        )}
                       </div>
-                    </div>
 
-                    {(activeLine?.status === 'RUNNING' || activeLine?.status === 'STOPPED') && (
-                      <div className="space-y-4">
-                        <div className="flex flex-col gap-2.5">
-                          <div className="relative">
-                            <p className="text-[7px] font-black text-slate-500 uppercase tracking-[0.12em] px-3 mb-1.5">Saisie Rapide</p>
-                            <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-xl border border-white/5 shadow-inner">
-                              <input 
-                                type="number"
-                                className="flex-1 bg-transparent border-none text-2xl font-black text-white text-center font-mono outline-none"
-                                value={palletInput}
-                                onChange={e => setPalletInput(e.target.value)}
-                                placeholder="0"
-                              />
-                              <button 
-                                onClick={async () => {
-                                  const count = parseInt(palletInput);
-                                  if(isNaN(count) || count <= 0 || !activeProgramme || !user) return;
-                                  await localApi.addDoc('production_logs', {
-                                    programmeId: activeProgramme.id,
-                                    operatorId: user.id,
-                                    machineId: activeLine?.machineId,
-                                    lineId: activeLine?.id,
-                                    shiftId: currentShiftId,
-                                    count,
-                                    timestamp: new Date().toISOString()
-                                  });
-                                  await localApi.updateDoc('programmes', activeProgramme.id, {
-                                    producedPallets: (activeProgramme.producedPallets || 0) + count
-                                  });
-                                  setPalletInput('1');
-                                  setFlashFeedback(true);
-                                  setTimeout(() => setFlashFeedback(false), 500);
-                                }}
-                                className="w-14 h-14 bg-emerald-600 rounded-lg flex flex-col items-center justify-center text-white shadow-md active:scale-95 transition-all hover:bg-emerald-500"
-                              >
-                                <Plus size={20} />
-                                <span className="text-[6px] font-black uppercase mt-0.5">Ajouter</span>
-                              </button>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-2 px-1">
-                            {[1, 5, 12].map(val => (
+                      {!selectedStopType ? (
+                        <div className="relative group">
+                          <div 
+                            ref={scrollRef}
+                            className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory px-1 items-center"
+                          >
+                            {downtimeTypes.map((type) => (
                               <button
-                                key={val}
-                                onClick={() => setPalletInput(val.toString())}
-                                className={cn(
-                                  "py-2 rounded-lg border font-black text-[9px] transition-all active:scale-95",
-                                  palletInput === val.toString() 
-                                    ? "bg-blue-600 border-blue-500 text-white shadow-md font-black" 
-                                    : "bg-white/5 border-white/5 text-slate-500 hover:bg-white/10"
-                                )}
+                                key={type.id}
+                                onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
+                                className="flex-shrink-0 w-[40%] sm:w-[30%] lg:w-[22%] aspect-[4/3] bg-slate-800/40 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-2 transition-all hover:bg-blue-600 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-lg"
                               >
-                                {val} UNIT
+                                <div className="w-10 h-10 rounded-xl bg-slate-900/50 flex items-center justify-center text-xl group-hover:bg-white/20 transition-all shadow-inner">
+                                  {type.icon || '⚠️'}
+                                </div>
+                                <span className="text-[8px] font-black uppercase tracking-wider text-center px-2 leading-tight text-slate-400 group-hover:text-white">
+                                  {type.name}
+                                </span>
                               </button>
                             ))}
                           </div>
-
-                          <div className="pt-3 border-t border-white/5 space-y-2">
-                            <button 
-                              onClick={() => {
-                                if(window.confirm("Voulez-vous clôturer ce programme ?")) {
-                                  handleAddPallets(0);
-                                }
-                              }}
-                              className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-slate-500 rounded-lg font-black text-[7px] uppercase tracking-[0.12em] border border-white/5 transition-all flex items-center justify-center gap-1.5 italic"
-                            >
-                               Terminer Mission Programme
-                            </button>
-                            
-                            <button 
-                              onClick={() => setShowStopConfirmation(true)}
-                              className="w-full py-2.5 bg-slate-950 text-slate-600 rounded-lg font-black text-[7px] uppercase tracking-[0.12em] hover:bg-rose-600/10 hover:text-rose-500 border border-white/5 transition-all flex items-center justify-center gap-1.5"
-                            >
-                              Arrêter la Production
-                            </button>
-                          </div>
+                          
+                          <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-slate-900 to-transparent pointer-events-none z-10" />
+                          <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-slate-900 to-transparent pointer-events-none z-10" />
+                          
+                          <button 
+                            onClick={() => scroll('left')}
+                            className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <button 
+                            onClick={() => scroll('right')}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
                         </div>
-                      </div>
-                    )}
-
-                    {activeLine?.status === 'IDLE' && (
-                      <div className="space-y-2.5 pt-2.5 border-t border-white/5 text-center">
-                        <button 
-                          onClick={handleStartProduction}
-                          className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md active:scale-95 transition-all"
+                      ) : (
+                        <motion.div 
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="space-y-4"
                         >
-                          <Play size={16} fill="currentColor" className="inline-block mr-1.5" /> Démarrer Production
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-slate-900 rounded-[1.5rem] p-4 border border-white/5 shadow-lg relative overflow-hidden">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-1.5">
-                    <History size={12} className="text-blue-500" />
-                    <h3 className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">Activité Récente</h3>
-                  </div>
-                  <button 
-                    onClick={() => setShowManualStopModal(true)}
-                    className="flex items-center gap-1 px-2 py-1 bg-blue-600/10 text-blue-500 rounded-full border border-blue-500/20 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
-                  >
-                    <Plus size={10} />
-                    <span className="text-[7px] font-black uppercase tracking-widest">Manuel</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide pr-1">
-                  {downtimeLogs
-                    .filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime)))
-                    .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-                    .map(log => {
-                      const type = downtimeTypes.find(t => t.id === log.typeId);
-                      return (
-                        <div key={log.id} className="group relative bg-black/20 rounded-xl p-3.5 border border-white/5 hover:border-blue-500/30 transition-all flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-xl shadow-inner transition-transform group-hover:scale-105">
-                              {type?.icon || '⚠️'}
-                            </div>
+                          <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
+                            <div className="text-2xl">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
                             <div>
-                               <p className="text-[10px] font-black text-white uppercase tracking-tight italic leading-none mb-1">
-                                 {type?.name || 'Inconnu'}
-                               </p>
-                               <div className="flex items-center gap-1.5">
-                                 <Clock size={9} className="text-slate-600" />
-                                 <p className="text-[8px] font-mono font-bold text-slate-500 uppercase tracking-widest">
-                                   {format(parseISO(log.startTime), 'HH:mm')} - {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '--:--'}
-                                   <span className="ml-2 text-blue-500/80">
-                                     {log.duration ? formatDowntimeDisplay(log.duration) : 'En cours'}
-                                   </span>
-                                 </p>
+                               <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Type sélectionné</p>
+                               <p className="text-xs font-black text-white uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
+                            </div>
+                          </div>
+
+                          {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('AUTRE') ? (
+                            <div className="space-y-4">
+                              <textarea 
+                                className="w-full p-5 bg-slate-800/50 border border-white/5 rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                                placeholder="Décrivez la raison..."
+                                value={downtimeDescription}
+                                onChange={e => setDowntimeDescription(e.target.value)}
+                                rows={3}
+                              />
+                              <button 
+                                onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
+                                disabled={!downtimeDescription.trim()}
+                                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-50"
+                              >
+                                Confirmer
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="grid gap-2">
+                               <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest px-2">Choisir le programme cible</p>
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                 {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                                  <button 
+                                    key={p.id}
+                                    onClick={() => {
+                                      setSelectedProgrammeForChange(p.id);
+                                      setTimeout(() => {
+                                        if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
+                                        else handleCategorizeStop(selectedStopType!);
+                                      }, 0);
+                                    }}
+                                    className="p-4 bg-slate-800/50 hover:bg-blue-600 border border-white/5 rounded-2xl font-black text-[10px] text-white transition-all flex items-center justify-between group"
+                                  >
+                                    <span className="uppercase italic tracking-tight">{p.name}</span>
+                                    <Plus size={14} className="text-slate-500 group-hover:text-white" />
+                                  </button>
+                                 ))}
                                </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => handleEditStopRequest(log)}
-                              className="p-1.5 text-slate-500 hover:text-blue-500 transition-all"
-                            >
-                              <Edit size={12} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteStop(log.id)}
-                              className="p-1.5 text-slate-500 hover:text-rose-500 transition-all"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                          )}
+                          
+                          <button 
+                             onClick={() => {
+                               setSelectedStopType(null);
+                               setSelectedProgrammeForChange(null);
+                             }}
+                             className="w-full py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
+                          >
+                             ← Retour aux catégories
+                          </button>
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* RIGHT COLUMN: PRODUCTION & HISTORY */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* PRODUCTION CONTROLS */}
+                <div className={cn(
+                  "bg-slate-900 rounded-[2rem] p-6 border border-white/5 shadow-xl relative overflow-hidden group transition-all duration-500",
+                  flashFeedback ? "ring-2 ring-emerald-500" : ""
+                )}>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-[80px]" />
+                  
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20">
+                        <Package size={16} className="text-purple-500" />
+                      </div>
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Missions & Saisie</h3>
+                    </div>
+                    {activeLine?.status === 'RUNNING' && (
+                      <motion.div 
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20"
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest leading-none">Actif</span>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {!activeProgramme ? (
+                    <div className="text-center py-6 bg-black/20 rounded-2xl border border-dashed border-white/5">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{t('no_programme')}</p>
+                      <div className="grid grid-cols-1 gap-2 mt-4 px-3">
+                        {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => handleSelectProgramme(p.id)}
+                            className="w-full p-4 bg-slate-800 rounded-xl border border-white/5 text-left flex justify-between items-center group/btn hover:bg-blue-600 transition-all font-black active:scale-95"
+                          >
+                            <span className="text-[10px] uppercase italic tracking-tight">{p.name}</span>
+                            <Play size={14} className="text-slate-600 group-hover/btn:text-white" fill="currentColor" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="flex justify-between items-end bg-black/30 p-6 rounded-[2rem] border border-white/5 shadow-inner">
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Programme Actuel</p>
+                          <h4 className="text-xl font-black text-white italic tracking-tighter truncate max-w-[180px] uppercase">{activeProgramme.name}</h4>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Palettes</p>
+                          <div className="flex items-baseline justify-end gap-1.5">
+                            <p className="text-3xl font-black text-white font-mono tracking-tighter tabular-nums">{activeProgramme.producedPallets || 0}</p>
+                            <span className="text-[9px] font-black text-slate-600 uppercase">Unit</span>
                           </div>
                         </div>
-                      );
-                    })}
-                  {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
-                    <div className="py-10 text-center bg-black/10 rounded-xl border border-dashed border-white/5">
-                       <Activity size={20} className="mx-auto text-slate-800 mb-1.5 opacity-20" />
-                       <p className="text-[9px] font-black uppercase text-slate-700 tracking-[0.15em] italic">Historique vide</p>
+                      </div>
+
+                      {(activeLine?.status === 'RUNNING' || activeLine?.status === 'STOPPED') && (
+                        <div className="space-y-6">
+                          <div className="flex flex-col gap-4">
+                            <div className="relative">
+                              <div className="flex justify-between items-center px-4 mb-3">
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Saisie Rapide</p>
+                                <button 
+                                  onClick={async () => {
+                                    const count = parseInt(palletInput);
+                                    if(isNaN(count) || count <= 0 || !activeProgramme || !user) return;
+                                    await localApi.addDoc('production_logs', {
+                                      programmeId: activeProgramme.id,
+                                      operatorId: user.id,
+                                      machineId: activeLine?.machineId,
+                                      lineId: activeLine?.id,
+                                      shiftId: currentShiftId,
+                                      count,
+                                      timestamp: new Date().toISOString()
+                                    });
+                                    await localApi.updateDoc('programmes', activeProgramme.id, {
+                                      producedPallets: (activeProgramme.producedPallets || 0) + count
+                                    });
+                                    setPalletInput('1');
+                                    setFlashFeedback(true);
+                                    setTimeout(() => setFlashFeedback(false), 500);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all active:scale-95"
+                                >
+                                  <Plus size={12} />
+                                  Ajouter
+                                </button>
+                              </div>
+                              <div className="flex items-center bg-black/40 p-2 rounded-2xl border border-white/5 shadow-inner">
+                                <input 
+                                  type="number"
+                                  className="flex-1 bg-transparent border-none text-3xl font-black text-white text-center font-mono outline-none"
+                                  value={palletInput}
+                                  onChange={e => setPalletInput(e.target.value)}
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+
+
+                            <div className="pt-6 border-t border-white/5 space-y-3">
+                              <button 
+                                onClick={() => {
+                                  if(window.confirm("Voulez-vous clôturer ce programme ?")) {
+                                    handleAddPallets(0);
+                                  }
+                                }}
+                                className="w-full py-4 bg-white/5 hover:bg-white/10 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-white/5 transition-all flex items-center justify-center gap-2 italic"
+                              >
+                                 Terminer Mission Programme
+                              </button>
+                              
+                              <button 
+                                onClick={() => setShowStopConfirmation(true)}
+                                className="w-full py-4 bg-slate-950 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-rose-600/10 hover:text-rose-500 border border-white/5 transition-all flex items-center justify-center gap-2"
+                              >
+                                Arrêter la Production
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {activeLine?.status === 'IDLE' && (
+                    <div className="space-y-4 pt-4 border-t border-white/5 text-center">
+                      <button 
+                        onClick={handleStartProduction}
+                        className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                      >
+                        <Play size={20} fill="currentColor" className="inline-block mr-2" /> Démarrer Production
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* ACTIVITY LOGS */}
+                <div className="bg-slate-900 rounded-[2rem] p-6 border border-white/5 shadow-xl relative overflow-hidden">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-2">
+                      <History size={16} className="text-blue-500" />
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Activité Récente</h3>
+                    </div>
+                    <button 
+                      onClick={() => setShowManualStopModal(true)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 text-blue-500 rounded-full border border-blue-500/20 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+                    >
+                      <Plus size={14} />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Manuel</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto scrollbar-hide pr-1">
+                    {downtimeLogs
+                      .filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime)))
+                      .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+                      .map(log => {
+                        const type = downtimeTypes.find(t => t.id === log.typeId);
+                        return (
+                          <div key={log.id} className="group relative bg-black/20 rounded-2xl p-4 border border-white/5 hover:border-blue-500/30 transition-all flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-2xl shadow-inner transition-transform group-hover:scale-105">
+                                {type?.icon || '⚠️'}
+                              </div>
+                              <div>
+                                 <p className="text-[11px] font-black text-white uppercase tracking-tight italic leading-none mb-1.5">
+                                   {type?.name || 'Inconnu'}
+                                 </p>
+                                 <div className="flex items-center gap-2">
+                                   <Clock size={10} className="text-slate-600" />
+                                   <p className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">
+                                     {format(parseISO(log.startTime), 'HH:mm')} - {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '--:--'}
+                                     <span className="ml-2 text-blue-500/80">
+                                       {log.duration ? formatDowntimeDisplay(log.duration) : 'En cours'}
+                                     </span>
+                                   </p>
+                                 </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => handleEditStopRequest(log)}
+                                className="p-2 text-slate-500 hover:text-blue-500 transition-all"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteStop(log.id)}
+                                className="p-2 text-slate-500 hover:text-rose-500 transition-all"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
+                      <div className="py-12 text-center bg-black/10 rounded-2xl border border-dashed border-white/5">
+                         <Activity size={24} className="mx-auto text-slate-800 mb-2 opacity-20" />
+                         <p className="text-[10px] font-black uppercase text-slate-700 tracking-[0.2em] italic">Historique vide</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1114,8 +1115,8 @@ export default function OperatorScreen() {
             animate={{ y: 0 }}
             className="fixed bottom-0 inset-x-0 bg-black/80 backdrop-blur-xl border-t border-white/5 px-4 py-2.5 z-40"
           >
-            <div className="max-w-xl mx-auto flex justify-between items-center">
-              <div className="flex items-center gap-2">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-3">
                 <div className={cn(
                   "w-2 h-2 rounded-full animate-pulse",
                   activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]"
@@ -1138,13 +1139,6 @@ export default function OperatorScreen() {
           </motion.footer>
         )}
       </AnimatePresence>
-
-      {/* ADMIN NAV ACCESS */}
-      <div className="hidden sm:flex absolute bottom-4 right-4">
-         <button onClick={handleLogout} className="p-3 bg-white/80 backdrop-blur rounded-full shadow-lg border border-gray-100 text-gray-400 hover:text-red-500 transition-colors">
-             <span className="text-[10px] font-black uppercase">{t('logout')}</span>
-         </button>
-      </div>
 
       {/* MANUAL STOP MODAL */}
       <AnimatePresence>
