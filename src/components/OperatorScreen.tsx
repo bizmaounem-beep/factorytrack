@@ -310,7 +310,18 @@ export default function OperatorScreen() {
     }
 
     try {
-      const logData: any = {
+      const machineLines = lines.filter(l => l.machineId === activeLine.machineId);
+      const windowMs = 2 * 60 * 1000; // 2 minutes
+      const now = new Date().getTime();
+
+      const existingRecentDowntime = downtimeLogs.find(log => 
+        log.machineId === activeLine.machineId && 
+        log.typeId === typeId && 
+        !log.endTime && 
+        (now - new Date(log.startTime).getTime()) < windowMs
+      );
+
+      const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
         machineId: activeLine.machineId,
         lineId: activeLine.id,
         typeId,
@@ -320,13 +331,11 @@ export default function OperatorScreen() {
         operatorId: user.id,
         shiftId: currentShiftId,
         startTime: new Date().toISOString()
-      };
-
-      const docRef = await localApi.addDoc('downtime_logs', logData);
+      })).id;
 
       await localApi.updateDoc('lines', selectedLineId, {
         status: 'STOPPED',
-        activeDowntimeId: docRef.id
+        activeDowntimeId: logId
       });
       
       setIsInitialSelection(false);

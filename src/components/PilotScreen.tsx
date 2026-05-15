@@ -431,36 +431,50 @@ export default function PilotScreen() {
       const startTime = new Date().toISOString();
       const currentShiftId = getCurrentShiftId(shifts);
 
+      // --- CONSOLIDATED STOP LOGIC ---
+      // Requirement: "IF the same ARRET HAS set in all lines in the same time or even close in time 
+      // they will be set as one arret for the whole machine"
+      // Wait for a small window to see if another line already started this same downtime type
+      const machineLines = lines.filter(l => l.machineId === selectedMachineId);
+      const windowMs = 2 * 60 * 1000; // 2 minutes
+      const now = new Date().getTime();
+
+      const existingRecentDowntime = downLogs.find(log => 
+        log.machineId === selectedMachineId && 
+        log.typeId === typeId && 
+        !log.endTime && 
+        (now - new Date(log.startTime).getTime()) < windowMs
+      );
+
       if (lineId && lineId !== 'global') {
         // Specific line stop
-        const log = await localApi.addDoc('downtime_logs', {
+        const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
           machineId: selectedMachineId,
           lineId: lineId,
           typeId,
           operatorId: user.id,
           shiftId: currentShiftId,
           startTime,
-        });
+        })).id;
 
         await localApi.updateDoc('lines', lineId, {
-          activeDowntimeId: log.id,
+          activeDowntimeId: logId,
           status: 'STOPPED'
         });
       } else {
         // Global machine stop (all lines)
-        const machineLines = lines.filter(l => l.machineId === selectedMachineId);
-        for (const line of machineLines) {
-          const log = await localApi.addDoc('downtime_logs', {
-            machineId: selectedMachineId,
-            lineId: line.id,
-            typeId,
-            operatorId: user.id,
-            shiftId: currentShiftId,
-            startTime,
-          });
+        const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
+          machineId: selectedMachineId,
+          lineId: 'MACHINE_LEVEL', // Using a marker for machine level if needed or just first line
+          typeId,
+          operatorId: user.id,
+          shiftId: currentShiftId,
+          startTime,
+        })).id;
 
+        for (const line of machineLines) {
           await localApi.updateDoc('lines', line.id, {
-            activeDowntimeId: log.id,
+            activeDowntimeId: logId,
             status: 'STOPPED'
           });
         }
