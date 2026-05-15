@@ -333,10 +333,14 @@ export default function OperatorScreen() {
         startTime: new Date().toISOString()
       })).id;
 
-      await localApi.updateDoc('lines', selectedLineId, {
-        status: 'STOPPED',
-        activeDowntimeId: logId
-      });
+      // --- PROPAGATION LOGIC ---
+      // Requirement: propagating the stop to all lines of the machine
+      for (const line of machineLines) {
+        await localApi.updateDoc('lines', line.id, {
+          status: 'STOPPED',
+          activeDowntimeId: logId
+        });
+      }
       
       setIsInitialSelection(false);
       setSelectedStopType(null);
