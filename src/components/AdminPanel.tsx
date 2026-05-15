@@ -16,7 +16,7 @@ import { saveAs } from 'file-saver';
 import { format, startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-fns';
 
 export default function AdminPanel() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { t } = useLanguage();
   const { 
     users, 
@@ -322,218 +322,229 @@ export default function AdminPanel() {
     const dashboardSheet = workbook.addWorksheet('Dashboard');
     
     let fileName = "";
-    let title = "";
+    const now = new Date();
+    const dateStr = format(now, "dd-MM-yyyy");
+
+    // Styling constants
+    const headerStyle = {
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } } as ExcelJS.Fill,
+      font: { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 } as Partial<ExcelJS.Font>,
+      alignment: { horizontal: 'center', vertical: 'middle' } as Partial<ExcelJS.Alignment>,
+      border: {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      } as Partial<ExcelJS.Borders>
+    };
+
+    const cellStyle = {
+      alignment: { horizontal: 'center', vertical: 'middle' } as Partial<ExcelJS.Alignment>,
+      border: {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      } as Partial<ExcelJS.Borders>
+    };
+
+    const formatDateExcel = (iso: string | undefined) => {
+      if (!iso) return '—';
+      try {
+        return format(new Date(iso), 'dd/MM/yyyy HH:mm');
+      } catch (e) {
+        return '—';
+      }
+    };
 
     if (type === 'production') {
-      title = t('production_report_title');
-      fileName = `Production_${new Date().toISOString().split('T')[0]}.xlsx`;
+      fileName = `Production_${dateStr}.xlsx`;
 
-      // Define columns for Data sheet
       dataSheet.columns = [
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'Machine', key: 'machine', width: 20 },
-        { header: 'Ligne', key: 'line', width: 15 },
+        { header: 'Date & Heure', key: 'timestamp', width: 20 },
+        { header: 'Machine', key: 'machine', width: 25 },
+        { header: 'Ligne', key: 'line', width: 20 },
+        { header: 'Opérateur', key: 'operator', width: 25 },
         { header: 'Shift', key: 'shift', width: 15 },
-        { header: 'Programme', key: 'programme', width: 25 },
-        { header: 'Palettes', key: 'pallets', width: 12 },
+        { header: 'Programme', key: 'programme', width: 30 },
+        { header: 'Palettes', key: 'pallets', width: 15 },
       ];
 
-      // Add Data
       prodLogs.forEach(log => {
         dataSheet.addRow({
-          date: new Date(log.timestamp).toLocaleDateString(),
+          timestamp: formatDateExcel(log.timestamp),
           machine: machines.find(m => m.id === log.machineId)?.name || '—',
           line: lines.find(l => l.id === log.lineId)?.name || '—',
+          operator: users.find(u => u.id === log.operatorId)?.name || '—',
           shift: shifts.find(s => s.id === log.shiftId)?.name || '—',
           programme: programmes.find(p => p.id === log.programmeId)?.name || '—',
           pallets: log.count
         });
       });
 
-      // DASHBOARD - PRODUCTION
-      dashboardSheet.getCell('A1').value = "DASHBOARD DE PRODUCTION";
-      dashboardSheet.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FF1D4ED8' } };
-      dashboardSheet.getCell('A2').value = `Généré le : ${new Date().toLocaleString()}`;
-
-      // Summary Table 1: Total Pallets per Machine
-      dashboardSheet.getCell('A4').value = "Total Palettes par Machine";
-      dashboardSheet.getCell('A4').font = { bold: true };
-      dashboardSheet.getRow(5).values = ['Machine', 'Total Palettes'];
-      dashboardSheet.getRow(5).font = { bold: true };
+      // Dashboard Production
+      dashboardSheet.getCell('A1').value = "RAPPORT DE PRODUCTION - DASHBOARD";
+      dashboardSheet.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FF1F4E78' } };
+      dashboardSheet.mergeCells('A1:D1');
       
-      const palletsPerMachine = machines.map(m => ({
-        name: m.name,
-        total: prodLogs.filter(l => l.machineId === m.id).reduce((acc, l) => acc + l.count, 0)
-      })).filter(m => m.total > 0);
-
-      let currentRow = 6;
-      palletsPerMachine.forEach(m => {
-        dashboardSheet.getRow(currentRow).values = [m.name, m.total];
-        currentRow++;
+      dashboardSheet.getCell('A3').value = "Résumé par Machine";
+      dashboardSheet.getCell('A3').font = { bold: true, size: 12 };
+      
+      const machineHeaders = ['Machine', 'Total Palettes', 'Nb Saisies'];
+      const machineRow = dashboardSheet.getRow(4);
+      machineHeaders.forEach((h, i) => {
+        const cell = machineRow.getCell(i + 1);
+        cell.value = h;
+        Object.assign(cell, headerStyle);
       });
-      
-      const totalPallets = prodLogs.reduce((acc, l) => acc + l.count, 0);
-      dashboardSheet.getRow(currentRow).values = ['TOTAL GÉNÉRAL', totalPallets];
-      dashboardSheet.getRow(currentRow).font = { bold: true };
-      dashboardSheet.getRow(currentRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
-      
-      currentRow += 3;
 
-      // Summary Table 2: Total Pallets per Programme
-      dashboardSheet.getRow(currentRow).values = ["Production par Programme"];
-      dashboardSheet.getRow(currentRow).font = { bold: true };
-      currentRow++;
-      dashboardSheet.getRow(currentRow).values = ['Programme', 'Réalisé'];
-      dashboardSheet.getRow(currentRow).font = { bold: true };
-      currentRow++;
-
-      programmes.filter(p => prodLogs.some(l => l.programmeId === p.id)).forEach(p => {
-        const prod = prodLogs.filter(l => l.programmeId === p.id).reduce((acc, l) => acc + l.count, 0);
-        dashboardSheet.getRow(currentRow).values = [
-          p.name, 
-          prod
-        ];
-        currentRow++;
+      let currentRow = 5;
+      machines.forEach(m => {
+        const logs = prodLogs.filter(l => l.machineId === m.id);
+        const totalPallets = logs.reduce((acc, l) => acc + l.count, 0);
+        if (totalPallets > 0) {
+          const row = dashboardSheet.getRow(currentRow);
+          row.values = [m.name, totalPallets, logs.length];
+          row.eachCell(cell => Object.assign(cell, cellStyle));
+          currentRow++;
+        }
       });
 
     } else {
-      title = t('downtime_report_title');
-      fileName = `Downtime_${new Date().toISOString().split('T')[0]}.xlsx`;
+      fileName = `Logs_Arrets_${dateStr}.xlsx`;
 
-      // Define columns for Data sheet
       dataSheet.columns = [
-        { header: 'Date', key: 'date', width: 12 },
-        { header: 'Machine', key: 'machine', width: 20 },
-        { header: 'Ligne', key: 'line', width: 15 },
-        { header: 'Opérateur', key: 'operator', width: 20 },
+        { header: 'Heure_Debut', key: 'start', width: 20 },
+        { header: 'Heure_Fin', key: 'end', width: 20 },
+        { header: 'Durée (min)', key: 'duration', width: 15 },
+        { header: 'Machine', key: 'machine', width: 25 },
+        { header: 'Ligne', key: 'line', width: 20 },
+        { header: 'Type_Arret', key: 'type', width: 25 },
+        { header: 'Opérateur', key: 'operator', width: 25 },
         { header: 'Shift', key: 'shift', width: 15 },
-        { header: 'Type', key: 'type', width: 20 },
-        { header: 'Description', key: 'desc', width: 30 },
-        { header: 'Début', key: 'start', width: 12 },
-        { header: 'Fin', key: 'end', width: 12 },
-        { header: 'Durée (Min)', key: 'duration', width: 15 },
+        { header: 'Description', key: 'desc', width: 40 },
       ];
 
-      // Add Data
       downLogs.forEach(log => {
-        const start = new Date(log.startTime);
-        const end = log.endTime ? new Date(log.endTime) : null;
         const durationSec = getLogDurationSec(log);
-        const durationMin = Number((durationSec / 60).toFixed(2));
+        const durationMin = log.endTime ? Number((durationSec / 60).toFixed(1)) : 'En cours';
         
-        dataSheet.addRow({
-          date: start.toLocaleDateString(),
+        const row = dataSheet.addRow({
+          start: formatDateExcel(log.startTime),
+          end: log.endTime ? formatDateExcel(log.endTime) : 'En cours',
+          duration: durationMin,
           machine: machines.find(m => m.id === log.machineId)?.name || '—',
           line: lines.find(l => l.id === log.lineId)?.name || '—',
+          type: downtimeTypes.find(t => t.id === log.typeId)?.name || '—',
           operator: users.find(u => u.id === log.operatorId)?.name || '—',
           shift: shifts.find(s => s.id === log.shiftId)?.name || '—',
-          type: downtimeTypes.find(t => t.id === log.typeId)?.name || '—',
-          desc: log.description || '—',
-          start: start.toLocaleTimeString(),
-          end: end ? end.toLocaleTimeString() : 'En cours',
-          duration: durationMin
+          desc: log.description || '—'
         });
+
+        // Conditional Formatting: Duration > 30 minutes
+        if (typeof durationMin === 'number' && durationMin > 30) {
+          const durationCell = row.getCell('duration');
+          durationCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFC7CE' } // Red Light
+          };
+          durationCell.font = { color: { argb: 'FF9C0006' }, bold: true };
+        }
       });
 
-      // DASHBOARD - DOWNTIME
-      dashboardSheet.getCell('A1').value = "ANALYSE DES ARRÊTS (DOWNTIME)";
-      dashboardSheet.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FFEA580C' } };
-      dashboardSheet.getCell('A2').value = `Généré le : ${new Date().toLocaleString()}`;
+      // Dashboard Downtime
+      dashboardSheet.getCell('A1').value = "ANALYSE PERFORMANCE - DASHBOARD ARRÊTS";
+      dashboardSheet.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FF1F4E78' } };
+      dashboardSheet.mergeCells('A1:D1');
+      dashboardSheet.getCell('A2').value = `Généré le : ${format(now, 'dd/MM/yyyy HH:mm')}`;
 
+      // Total per Line
       let currentRow = 4;
-
-      // Table 1: Duration per Type
-      dashboardSheet.getRow(currentRow).values = ["Temps d'arrêt par Type (Minutes)"];
-      dashboardSheet.getRow(currentRow).font = { bold: true };
-      currentRow++;
-      dashboardSheet.getRow(currentRow).values = ['Type d\'Arrêt', 'Durée Totale (Min)'];
-      dashboardSheet.getRow(currentRow).font = { bold: true };
+      dashboardSheet.getCell(`A${currentRow}`).value = "Total Durée d'Arrêt par Ligne (min)";
+      dashboardSheet.getCell(`A${currentRow}`).font = { bold: true, size: 11 };
       currentRow++;
 
-      downtimeTypes.forEach(t => {
-        const totalSec = downLogs.filter(l => l.typeId === t.id).reduce((acc, l) => acc + getLogDurationSec(l), 0);
-        if (totalSec > 0) {
-          dashboardSheet.getRow(currentRow).values = [t.name, Number((totalSec / 60).toFixed(2))];
+      const lineHeaderRow = dashboardSheet.getRow(currentRow);
+      ['Ligne', 'Durée Totale (min)'].forEach((h, i) => {
+        const cell = lineHeaderRow.getCell(i + 1);
+        cell.value = h;
+        Object.assign(cell, headerStyle);
+      });
+      currentRow++;
+
+      lines.forEach(line => {
+        const totalMin = downLogs
+          .filter(l => l.lineId === line.id)
+          .reduce((acc, l) => acc + getLogDurationSec(l), 0) / 60;
+        
+        if (totalMin > 0) {
+          const row = dashboardSheet.getRow(currentRow);
+          row.values = [line.name, Number(totalMin.toFixed(1))];
+          row.eachCell(cell => Object.assign(cell, cellStyle));
           currentRow++;
         }
       });
 
+      // Top 5 Causes
       currentRow += 2;
-
-      // Table 2: Duration per Machine
-      dashboardSheet.getRow(currentRow).values = ["Performance par Machine (Arrêt Total)"];
-      dashboardSheet.getRow(currentRow).font = { bold: true };
-      currentRow++;
-      dashboardSheet.getRow(currentRow).values = ['Machine', 'Arrêt Total (Min)', 'Nb d\'incidents'];
-      dashboardSheet.getRow(currentRow).font = { bold: true };
+      dashboardSheet.getCell(`A${currentRow}`).value = "Top 5 des Causes d'Arrêt";
+      dashboardSheet.getCell(`A${currentRow}`).font = { bold: true, size: 11 };
       currentRow++;
 
-      machines.forEach(m => {
-        const logs = downLogs.filter(l => l.machineId === m.id);
-        const totalSec = logs.reduce((acc, l) => acc + getLogDurationSec(l), 0);
-        if (totalSec > 0 || logs.length > 0) {
-          dashboardSheet.getRow(currentRow).values = [m.name, Number((totalSec / 60).toFixed(2)), logs.length];
-          currentRow++;
-        }
+      const causeHeaderRow = dashboardSheet.getRow(currentRow);
+      ['Motif d\'Arrêt', 'Nombre d\'Occurrences', 'Durée Cumulée (min)'].forEach((h, i) => {
+        const cell = causeHeaderRow.getCell(i + 1);
+        cell.value = h;
+        Object.assign(cell, headerStyle);
+      });
+      currentRow++;
+
+      const causeStats = downtimeTypes.map(t => {
+        const filteredLogs = downLogs.filter(l => l.typeId === t.id);
+        const totalMin = filteredLogs.reduce((acc, l) => acc + getLogDurationSec(l), 0) / 60;
+        return {
+          name: t.name,
+          count: filteredLogs.length,
+          totalMin
+        };
+      }).sort((a, b) => b.count - a.count).slice(0, 5);
+
+      causeStats.forEach(stat => {
+        const row = dashboardSheet.getRow(currentRow);
+        row.values = [stat.name, stat.count, Number(stat.totalMin.toFixed(1))];
+        row.eachCell(cell => Object.assign(cell, cellStyle));
+        currentRow++;
       });
     }
 
-    // Apply Common Formatting to Data Sheet
-    dataSheet.getRow(1).font = { bold: true };
-    dataSheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE5E7EB' }
-    };
-    
-    // Borders for all data cells
+    // Common Data Formatting
+    dataSheet.getRow(1).eachCell(cell => {
+      Object.assign(cell, headerStyle);
+    });
+
     dataSheet.eachRow((row, rowNumber) => {
-      row.eachCell((cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
-        // Center text in headers
-        if (rowNumber === 1) cell.alignment = { horizontal: 'center' };
+      if (rowNumber > 1) {
+        row.eachCell(cell => {
+          Object.assign(cell, cellStyle);
+        });
+      }
+    });
+
+    // Auto-fit Column Widths (Better Logic)
+    [dataSheet, dashboardSheet].forEach(sheet => {
+      sheet.columns.forEach(column => {
+        let maxLen = 0;
+        column.eachCell?.({ includeEmpty: true }, (cell) => {
+          const val = cell.value ? cell.value.toString() : '';
+          maxLen = Math.max(maxLen, val.length);
+        });
+        column.width = Math.max(12, maxLen + 5);
       });
     });
 
-    const columnLetter = (col: number) => {
-      let s = "";
-      while (col > 0) {
-        let m = (col - 1) % 26;
-        s = String.fromCharCode(65 + m) + s;
-        col = Math.floor((col - m) / 26);
-      }
-      return s;
-    };
-
-    dataSheet.autoFilter = `A1:${columnLetter(dataSheet.columns?.length || 1)}1`;
     dataSheet.views = [{ state: 'frozen', ySplit: 1 }];
 
-    // Auto-size columns (rough estimate since exceljs auto-size is not integrated)
-    dataSheet.columns?.forEach(column => {
-      let maxColumnLength = 0;
-      column.eachCell?.({ includeEmpty: true }, cell => {
-        const columnLength = cell.value ? cell.value.toString().length : 10;
-        if (columnLength > maxColumnLength) {
-          maxColumnLength = columnLength;
-        }
-      });
-      column.width = maxColumnLength < 10 ? 10 : maxColumnLength + 2;
-    });
-
-    // Formatting for Dashboard Sheet
-    dashboardSheet.columns = [
-      { key: 'A', width: 30 },
-      { key: 'B', width: 20 },
-      { key: 'C', width: 20 },
-      { key: 'D', width: 15 },
-    ];
-
-    // Finalize and Download
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), fileName);
   };
