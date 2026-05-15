@@ -4,7 +4,6 @@ import Login from './components/Login';
 import OperatorScreen from './components/OperatorScreen';
 import PilotScreen from './components/PilotScreen';
 import AdminPanel from './components/AdminPanel';
-import SecuritySetup from './components/SecuritySetup';
 import { useEffect, useState } from 'react';
 import { Terminal, Download, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -53,11 +52,6 @@ export default function App() {
   const renderContent = () => {
     if (!user) return <Login />;
 
-    // Force security setup if password_hash is missing
-    if (!user.password_hash) {
-      return <SecuritySetup />;
-    }
-
     switch (user.role) {
       case 'ADMIN':
         return <AdminPanel />;
@@ -92,7 +86,7 @@ export default function App() {
                   <Download size={20} className="text-white" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold leading-tight">Installer AgroSync</h4>
+                  <h4 className="text-sm font-bold leading-tight">Installer Factorycloud</h4>
                   <p className="text-[10px] text-gray-400 font-medium">Pour un accès rapide et hors-ligne</p>
                 </div>
               </div>

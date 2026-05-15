@@ -182,13 +182,7 @@ export const translations: Translation = {
   all_lines: { fr: 'Toutes les lignes' },
   all_shifts: { fr: 'Toutes les équipes' },
   all_operators: { fr: 'Tous les opérateurs' },
-  new_pin_placeholder: { fr: 'Nouveau PIN (Laissez vide pour conserver)' },
-  security_init: { fr: 'Initialisation de sécurité' },
-  migration_step: { fr: 'Étape obligatoire : Migration compte' },
-  username_label: { fr: 'Identifiant' },
-  password_label: { fr: 'Mot de passe' },
-  confirm_password_label: { fr: 'Confirmation' },
-  validate_migration: { fr: 'Valider la migration' }
+  new_pin_placeholder: { fr: 'Nouveau PIN (Laissez vide pour conserver)' }
 };
 
 interface LanguageContextType {

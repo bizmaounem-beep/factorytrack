@@ -1,6 +1,6 @@
 {
-  "name": "AgroSync Production",
-  "short_name": "AgroSync",
+  "name": "Factorycloud Production",
+  "short_name": "Factorycloud",
   "description": "Industrial production tracking and downtime monitoring system.",
   "start_url": "/",
   "display": "standalone",

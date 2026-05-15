@@ -58,8 +58,6 @@ async function startServer() {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT,
-        username TEXT UNIQUE,
-        password_hash TEXT,
         pin TEXT,
         role TEXT
       );
@@ -134,23 +132,6 @@ async function startServer() {
 
     // Migrations for existing databases
     console.log('Running database migrations...');
-    
-    // Migration: Add username and password_hash to users
-    try {
-      const userTableInfo = db.prepare('PRAGMA table_info(users)').all() as any[];
-      const userColumns = userTableInfo.map(c => c.name);
-      if (!userColumns.includes('username')) {
-        console.log('Migration: Adding username column to users...');
-        db.exec('ALTER TABLE users ADD COLUMN username TEXT;');
-      }
-      if (!userColumns.includes('password_hash')) {
-        console.log('Migration: Adding password_hash column to users...');
-        db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT;');
-      }
-    } catch (err) {
-      console.error('Migration failed for users:', err);
-    }
-
     const logTables = ['production_logs', 'downtime_logs', 'programmes', 'lines'];
     for (const table of logTables) {
       try {
@@ -217,9 +198,6 @@ async function startServer() {
   }
 
   const app = express();
-  
-  // Important: trust proxy must be enabled for express-rate-limit to work behind a load balancer/proxy
-  app.set('trust proxy', 1);
   
   // Security Middlewares
   app.use(helmet({
@@ -349,10 +327,9 @@ async function startServer() {
       const data = { ...req.body };
       if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
       
-      // Hash PIN or Password if creating a user
-      if (collection === 'users') {
-        if (data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
-        if (data.password_hash) data.password_hash = await bcrypt.hash(String(data.password_hash), SALT_ROUNDS);
+      // Hash PIN if creating a user
+      if (collection === 'users' && data.pin) {
+        data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
       }
 
       // Auto-populate shiftId for logs if missing
@@ -402,10 +379,9 @@ async function startServer() {
 
       const data = { ...req.body };
 
-      // Hash PIN or Password if updating a user
-      if (collection === 'users') {
-        if (data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
-        if (data.password_hash) data.password_hash = await bcrypt.hash(String(data.password_hash), SALT_ROUNDS);
+      // Hash PIN if updating a user
+      if (collection === 'users' && data.pin) {
+        data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
       }
 
       // Auto-populate shiftId for logs if missing/null during update
@@ -463,70 +439,51 @@ async function startServer() {
     }
   });
 
-  // Specialized Login Route with Hashed PIN/Password check and Rate Limiting
+  // Specialized Login Route with Hashed PIN check and Rate Limiting
   app.post('/api/login', loginLimiter, async (req, res) => {
     try {
       if (!db) throw new Error('Base de données non initialisée');
-      const { username, password, pin } = req.body;
+      const { name, pin } = req.body;
       
-      // Case 1: Password login
-      if (username && password) {
-        const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
-        if (user && user.password_hash) {
-          const isValid = await bcrypt.compare(password, user.password_hash);
-          if (isValid) {
-            return res.json(user);
-          }
-        }
-        return res.status(401).json({ error: 'Identifiants invalides' });
+      if (!pin) {
+        return res.status(400).json({ error: 'PIN manquant' });
       }
 
-      // Case 2: Legacy PIN login
-      if (pin) {
-        const pinStr = String(pin);
+      const pinStr = String(pin);
+      const nameStr = name ? sanitizeValue(name) : null;
+      
+      let user;
+      if (nameStr) {
+        // First find user by name exactly using prepared statement
+        user = db.prepare('SELECT * FROM users WHERE name = ?').get(nameStr) as any;
+      } else {
+        // Optimization: Find candidate users (since we can't search by hash directly)
+        // In a real system we'd always require a name/username
         const allUsers = db.prepare('SELECT * FROM users').all() as any[];
         for (const u of allUsers) {
-          if (u.pin && await bcrypt.compare(pinStr, u.pin)) {
-            return res.json(u);
+          if (await bcrypt.compare(pinStr, u.pin)) {
+            user = u;
+            break;
           }
         }
-        return res.status(401).json({ error: 'Code PIN incorrect' });
       }
-
-      return res.status(400).json({ error: 'Identifiants manquants' });
+      
+      if (user && nameStr) {
+        // Verify PIN hash
+        const isValid = await bcrypt.compare(pinStr, user.pin);
+        if (isValid) {
+          res.json(user);
+        } else {
+          res.status(401).json({ error: 'Identifiants invalides' });
+        }
+      } else if (user) {
+        res.json(user);
+      } else {
+        res.status(401).json({ error: 'Identifiants invalides' });
+      }
     } catch (e) {
       console.error('Login error:', e);
       res.status(500).json({ error: 'Erreur interne du serveur' });
-    }
-  });
-
-  // Security Initialization Route
-  app.post('/api/setup-security', async (req, res) => {
-    try {
-      if (!db) throw new Error('Base de données non initialisée');
-      const { userId, username, password } = req.body;
-
-      if (!userId || !username || !password) {
-        return res.status(400).json({ error: 'Données manquantes' });
-      }
-
-      // Check if username is already taken by another user
-      const existing = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username, userId);
-      if (existing) {
-        return res.status(400).json({ error: 'Cet identifiant est déjà utilisé' });
-      }
-
-      const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-      
-      // Update user and CLEAR PIN
-      db.prepare('UPDATE users SET username = ?, password_hash = ?, pin = NULL WHERE id = ?')
-        .run(username, passwordHash, userId);
-
-      notifyChange('users');
-      res.json({ success: true });
-    } catch (e) {
-      console.error('Setup security error:', e);
-      res.status(500).json({ error: 'Erreur lors de la configuration de sécurité' });
     }
   });
 

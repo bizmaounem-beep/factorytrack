@@ -110,8 +110,8 @@ export default function AdminPanel() {
 
   const openModal = (type: typeof modalType, data: any = {}) => {
     setModalType(type);
-    // When editing a user, we don't want to show the hashed sensitive data
-    const cleanData = type === 'user' && data.id ? { ...data, pin: '', password_hash: '' } : { ...data };
+    // When editing a user, we don't want to show the hashed PIN
+    const cleanData = type === 'user' && data.id ? { ...data, pin: '' } : { ...data };
     setModalData(cleanData);
     setEditingId(data.id || null);
     if (type === 'line' && data.machineId) {
@@ -130,7 +130,7 @@ export default function AdminPanel() {
         }
       }
       if (modalType === 'user') {
-        if (!modalData.name || !modalData.role || (!editingId && !modalData.pin && !modalData.password_hash)) {
+        if (!modalData.name || !modalData.pin || !modalData.role) {
           alert(t('fill_all_fields'));
           return;
         }
@@ -160,9 +160,8 @@ export default function AdminPanel() {
       let finalData = { ...modalData };
       
       // If editing a user and PIN is empty, remove it from the update payload so it's not changed
-      if (modalType === 'user' && editingId) {
-        if (!finalData.pin) delete finalData.pin;
-        if (!finalData.password_hash) delete finalData.password_hash;
+      if (modalType === 'user' && editingId && !finalData.pin) {
+        delete finalData.pin;
       }
 
       if (modalType === 'production_log' && finalData.count) {
@@ -866,9 +865,7 @@ export default function AdminPanel() {
                       </div>
                       <div>
                         <p className="font-black text-[10px] md:text-sm text-gray-900 leading-tight">{u.name}</p>
-                        <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">
-                          {u.username ? `@${u.username}` : `PIN: ••••`} • {u.role}
-                        </p>
+                        <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">PIN: <span className="bg-gray-100 px-1 rounded text-gray-400 font-mono italic">••••</span> • {u.role}</p>
                       </div>
                     </div>
                     <div className="flex gap-0.5">
@@ -1670,22 +1667,6 @@ export default function AdminPanel() {
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input 
-                      placeholder="Identifiant"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={modalData.username || ''}
-                      onChange={e => setModalData({...modalData, username: e.target.value})}
-                    />
-                    <input 
-                      placeholder={editingId ? 'Nouveau Password' : 'Password'}
-                      type="password"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={modalData.password_hash || ''}
-                      onChange={e => setModalData({...modalData, password_hash: e.target.value})}
-                    />
-                  </div>
-                  {!modalData.username && (
                     <input 
                       placeholder={editingId ? t('new_pin_placeholder') || 'Nouveau PIN (optionnel)' : t('pin')}
                       type="password"
@@ -1695,7 +1676,6 @@ export default function AdminPanel() {
                       value={modalData.pin || ''}
                       onChange={e => setModalData({...modalData, pin: e.target.value})}
                     />
-                  )}
                   <select 
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
                     value={modalData.role || ''}
