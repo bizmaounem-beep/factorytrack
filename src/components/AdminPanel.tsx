@@ -147,6 +147,12 @@ export default function AdminPanel() {
           return;
         }
       }
+      if (modalType === 'downtime_log') {
+        if (!modalData.machineId || !modalData.lineId || !modalData.typeId || !modalData.startTime || !modalData.endTime) {
+          alert(t('fill_all_fields'));
+          return;
+        }
+      }
 
       const collectionName = 
         modalType === 'user' ? 'users' : 
@@ -168,7 +174,11 @@ export default function AdminPanel() {
         finalData.count = parseInt(finalData.count);
       }
       if (modalType === 'downtime_log') {
-        if (finalData.duration) finalData.duration = parseInt(finalData.duration);
+        if (finalData.startTime && finalData.endTime) {
+          const start = new Date(finalData.startTime).getTime();
+          const end = new Date(finalData.endTime).getTime();
+          finalData.duration = Math.max(0, Math.floor((end - start) / 1000));
+        }
       }
       if (modalType === 'downtime' && !finalData.icon) {
         finalData.icon = '⚠️';
@@ -1134,6 +1144,17 @@ export default function AdminPanel() {
                     >
                       <Download size={12} /> {t('export')}
                     </button>
+                    {historyLogType === 'downtime' && (
+                      <button 
+                        onClick={() => openModal('downtime_log', {
+                          startTime: new Date().toISOString(),
+                          operatorId: user?.id,
+                        })}
+                        className="p-1.5 px-3 bg-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center gap-1.5"
+                      >
+                        <Plus size={12} strokeWidth={3} /> {t('add')}
+                      </button>
+                    )}
                   </div>
                   
                   <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
@@ -1539,6 +1560,34 @@ export default function AdminPanel() {
 
               {modalType === 'downtime_log' && (
                 <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('machine')}</label>
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      value={modalData.machineId || ''}
+                      onChange={e => {
+                        const mId = e.target.value;
+                        setModalData({ ...modalData, machineId: mId, lineId: '' });
+                      }}
+                    >
+                      <option value="">{t('choose_machine')}</option>
+                      {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</label>
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      disabled={!modalData.machineId}
+                      value={modalData.lineId || ''}
+                      onChange={e => setModalData({...modalData, lineId: e.target.value})}
+                    >
+                      <option value="">{t('choose_line')}</option>
+                      {lines.filter(l => l.machineId === modalData.machineId).map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('downtime_reason')}</label>
                     <select 

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { DowntimeLog, Shift } from '../types';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Monitor, LayoutGrid, Package, Users, Activity, 
@@ -159,7 +159,7 @@ export default function PilotScreen() {
   const [showManualStopModal, setShowManualStopModal] = useState(false);
   const [manualStopForm, setManualStopForm] = useState({
     typeId: '',
-    startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
+    startTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     description: '',
     lineId: ''
@@ -498,6 +498,16 @@ export default function PilotScreen() {
 
       if (durationMs <= 0) {
         alert('L\'heure de fin doit être après l\'heure de début.');
+        return;
+      }
+
+      if (!isToday(new Date(data.startTime)) || !isToday(new Date(data.endTime))) {
+        alert("Le pilote ne peut ajouter des arrêts que pour la journée en cours.");
+        return;
+      }
+
+      if (!isToday(new Date(data.startTime)) || !isToday(new Date(data.endTime))) {
+        alert("Le pilote ne peut ajouter des arrêts que pour la journée en cours.");
         return;
       }
 
@@ -1150,8 +1160,8 @@ export default function PilotScreen() {
                              setManualStopForm({
                                ...manualStopForm,
                                lineId: line.id,
-                               startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
-                               endTime: new Date().toISOString().slice(0, 16)
+                               startTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+                               endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm")
                              });
                              setShowManualStopModal(true);
                           }}
@@ -1724,6 +1734,8 @@ export default function PilotScreen() {
                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Début</label>
                     <input 
                       type="datetime-local"
+                      min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                      max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                       value={manualStopForm.startTime}
                       onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
@@ -1733,6 +1745,8 @@ export default function PilotScreen() {
                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Fin</label>
                     <input 
                       type="datetime-local"
+                      min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                      max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                       value={manualStopForm.endTime}
                       onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}

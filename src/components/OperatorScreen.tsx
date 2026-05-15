@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Line, Shift } from '../types';
-import { format, parseISO, isToday } from 'date-fns';
+import { format, parseISO, isToday, startOfDay, endOfDay } from 'date-fns';
 import { 
   Play, Square, Settings, Timer, Package, AlertCircle, 
   CheckCircle, Factory, Monitor, Activity, Plus, Minus, 
@@ -79,7 +79,7 @@ export default function OperatorScreen() {
   // Manual Stop Form State
   const [manualStopForm, setManualStopForm] = useState({
     typeId: '',
-    startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
+    startTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     description: ''
   });
@@ -442,6 +442,11 @@ export default function OperatorScreen() {
 
       if (durationMs <= 0) {
         alert('L\'heure de fin doit être après l\'heure de début.');
+        return;
+      }
+
+      if (!isToday(new Date(data.startTime)) || !isToday(new Date(data.endTime))) {
+        alert("L'opérateur ne peut ajouter des arrêts que pour la journée en cours.");
         return;
       }
 
@@ -1197,6 +1202,8 @@ export default function OperatorScreen() {
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('start_time')}</label>
                     <input 
                       type="datetime-local"
+                      min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                      max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500"
                       value={manualStopForm.startTime}
                       onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
@@ -1206,6 +1213,8 @@ export default function OperatorScreen() {
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('end_time')}</label>
                     <input 
                       type="datetime-local"
+                      min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                      max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500"
                       value={manualStopForm.endTime}
                       onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
