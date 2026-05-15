@@ -11,7 +11,7 @@ import {
   ExternalLink, Plus, History, Timer, Pencil, 
   Trash2, Menu, X, ArrowLeft, Clock, Square, 
   Play, TrendingUp, AlertTriangle, CheckCircle2,
-  Box, LayoutDashboard
+  Box, LayoutDashboard, Info
 } from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -154,6 +154,7 @@ export default function PilotScreen() {
   const [editModalData, setEditModalData] = useState<any>({});
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
+  const [showFeatureInfo, setShowFeatureInfo] = useState(false);
   const [declaringDowntimeLineId, setDeclaringDowntimeLineId] = useState<string | null>(null);
   const [showManualStopModal, setShowManualStopModal] = useState(false);
   const [manualStopForm, setManualStopForm] = useState({
@@ -610,10 +611,17 @@ export default function PilotScreen() {
               {isMobileMenuOpen ? <X size={14} /> : <Menu size={14} />}
             </button>
           )}
-          <div className="flex items-center gap-1">
-            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
-              A
-            </div>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => setShowFeatureInfo(true)}
+                  className="p-1.5 text-gray-400 hover:bg-blue-600 hover:text-white rounded-lg transition-colors mr-1"
+                  title="Description des fonctionnalités intelligentes"
+                >
+                  <Info size={14} />
+                </button>
+                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
+                  A
+                </div>
             <h1 className="font-black text-xs tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
@@ -1234,6 +1242,13 @@ export default function PilotScreen() {
                           {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
                         </span>
                       </div>
+                      {lines.filter(otherL => otherL.machineId === selectedMachineId && otherL.activeDowntimeId === down.id).length > 1 && (
+                        <div className="pt-2 flex justify-center">
+                          <span className="bg-blue-600/10 text-blue-600 px-2 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest flex items-center gap-1 animate-pulse">
+                            <Activity size={8} /> Arrêt Groupé
+                          </span>
+                        </div>
+                      )}
                   </div>
                 )}
               </motion.div>
@@ -1770,6 +1785,92 @@ export default function PilotScreen() {
           </motion.div>
         </div>
       )}
+      {/* FEATURE INFO MODAL */}
+      <AnimatePresence>
+        {showFeatureInfo && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-3xl overflow-hidden"
+            >
+              <div className="p-8 space-y-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                      <Activity size={24} className="text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-gray-900 tracking-tighter uppercase italic leading-none mb-1">Arrêts Groupés Intelligents</h2>
+                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Pilot Hub Feature</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowFeatureInfo(false)} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <section className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
+                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                       <TrendingUp size={14} /> Détection de Proximité Temporelle
+                    </h4>
+                    <p className="text-xs font-bold text-gray-700 leading-relaxed italic">
+                      "Comment le système identifie que des arrêts sur différentes lignes sont liés."
+                    </p>
+                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                      L'algorithme AgroSync analyse les flags d'arrêts en temps réel. Si plusieurs lignes déclarent le même incident dans une fenêtre critique (moins de 2 minutes), le système fusionne ces données pour refléter la réalité de la panne machine globale.
+                    </p>
+                  </section>
+
+                  <section className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
+                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                       <Users size={14} /> Propagation de l'Action de Groupe
+                    </h4>
+                    <p className="text-xs font-bold text-gray-700 leading-relaxed italic">
+                      "Le premier opérateur qui déclare l'arrêt propage l'état."
+                    </p>
+                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                      Fini les doubles saisies. Dès qu'un arrêt est qualifié sur une ligne, le système peut propager automatiquement cet état aux autres lignes de la machine. Cela assure une synchronisation parfaite entre les opérateurs et le Pilot.
+                    </p>
+                  </section>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
+                      <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <Box size={14} /> Consolidation
+                      </h4>
+                      <p className="text-[11px] text-emerald-800/80 leading-relaxed font-bold">
+                        Un seul événement en base de données pour toute la machine. Rapports simplifiés et statistiques OEE fiables.
+                      </p>
+                    </div>
+                    <div className="p-5 bg-orange-50 rounded-2xl border border-orange-100">
+                      <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <Activity size={14} /> Avantage Industriel
+                      </h4>
+                      <p className="text-[11px] text-orange-800/80 leading-relaxed font-bold">
+                        Réduction de 40% de la charge administrative des opérateurs et précision accrue du suivi des temps d'arrêt.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowFeatureInfo(false)}
+                  className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                >
+                  FERMER
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

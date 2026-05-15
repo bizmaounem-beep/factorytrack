@@ -57,6 +57,7 @@ export default function OperatorScreen() {
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [showManualStopModal, setShowManualStopModal] = useState(false);
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
+  const [showFeatureInfo, setShowFeatureInfo] = useState(false);
   const [selectedProgrammeForChange, setSelectedProgrammeForChange] = useState<string | null>(null);
   const [palletInput, setPalletInput] = useState('1');
   const [downtimeDescription, setDowntimeDescription] = useState('');
@@ -636,6 +637,13 @@ export default function OperatorScreen() {
               <span className="text-[8px] font-bold text-blue-500/80 uppercase tracking-widest leading-none mt-1">{activeLine?.name}</span>
             </div>
             <button 
+              onClick={() => setShowFeatureInfo(true)}
+              className="p-2 text-slate-500 hover:text-blue-500 transition-colors"
+              title="Aide sur les fonctionnalités"
+            >
+              <Info size={18} />
+            </button>
+            <button 
               onClick={handleLogout}
               className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 hover:bg-red-500 hover:text-white"
             >
@@ -735,6 +743,12 @@ export default function OperatorScreen() {
                           <p className="text-4xl font-black tracking-tighter tabular-nums text-white group-hover:scale-105 transition-transform duration-500">
                             {formatDowntimeDisplay(timer)}
                           </p>
+                          {lines.filter(l => l.machineId === activeLine?.machineId && l.activeDowntimeId === activeDowntime.id).length > 1 && (
+                            <div className="flex items-center justify-center gap-1 mt-1 text-blue-400 animate-pulse">
+                              <Activity size={10} />
+                              <span className="text-[8px] font-black uppercase tracking-widest">Arrêt Groupé Intelligent</span>
+                            </div>
+                          )}
                           {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
                             <div className="mt-3">
                               <span className="px-5 py-1.5 bg-white/5 border border-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest inline-flex items-center gap-2">
@@ -1235,7 +1249,101 @@ export default function OperatorScreen() {
         )}
       </AnimatePresence>
 
-      {/* STOP PROD CONFIRMATION */}
+      {/* FEATURE INFO MODAL */}
+      <AnimatePresence>
+        {showFeatureInfo && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-slate-900 border border-white/10 rounded-[2.5rem] w-full max-w-2xl shadow-3xl overflow-hidden"
+            >
+              <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                      <Activity size={24} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white italic tracking-tighter uppercase leading-none mb-1">Arrêts Groupés Intelligents</h3>
+                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Fonctionnalité AgroSync v2.4</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowFeatureInfo(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="grid gap-6">
+                  <section className="space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      Détection de Proximité Temporelle
+                    </h4>
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
+                      Le système analyse en continu les temps de début d'incident. Si deux arrêts ou plus du même type surviennent sur différentes lignes d'une même machine dans une fenêtre de 2 minutes, ils sont automatiquement identifiés comme un incident lié.
+                    </p>
+                  </section>
+
+                  <section className="space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      L'Action de Groupe : Propagation
+                    </h4>
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
+                      Lorsqu'un opérateur déclare un arrêt, l'application vérifie si une autre ligne a déjà déclaré le même motif récemment. Si c'est le cas, elle se connecte à cet arrêt existant. Sinon, elle propage l'état d'arrêt à toutes les autres lignes concernées pour synchroniser la machine.
+                    </p>
+                  </section>
+
+                  <section className="space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      Consolidation des Données
+                    </h4>
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
+                      Au lieu de multiplier les entrées, AgroSync enregistre ces arrêts comme un seul événement global dans la base de données. Cela simplifie drastiquement vos rapports de production et évite de gonfler artificiellement les statistiques d'indisponibilité.
+                    </p>
+                  </section>
+
+                  <section className="space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      Interface Opérateur Intelligente
+                    </h4>
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
+                      L'application informe visuellement les opérateurs qu'un arrêt a déjà été déclaré par un collègue ou par le système. Un indicateur "Arrêt Groupé" s'affiche sur le chronomètre pour confirmer que la synchronisation est active.
+                    </p>
+                  </section>
+
+                  <section className="space-y-3 p-4 bg-blue-600/5 rounded-2xl border border-blue-500/10">
+                    <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                      <Activity size={12} />
+                      Avantage Industriel
+                    </h4>
+                    <p className="text-xs font-bold text-blue-100/80 leading-relaxed">
+                      Cette automatisation réduit la charge mentale des opérateurs qui n'ont plus à saisir manuellement chaque arrêt sur chaque ligne. Elle garantit une précision absolue dans le suivi des temps d'arrêt réels et facilite l'analyse des causes racines (Root Cause Analysis).
+                    </p>
+                  </section>
+                </div>
+
+                <button 
+                  onClick={() => setShowFeatureInfo(false)}
+                  className="w-full py-4 bg-white text-black rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  Compris
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* STOP PROD CONTRAST OVERLAY */}
       <AnimatePresence>
         {showStopConfirmation && (
           <motion.div 
