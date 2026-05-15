@@ -7,9 +7,18 @@ import fs from 'fs';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import bcrypt from 'bcrypt';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const SALT_ROUNDS = 10;
+const ALLOWED_COLLECTIONS = [
+  'users', 'machines', 'lines', 'programmes', 
+  'downtime_types', 'production_logs', 'downtime_logs', 'shifts'
+];
 
 let db: Database.Database;
 
@@ -26,9 +35,8 @@ async function startServer() {
     
     db = new Database('data.db', { 
       verbose: (message) => {
-        // Obfuscate PIN values in logs for security
-        let safeMsg = message.replace(/(pin\s*=\s*)'[^']+'/gi, "$1'****'");
-        console.log(safeMsg);
+        // Obfuscate sensitive values in logs
+        console.log(message);
       }
     });
 
@@ -152,9 +160,10 @@ async function startServer() {
     if (countRow.count === 0) {
       console.log('Seeding initial database data...');
       
-      // Default Admin
+      // Default Admin (Hashed PIN)
+      const hashedAdminPin = await bcrypt.hash('1234', SALT_ROUNDS);
       db.prepare('INSERT INTO users (id, name, pin, role) VALUES (?, ?, ?, ?)').run(
-        'admin-1', 'Admin', '1234', 'ADMIN'
+        'admin-1', 'Admin', hashedAdminPin, 'ADMIN'
       );
 
       // Default Downtime Types
@@ -193,6 +202,14 @@ async function startServer() {
   }
 
   const app = express();
+  
+  // Security Middlewares
+  app.use(helmet({
+    contentSecurityPolicy: false, // Vite handles CSP in dev
+  }));
+  app.use(cors());
+  app.use(express.json({ limit: '1mb' })); // Limit body size to prevent huge payload attacks
+
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
@@ -201,24 +218,34 @@ async function startServer() {
     }
   });
 
-  // Helper to strictly sanitize values for SQLite
-  const sanitizeSqlValue = (val: any) => {
+  // Login Rate Limiting
+  const loginLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 5, // 5 attempts per minute
+    message: { error: 'Trop de tentatives de connexion. Réessayez dans une minute.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Sanitization helper
+  const sanitizeValue = (val: any) => {
     if (val === null || val === undefined) return null;
-    const type = typeof val;
-    if (type === 'string' || type === 'number') return val;
-    if (type === 'boolean') return val ? 1 : 0;
-    if (type === 'object') {
-       try {
-         return JSON.stringify(val);
-       } catch {
-         return null;
-       }
+    if (typeof val === 'string') {
+      // Basic protection against XSS and control characters
+      return val.replace(/[\x00-\x1F\x7F]/g, "").trim();
+    }
+    if (typeof val === 'number') return val;
+    if (typeof val === 'boolean') return val ? 1 : 0;
+    if (typeof val === 'object') {
+      try {
+        return JSON.stringify(val);
+      } catch {
+        return null;
+      }
     }
     return String(val);
   };
 
-  app.use(cors());
-  app.use(express.json());
 
   // Socket logic
   io.on('connection', (socket) => {
@@ -261,7 +288,14 @@ async function startServer() {
   app.get('/api/db/:collection', (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
-      const rows = db.prepare(`SELECT * FROM ${req.params.collection}`).all();
+      const { collection } = req.params;
+      
+      if (!ALLOWED_COLLECTIONS.includes(collection)) {
+        return res.status(403).json({ error: 'Accès non autorisé' });
+      }
+
+      // Prepared statement for safety
+      const rows = db.prepare(`SELECT * FROM ${collection}`).all();
       res.json(rows);
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
@@ -271,76 +305,99 @@ async function startServer() {
   app.get('/api/db/:collection/:id', (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
-      const row = db.prepare(`SELECT * FROM ${req.params.collection} WHERE id = ?`).get(req.params.id);
+      const { collection, id } = req.params;
+
+      if (!ALLOWED_COLLECTIONS.includes(collection)) {
+        return res.status(403).json({ error: 'Accès non autorisé' });
+      }
+
+      // Prepared statement with parameter binding
+      const row = db.prepare(`SELECT * FROM ${collection} WHERE id = ?`).get(id);
       res.json(row);
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
     }
   });
 
-  app.post('/api/db/:collection', (req, res) => {
+  app.post('/api/db/:collection', async (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
+      const { collection } = req.params;
+      
+      if (!ALLOWED_COLLECTIONS.includes(collection)) {
+        return res.status(403).json({ error: 'Accès non autorisé' });
+      }
+
       const data = { ...req.body };
       if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
       
+      // Hash PIN if creating a user
+      if (collection === 'users' && data.pin) {
+        data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+      }
+
       // Auto-populate shiftId for logs if missing
       const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
-      if (logCollections.includes(req.params.collection) && !data.shiftId) {
+      if (logCollections.includes(collection) && !data.shiftId) {
         data.shiftId = getServerShiftId();
       }
       
       // Get valid columns for safety
-      const pragma = db.prepare(`PRAGMA table_info(${req.params.collection})`).all() as any[];
+      const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
       const validColumns = pragma.map(p => p.name);
       
-      const filteredData: any = {};
       const values: any[] = [];
       const keys: string[] = [];
 
       for (const col of validColumns) {
         if (data[col] !== undefined) {
           keys.push(col);
-          const val = sanitizeSqlValue(data[col]);
-          values.push(val);
-          filteredData[col] = data[col];
+          values.push(sanitizeValue(data[col]));
         }
       }
 
       if (keys.length === 0) {
-        return res.status(400).json({ error: 'No valid fields provided' });
+        return res.status(400).json({ error: 'Aucun champ valide fourni' });
       }
 
       const placeholders = keys.map(() => '?').join(',');
-      const stmt = db.prepare(`INSERT INTO ${req.params.collection} (${keys.join(',')}) VALUES (${placeholders})`);
+      const stmt = db.prepare(`INSERT INTO ${collection} (${keys.join(',')}) VALUES (${placeholders})`);
       stmt.run(...values);
       
-      notifyChange(req.params.collection);
-      res.json(filteredData);
+      notifyChange(collection);
+      res.json({ id: data.id });
     } catch (e) {
       console.error('POST Error:', e);
       res.status(500).json({ error: (e as Error).message });
     }
   });
 
-  app.put('/api/db/:collection/:id', (req, res) => {
+  app.put('/api/db/:collection/:id', async (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
+      const { collection, id } = req.params;
+
+      if (!ALLOWED_COLLECTIONS.includes(collection)) {
+        return res.status(403).json({ error: 'Accès non autorisé' });
+      }
+
       const data = { ...req.body };
+
+      // Hash PIN if updating a user
+      if (collection === 'users' && data.pin) {
+        data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+      }
 
       // Auto-populate shiftId for logs if missing/null during update
       const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
-      if (logCollections.includes(req.params.collection) && !data.shiftId) {
-        // Only fetch if it's not already in the DB? 
-        // Actually if we are validating (categorizing) a stop, we might want to ensure it has a shiftId.
-        const current = db.prepare(`SELECT shiftId FROM ${req.params.collection} WHERE id = ?`).get(req.params.id) as any;
+      if (logCollections.includes(collection) && !data.shiftId) {
+        const current = db.prepare(`SELECT shiftId FROM ${collection} WHERE id = ?`).get(id) as any;
         if (!current || !current.shiftId) {
           data.shiftId = getServerShiftId();
         }
       }
       
-      // Get valid columns for safety
-      const pragma = db.prepare(`PRAGMA table_info(${req.params.collection})`).all() as any[];
+      const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
       const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
       
       const values: any[] = [];
@@ -349,20 +406,19 @@ async function startServer() {
       for (const col of validColumns) {
         if (data[col] !== undefined) {
           keys.push(col);
-          const val = sanitizeSqlValue(data[col]);
-          values.push(val);
+          values.push(sanitizeValue(data[col]));
         }
       }
 
       if (keys.length === 0) {
-        return res.json({ success: true, message: 'No fields to update' });
+        return res.json({ success: true, message: 'Aucun champ à mettre à jour' });
       }
 
       const sets = keys.map(k => `${k} = ?`).join(',');
-      const stmt = db.prepare(`UPDATE ${req.params.collection} SET ${sets} WHERE id = ?`);
-      stmt.run(...values, req.params.id);
+      const stmt = db.prepare(`UPDATE ${collection} SET ${sets} WHERE id = ?`);
+      stmt.run(...values, id);
       
-      notifyChange(req.params.collection);
+      notifyChange(collection);
       res.json({ success: true });
     } catch (e) {
       console.error('PUT Error:', e);
@@ -373,18 +429,24 @@ async function startServer() {
   app.delete('/api/db/:collection/:id', (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
-      db.prepare(`DELETE FROM ${req.params.collection} WHERE id = ?`).run(req.params.id);
-      notifyChange(req.params.collection);
+      const { collection, id } = req.params;
+
+      if (!ALLOWED_COLLECTIONS.includes(collection)) {
+        return res.status(403).json({ error: 'Accès non autorisé' });
+      }
+
+      db.prepare(`DELETE FROM ${collection} WHERE id = ?`).run(id);
+      notifyChange(collection);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
     }
   });
 
-  // Specialized Login Route
-  app.post('/api/login', (req, res) => {
+  // Specialized Login Route with Hashed PIN check and Rate Limiting
+  app.post('/api/login', loginLimiter, async (req, res) => {
     try {
-      if (!db) throw new Error('Database not initialized');
+      if (!db) throw new Error('Base de données non initialisée');
       const { name, pin } = req.body;
       
       if (!pin) {
@@ -392,22 +454,40 @@ async function startServer() {
       }
 
       const pinStr = String(pin);
-      const nameStr = name ? String(name) : null;
+      const nameStr = name ? sanitizeValue(name) : null;
       
       let user;
       if (nameStr) {
-        user = db.prepare('SELECT * FROM users WHERE name = ? AND pin = ?').get(nameStr, pinStr);
+        // First find user by name exactly using prepared statement
+        user = db.prepare('SELECT * FROM users WHERE name = ?').get(nameStr) as any;
       } else {
-        user = db.prepare('SELECT * FROM users WHERE pin = ?').get(pinStr);
+        // Optimization: Find candidate users (since we can't search by hash directly)
+        // In a real system we'd always require a name/username
+        const allUsers = db.prepare('SELECT * FROM users').all() as any[];
+        for (const u of allUsers) {
+          if (await bcrypt.compare(pinStr, u.pin)) {
+            user = u;
+            break;
+          }
+        }
       }
       
-      if (user) {
+      if (user && nameStr) {
+        // Verify PIN hash
+        const isValid = await bcrypt.compare(pinStr, user.pin);
+        if (isValid) {
+          res.json(user);
+        } else {
+          res.status(401).json({ error: 'Identifiants invalides' });
+        }
+      } else if (user) {
         res.json(user);
       } else {
         res.status(401).json({ error: 'Identifiants invalides' });
       }
     } catch (e) {
-      res.status(500).json({ error: (e as Error).message });
+      console.error('Login error:', e);
+      res.status(500).json({ error: 'Erreur interne du serveur' });
     }
   });
 

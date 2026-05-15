@@ -37,6 +37,12 @@ export default function PilotScreen() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'monitor' | 'history'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => sessionStorage.getItem('pilot_selected_machine') || '');
+  const [globalTimer, setGlobalTimer] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setGlobalTimer(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Analytics Calculations (Filtered for current shift)
   const currentShiftId = useMemo(() => getCurrentShiftId(shifts), [shifts]);
@@ -509,6 +515,30 @@ export default function PilotScreen() {
     }
   };
 
+  const handlePalletTick = async (lineId: string, progId: string) => {
+    if (!user || !selectedMachineId) return;
+    try {
+      const currentShiftId = getCurrentShiftId(shifts);
+      await localApi.addDoc('production_logs', {
+        programmeId: progId,
+        operatorId: user.id,
+        machineId: selectedMachineId,
+        lineId,
+        shiftId: currentShiftId,
+        count: 1,
+        timestamp: new Date().toISOString()
+      });
+      const prog = programmes.find(p => p.id === progId);
+      if (prog) {
+        await localApi.updateDoc('programmes', progId, {
+          producedPallets: (prog.producedPallets || 0) + 1
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const calculateManualDuration = () => {
     const start = new Date(manualStopForm.startTime).getTime();
     const end = new Date(manualStopForm.endTime).getTime();
@@ -695,7 +725,12 @@ export default function PilotScreen() {
               <History size={14} />
               {t('history')}
             </button>
-            <button onClick={handleLogout} className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-200 px-2 py-1 rounded">{t('logout')}</button>
+            <button 
+              onClick={handleLogout} 
+              className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 hover:bg-red-500 hover:text-white shrink-0"
+            >
+              {t('logout')}
+            </button>
           </div>
         </div>
         
@@ -1038,7 +1073,7 @@ export default function PilotScreen() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="p-1 sm:p-4 space-y-1 sm:space-y-4 max-w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-4"
+          className="p-1 sm:p-4 gap-2 sm:gap-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
         >
           {lines.filter(l => l.machineId === selectedMachineId).map(line => {
             const prog = programmes.find(p => p.id === line.currentProgrammeId);
@@ -1050,22 +1085,20 @@ export default function PilotScreen() {
                 key={line.id}
                 variants={item}
                 layout
-                className="card transition-colors flex flex-col overflow-hidden border-l-4 border-slate-200 hover:border-blue-500"
+                className="card transition-colors flex flex-col overflow-hidden border-l-4 border-slate-200 hover:border-blue-500 bg-white"
               >
-                <div className="px-2 py-1.5 sm:p-4 flex justify-between items-center border-b border-slate-50 shrink-0">
+                <div className="px-3 py-2 flex justify-between items-center border-b border-slate-50 shrink-0">
                   <div className="leading-none">
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="font-black text-[10px] sm:text-sm text-slate-900">{line.name}</h3>
-                    </div>
-                    <div className="flex items-center gap-1 mt-0.5 sm:mt-2">
+                    <h3 className="font-black text-xs text-slate-900 truncate max-w-[100px]">{line.name}</h3>
+                    <div className="flex items-center gap-1 mt-1">
                        <span className={cn(
-                        "px-1 py-0.5 rounded-full text-[6px] sm:text-[9px] font-black uppercase tracking-widest flex items-center gap-0.5",
-                        line.status === 'RUNNING' ? "bg-status-running-bg text-status-running-text" :
-                        line.status === 'STOPPED' ? "bg-status-stopped-bg text-status-stopped-text" : "bg-status-idle-bg text-status-idle-text"
+                        "px-1 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest flex items-center gap-0.5",
+                        line.status === 'RUNNING' ? "bg-emerald-50 text-emerald-600" :
+                        line.status === 'STOPPED' ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-400"
                       )}>
                         <span className={cn(
                           "w-1 h-1 rounded-full",
-                          line.status === 'RUNNING' ? "bg-green-600 animate-pulse" : line.status === 'STOPPED' ? "bg-red-600" : "bg-slate-400"
+                          line.status === 'RUNNING' ? "bg-emerald-500 animate-pulse" : line.status === 'STOPPED' ? "bg-rose-500" : "bg-slate-400"
                         )} />
                         {line.status === 'RUNNING' ? t('running') : 
                          line.status === 'STOPPED' ? t('stopped') : t('idle')}
@@ -1073,109 +1106,118 @@ export default function PilotScreen() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    {/* STOP/RESUME BUTTONS PER LINE */}
-                    <div className="flex items-center gap-1">
-                      {line.status === 'STOPPED' || down ? (
+                    {line.status === 'STOPPED' || down ? (
+                      <button 
+                        onClick={() => handleStopSpecificDowntime(line.id)}
+                        className="p-1.5 text-emerald-600 bg-emerald-50 rounded-lg active:scale-95 hover:bg-emerald-100 transition-all shadow-sm flex items-center gap-1 border border-emerald-100 h-7"
+                      >
+                        <Play className="w-3 h-3" strokeWidth={3} />
+                        <span className="text-[9px] font-black uppercase tracking-tight">RELANCER</span>
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1">
                         <button 
-                          onClick={() => handleStopSpecificDowntime(line.id)}
-                          className="p-1 sm:p-2 text-green-600 bg-green-50 rounded-lg active:scale-95 hover:bg-green-100 transition-all shadow-sm flex items-center gap-1 border border-green-100 shrink-0 h-6 sm:h-auto"
-                          title={t('resume')}
+                          onClick={() => setDeclaringDowntimeLineId(line.id)}
+                          className="p-1 px-1.5 text-red-600 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all shadow-sm flex flex-col items-center justify-center border border-red-100 h-7 leading-none"
                         >
-                          <Play className="w-2.5 h-2.5 sm:w-4 sm:h-4" strokeWidth={3} />
-                          <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight">RELANCER</span>
+                          <Square size={8} fill="currentColor" />
+                          <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">AUTO</span>
                         </button>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => setDeclaringDowntimeLineId(line.id)}
-                            className="p-1 sm:p-2 text-red-600 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all shadow-sm flex items-center gap-1 border border-red-100 shrink-0 h-6 sm:h-auto"
-                            title="Arrêt Auto (Immédiat)"
-                          >
-                            <Square size={10} fill="currentColor" />
-                            <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight leading-none text-center">ARRÊT<br/>AUTO</span>
-                          </button>
-                          <button 
-                            onClick={() => {
-                               setManualStopForm({
-                                 ...manualStopForm,
-                                 lineId: line.id,
-                                 startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
-                                 endTime: new Date().toISOString().slice(0, 16)
-                               });
-                               setShowManualStopModal(true);
-                            }}
-                            className="p-1 sm:p-2 text-slate-600 bg-slate-50 rounded-lg active:scale-95 hover:bg-slate-100 transition-all shadow-sm flex items-center gap-1 border border-slate-200 shrink-0 h-6 sm:h-auto"
-                            title="Saisie Manuelle (Durée)"
-                          >
-                            <Clock size={10} />
-                            <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight leading-none text-center">SAISIE<br/>MANUELLE</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
+                        <button 
+                          onClick={() => {
+                             setManualStopForm({
+                               ...manualStopForm,
+                               lineId: line.id,
+                               startTime: new Date(Date.now() - 15 * 60000).toISOString().slice(0, 16),
+                               endTime: new Date().toISOString().slice(0, 16)
+                             });
+                             setShowManualStopModal(true);
+                          }}
+                          className="p-1 px-1.5 text-slate-600 bg-slate-50 rounded-lg active:scale-95 hover:bg-slate-100 transition-all shadow-sm flex flex-col items-center justify-center border border-slate-200 h-7 leading-none"
+                        >
+                          <Clock size={8} />
+                          <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">MANU</span>
+                        </button>
+                      </div>
+                    )}
                     {prog && (
                       <button 
                         onClick={() => handleReleaseLine(line.id)}
-                        className="p-1 sm:p-2 text-red-600 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all shadow-sm flex items-center gap-1 border border-red-100 shrink-0 h-6 sm:h-auto"
-                        title="Libérer la ligne"
+                        className="p-1.5 text-red-500 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all border border-red-100 h-7"
                       >
-                        <X className="w-2.5 h-2.5 sm:w-4 sm:h-4" strokeWidth={3} />
+                        <X className="w-3 h-3" strokeWidth={3} />
                       </button>
                     )}
                     <button 
                       onClick={() => setIsAssigning(line.id)}
-                      className="p-1 sm:p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100 shrink-0 h-6 sm:h-auto"
+                      className="p-1 px-1.5 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100 h-7"
                     >
-                      <Plus className="w-2.5 h-2.5 sm:w-4 sm:h-4" strokeWidth={3} />
-                      <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-tight">
-                        {prog ? 'CHG.' : 'ASS.'}
+                      <Plus className="w-3 h-3" strokeWidth={3} />
+                      <span className="text-[9px] font-black uppercase tracking-tight italic">
+                        {prog ? 'CHG' : 'ASS'}
                       </span>
                     </button>
                   </div>
                 </div>
 
-                <div className="p-1.5 sm:p-4 grid grid-cols-2 gap-1 sm:gap-4 flex-1">
-                  <div className="space-y-0 text-left leading-none">
-                    <p className="text-[7px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Prog.</p>
+                <div className="p-3 grid grid-cols-2 gap-3 flex-1">
+                  <div className="space-y-0 text-left">
+                    <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Programme</p>
                     <p className={cn(
-                      "text-[9px] sm:text-sm font-black truncate",
-                      prog ? "text-blue-900" : "text-slate-300 italic"
+                      "text-[10px] font-black truncate leading-tight uppercase italic",
+                      prog ? "text-blue-900" : "text-slate-300"
                     )}>
                       {prog ? prog.name : '—'}
                     </p>
                   </div>
-                  <div className="space-y-0 text-left leading-none">
-                    <p className="text-[7px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Op.</p>
-                    <p className={cn(
-                      "text-[9px] sm:text-sm font-bold truncate",
-                      op ? "text-slate-800" : "text-slate-300 italic"
-                    )}>
-                      {op ? op.name : '—'}
-                    </p>
+                  <div className="space-y-0 text-left">
+                    <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Opérateur</p>
+                    <div className="flex items-center gap-1">
+                      {op && <div className="w-3 h-3 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-black text-slate-400 uppercase">{op.name.charAt(0)}</div>}
+                      <p className={cn(
+                        "text-[10px] font-bold truncate leading-tight",
+                        op ? "text-slate-800" : "text-slate-300 italic"
+                      )}>
+                        {op ? op.name : 'Vacent'}
+                      </p>
+                    </div>
                   </div>
                   
                   {line.tracksProduction !== 0 && (
-                    <div className="col-span-2 mt-0.5">
-                      <div className="flex justify-between items-center bg-blue-50/20 p-1 sm:p-4 rounded-lg border border-blue-100/10">
-                        <p className="text-[7px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-tight">Produit</p>
-                        <p className="text-sm sm:text-3xl font-black text-blue-600 leading-none">
-                          {prog ? prog.producedPallets : '0'}<span className="text-[7px] ml-0.5 text-slate-300 not-italic">P.</span>
-                        </p>
+                    <div className="col-span-2">
+                    <div className="flex justify-between items-center bg-blue-50/40 p-2 rounded-xl border border-blue-100/50 group/prod">
+                        <div>
+                          <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Production</p>
+                          <p className="text-xl font-black text-blue-600 leading-none tabular-nums group-hover/prod:scale-105 transition-transform origin-left">
+                            {prog ? prog.producedPallets : '0'}<span className="text-[9px] ml-1 text-blue-300 font-black">PAL.</span>
+                          </p>
+                        </div>
+                        {prog && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePalletTick(line.id, prog.id);
+                            }}
+                            className="bg-blue-600 text-white rounded-xl px-2 py-1 flex items-center gap-1 shadow-lg shadow-blue-500/20 active:scale-90 hover:bg-blue-500 transition-all border border-blue-400"
+                          >
+                            <Plus size={14} strokeWidth={3} />
+                            <span className="text-[9px] font-black uppercase italic tracking-tighter">AJOUTER</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
                 </div>
 
                 {down && (
-                  <div className="px-1.5 pb-1.5">
-                     <div className="bg-status-downtime-bg/40 p-1 rounded-lg flex justify-between items-center border border-orange-100/50">
-                        <div className="flex items-center gap-1 text-status-downtime-text leading-none">
-                          <Activity size={10} className="animate-pulse" />
-                          <span className="text-[8px] font-black uppercase tracking-tight truncate max-w-[80px]">{downType?.name || 'Arrêt'}</span>
+                  <div className="px-3 pb-3">
+                     <div className="bg-rose-50 p-2 rounded-xl flex justify-between items-center border border-rose-100 animate-in fade-in duration-300">
+                        <div className="flex items-center gap-2 text-rose-600 leading-none">
+                          <Activity size={14} className="animate-pulse" />
+                          <span className="text-[9px] font-black uppercase tracking-tight truncate max-w-[120px] italic">{downType?.name || 'Arrêt'}</span>
                         </div>
-                        <span className="text-[7px] font-mono font-bold text-orange-800 bg-white/40 px-1 rounded border border-orange-100/30">
-                              {new Date(down.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <span className="text-[9px] font-mono font-black text-white bg-rose-500 px-1.5 py-0.5 rounded shadow-sm">
+                          {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
                         </span>
                       </div>
                   </div>

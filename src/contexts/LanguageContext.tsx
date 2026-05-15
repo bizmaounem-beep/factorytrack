@@ -180,7 +180,9 @@ export const translations: Translation = {
   date: { fr: 'Date' },
   all_machines: { fr: 'Toutes les machines' },
   all_lines: { fr: 'Toutes les lignes' },
-  all_shifts: { fr: 'Toutes les équipes' }
+  all_shifts: { fr: 'Toutes les équipes' },
+  all_operators: { fr: 'Tous les opérateurs' },
+  new_pin_placeholder: { fr: 'Nouveau PIN (Laissez vide pour conserver)' }
 };
 
 interface LanguageContextType {

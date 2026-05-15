@@ -978,7 +978,7 @@ export default function OperatorScreen() {
                                     setFlashFeedback(true);
                                     setTimeout(() => setFlashFeedback(false), 500);
                                   }}
-                                  className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded-lg font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all active:scale-95"
+                                  className="flex items-center gap-1.5 px-2 py-0.5 text-blue-500 bg-blue-50 rounded-lg transition-colors font-black text-[9px] uppercase border border-blue-50 hover:bg-blue-500 hover:text-white"
                                 >
                                   <Plus size={12} />
                                   Ajouter
