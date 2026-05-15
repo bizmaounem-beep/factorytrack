@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { loginLocal } from '../lib/localApi';
+import { loginLocal, setupSecurityLocal } from '../lib/localApi';
 
 interface AuthContextType {
   user: User | null;
-  login: (pin: string) => Promise<boolean>;
+  login: (credentials: { pin?: string; username?: string; password?: string }) => Promise<boolean>;
+  setupSecurity: (username: string, password?: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
 }
@@ -24,9 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (pin: string) => {
+  const login = async (credentials: { pin?: string; username?: string; password?: string }) => {
     try {
-      const foundUser = await loginLocal(pin);
+      const foundUser = await loginLocal(credentials);
       
       if (foundUser) {
         setUser(foundUser);
@@ -36,6 +37,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     } catch (error) {
       // Re-throw the friendly error message
+      throw error;
+    }
+  };
+
+  const setupSecurity = async (username: string, password?: string) => {
+    if (!user) return false;
+    try {
+      const result = await setupSecurityLocal({ userId: user.id, username, password });
+      if (result.success) {
+        // Refresh local user state
+        const updatedUser = { ...user, username, password_hash: 'SET', pin: undefined };
+        setUser(updatedUser);
+        localStorage.setItem('factory_user', JSON.stringify(updatedUser));
+        return true;
+      }
+      return false;
+    } catch (error) {
       throw error;
     }
   };

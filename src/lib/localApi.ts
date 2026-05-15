@@ -123,27 +123,48 @@ export const localApi = {
   }
 };
 
-export const loginLocal = async (pin: string) => {
+export const loginLocal = async (credentials: { pin?: string; username?: string; password?: string }) => {
   try {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin })
+      body: JSON.stringify(credentials)
     });
+    
     if (res.status === 401) {
-      throw new Error('Code PIN incorrect');
+      if (credentials.pin) throw new Error('Code PIN incorrect');
+      throw new Error('Identifiants invalides');
     }
+    
     if (!res.ok) {
-      throw new Error('Erreur de connexion');
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Erreur de connexion');
     }
-    const contentType = res.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Erreur de serveur');
-    }
+    
     return res.json();
   } catch (e) {
-    if ((e as Error).message === 'Code PIN incorrect') throw e;
+    if ((e as Error).message === 'Code PIN incorrect' || (e as Error).message === 'Identifiants invalides') throw e;
     console.error('Login error:', e);
     throw new Error('Erreur de connexion');
+  }
+};
+
+export const setupSecurityLocal = async (data: { userId: string; username: string; password?: string }) => {
+  try {
+    const res = await fetch('/api/setup-security', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Échec de la configuration');
+    }
+    
+    return res.json();
+  } catch (e) {
+    console.error('Setup security error:', e);
+    throw e;
   }
 };

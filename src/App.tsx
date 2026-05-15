@@ -4,6 +4,7 @@ import Login from './components/Login';
 import OperatorScreen from './components/OperatorScreen';
 import PilotScreen from './components/PilotScreen';
 import AdminPanel from './components/AdminPanel';
+import SecuritySetup from './components/SecuritySetup';
 import { useEffect, useState } from 'react';
 import { Terminal, Download, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -51,6 +52,11 @@ export default function App() {
 
   const renderContent = () => {
     if (!user) return <Login />;
+
+    // Force security setup if password_hash is missing
+    if (!user.password_hash) {
+      return <SecuritySetup />;
+    }
 
     switch (user.role) {
       case 'ADMIN':
