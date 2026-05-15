@@ -19,7 +19,10 @@ export function formatMinutes(seconds: number) {
 }
 
 export function formatDowntimeDisplay(seconds: number) {
-  if (!seconds || seconds <= 0) return '00 min';
+  if (!seconds || seconds <= 0) return '0s';
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
   const totalMinutes = Math.floor(seconds / 60);
   if (totalMinutes < 60) {
     return `${totalMinutes.toString().padStart(2, '0')} min`;

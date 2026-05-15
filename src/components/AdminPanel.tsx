@@ -408,7 +408,8 @@ export default function AdminPanel() {
       downLogs.forEach(log => {
         const start = new Date(log.startTime);
         const end = log.endTime ? new Date(log.endTime) : null;
-        const durationMin = log.duration ? Math.round(log.duration / 60) : 0;
+        const durationSec = getLogDurationSec(log);
+        const durationMin = Number((durationSec / 60).toFixed(2));
         
         dataSheet.addRow({
           date: start.toLocaleDateString(),
@@ -440,9 +441,9 @@ export default function AdminPanel() {
       currentRow++;
 
       downtimeTypes.forEach(t => {
-        const total = downLogs.filter(l => l.typeId === t.id).reduce((acc, l) => acc + (l.duration || 0), 0);
-        if (total > 0) {
-          dashboardSheet.getRow(currentRow).values = [t.name, Math.round(total / 60000)];
+        const totalSec = downLogs.filter(l => l.typeId === t.id).reduce((acc, l) => acc + getLogDurationSec(l), 0);
+        if (totalSec > 0) {
+          dashboardSheet.getRow(currentRow).values = [t.name, Number((totalSec / 60).toFixed(2))];
           currentRow++;
         }
       });
@@ -459,9 +460,9 @@ export default function AdminPanel() {
 
       machines.forEach(m => {
         const logs = downLogs.filter(l => l.machineId === m.id);
-        const total = logs.reduce((acc, l) => acc + (l.duration || 0), 0);
-        if (total > 0 || logs.length > 0) {
-          dashboardSheet.getRow(currentRow).values = [m.name, Math.round(total / 60000), logs.length];
+        const totalSec = logs.reduce((acc, l) => acc + getLogDurationSec(l), 0);
+        if (totalSec > 0 || logs.length > 0) {
+          dashboardSheet.getRow(currentRow).values = [m.name, Number((totalSec / 60).toFixed(2)), logs.length];
           currentRow++;
         }
       });
