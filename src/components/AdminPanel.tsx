@@ -1155,17 +1155,15 @@ export default function AdminPanel() {
                     >
                       <Download size={12} /> {t('export')}
                     </button>
-                    {historyLogType === 'downtime' && (
-                      <button 
-                        onClick={() => openModal('downtime_log', {
-                          startTime: new Date().toISOString(),
-                          operatorId: user?.id,
-                        })}
-                        className="p-1.5 px-3 bg-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center gap-1.5"
-                      >
-                        <Plus size={12} strokeWidth={3} /> {t('add')}
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => openModal('downtime_log', {
+                        startTime: new Date().toISOString(),
+                        operatorId: user?.id,
+                      })}
+                      className="p-1.5 px-3 bg-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center gap-1.5"
+                    >
+                      <Plus size={12} strokeWidth={3} /> {t('add_downtime_log')}
+                    </button>
                   </div>
                   
                   <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
@@ -1437,8 +1435,17 @@ export default function AdminPanel() {
           )}
           {activeTab === 'reports' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              <div className="px-1">
+              <div className="px-1 flex items-center justify-between">
                 <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('exports')}</h2>
+                <button 
+                  onClick={() => openModal('downtime_log', {
+                    startTime: new Date().toISOString(),
+                    operatorId: user?.id,
+                  })}
+                  className="p-1.5 px-3 bg-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <Plus size={12} strokeWidth={3} /> {t('add_downtime_log')}
+                </button>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                  <div className="card p-4 md:p-6 flex flex-col gap-4 relative overflow-hidden group">
