@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.factorycloud.app',
-  appName: 'Factorycloud',
+  appName: 'AgroSync',
   webDir: 'dist',
   server: {
     // Cette adresse permet à l'app mobile de contacter votre NUC

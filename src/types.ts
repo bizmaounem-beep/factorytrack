@@ -4,7 +4,9 @@ export type LineStatus = 'IDLE' | 'RUNNING' | 'STOPPED';
 export interface User {
   id: string;
   name: string;
-  pin: string;
+  pin?: string;
+  username?: string;
+  password_hash?: string;
   role: UserRole;
 }
 
