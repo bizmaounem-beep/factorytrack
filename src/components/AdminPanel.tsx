@@ -474,16 +474,18 @@ export default function AdminPanel() {
       currentRow++;
 
       lines.forEach(line => {
-        const totalMin = downLogs
-          .filter(l => l.lineId === line.id)
-          .reduce((acc, l) => acc + getLogDurationSec(l), 0) / 60;
-        
-        if (totalMin > 0) {
-          const row = dashboardSheet.getRow(currentRow);
-          row.values = [line.name, Number(totalMin.toFixed(1))];
-          row.eachCell(cell => Object.assign(cell, cellStyle));
-          currentRow++;
-        }
+        const row = dashboardSheet.getRow(currentRow);
+        row.values = [
+          line.name, 
+          { formula: `SUMIF(Data!C:C, "${line.name}", Data!H:H)` }
+        ];
+        row.eachCell(cell => {
+          Object.assign(cell, cellStyle);
+          if (cell.type === ExcelJS.ValueType.Formula) {
+            cell.numFmt = '0.0';
+          }
+        });
+        currentRow++;
       });
 
       // Top 5 Causes
@@ -747,6 +749,21 @@ export default function AdminPanel() {
                    </motion.div>
                  ))}
               </motion.div>
+
+              <div className="flex justify-end px-1">
+                <button 
+                  onClick={() => openModal('downtime_log', {
+                    startTime: new Date().toISOString(),
+                    operatorId: user?.id,
+                  })}
+                  className="bg-white border border-gray-200 text-gray-900 px-4 py-2.5 rounded-xl font-black shadow-sm active:scale-95 transition-all text-[10px] tracking-widest uppercase flex items-center gap-2 hover:bg-gray-50 group"
+                >
+                  <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
+                    <Plus size={12} strokeWidth={3} />
+                  </div>
+                  {t('add_downtime_log')}
+                </button>
+              </div>
 
               {/* BOTTOM ROW: SHIFT PERF & LIVE MONITOR */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1614,8 +1631,8 @@ export default function AdminPanel() {
                       onChange={e => setModalData({...modalData, operatorId: e.target.value})}
                     >
                       <option value="">{t('select_operator') || 'Choisir un opérateur'}</option>
-                      {users.filter(u => u.role === 'OPERATOR').map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                       ))}
                     </select>
                   </div>
@@ -1669,20 +1686,10 @@ export default function AdminPanel() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Opérateur</label>
-                    <select 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
-                      value={modalData.operatorId || ''}
-                      onChange={e => setModalData({...modalData, operatorId: e.target.value})}
-                    >
-                      <option value="">Sélectionner un opérateur</option>
-                      {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('description_comment')}</label>
                     <textarea 
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      placeholder={t('comments')}
                       value={modalData.description || ''}
                       onChange={e => setModalData({...modalData, description: e.target.value})}
                     />
