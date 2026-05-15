@@ -506,11 +506,6 @@ export default function PilotScreen() {
         return;
       }
 
-      if (!isToday(new Date(data.startTime)) || !isToday(new Date(data.endTime))) {
-        alert("Le pilote ne peut ajouter des arrêts que pour la journée en cours.");
-        return;
-      }
-
       const currentShiftId = getCurrentShiftId(shifts);
 
       await localApi.addDoc('downtime_logs', {

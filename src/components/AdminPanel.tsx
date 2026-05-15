@@ -148,7 +148,7 @@ export default function AdminPanel() {
         }
       }
       if (modalType === 'downtime_log') {
-        if (!modalData.machineId || !modalData.lineId || !modalData.typeId || !modalData.startTime || !modalData.endTime) {
+        if (!modalData.machineId || !modalData.lineId || !modalData.typeId || !modalData.startTime || !modalData.endTime || !modalData.operatorId) {
           alert(t('fill_all_fields'));
           return;
         }
@@ -1596,6 +1596,19 @@ export default function AdminPanel() {
                       <option value="">{t('choose_line')}</option>
                       {lines.filter(l => l.machineId === modalData.machineId).map(l => (
                         <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('operator')}</label>
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      value={modalData.operatorId || ''}
+                      onChange={e => setModalData({...modalData, operatorId: e.target.value})}
+                    >
+                      <option value="">{t('select_operator') || 'Choisir un opérateur'}</option>
+                      {users.filter(u => u.role === 'OPERATOR').map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
                       ))}
                     </select>
                   </div>
