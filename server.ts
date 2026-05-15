@@ -218,6 +218,9 @@ async function startServer() {
 
   const app = express();
   
+  // Important: trust proxy must be enabled for express-rate-limit to work behind a load balancer/proxy
+  app.set('trust proxy', 1);
+  
   // Security Middlewares
   app.use(helmet({
     contentSecurityPolicy: false, // Vite handles CSP in dev
