@@ -1454,15 +1454,6 @@ export default function AdminPanel() {
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
                 <div className="px-1 flex items-center gap-4">
                   <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('exports')}</h2>
-                  <button 
-                    onClick={() => openModal('downtime_log', {
-                      startTime: new Date().toISOString(),
-                      operatorId: user?.id || '',
-                    })}
-                    className="p-1.5 px-4 bg-green-600 hover:bg-green-700 rounded-lg text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-green-200 active:scale-95 transition-all flex items-center gap-2 border-2 border-green-500/20"
-                  >
-                    <Plus size={14} strokeWidth={3} /> {t('add_downtime_log') || 'Saisir un arrêt manuel'}
-                  </button>
                 </div>
               <div className="grid md:grid-cols-2 gap-4">
                  <div className="card p-4 md:p-6 flex flex-col gap-4 relative overflow-hidden group">
