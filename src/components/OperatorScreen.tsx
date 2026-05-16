@@ -738,7 +738,7 @@ export default function OperatorScreen() {
                       </span>
                     </div>
 
-                    {activeDowntime ? (
+                    {activeDowntime && !categorizingLogId ? (
                       <div className="space-y-4 w-full max-w-md mx-auto">
                         <div className="bg-black/40 rounded-2xl p-5 border border-white/5 backdrop-blur-3xl shadow-inner group">
                           <div className="flex items-center justify-center gap-2 text-rose-500 mb-2">
@@ -768,6 +768,169 @@ export default function OperatorScreen() {
                         >
                           <Play size={18} fill="currentColor" /> Relancer la Ligne
                         </button>
+
+                        <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Statut Opérationnel</span>
+                            <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-rose-500/20">
+                              Ligne Stoppée
+                            </span>
+                          </div>
+                          
+                          {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
+                            <div className="flex items-start gap-3 border-t border-white/5 pt-3">
+                              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-lg flex-shrink-0">
+                                {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.icon || '⚠️'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Motif Détecté</p>
+                                <p className="text-xs font-black text-white uppercase truncate">
+                                  {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
+                                </p>
+                                {activeDowntime.description && (
+                                  <p className="mt-1 text-[10px] font-medium text-slate-400 italic line-clamp-2">
+                                    "{activeDowntime.description}"
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!activeDowntime.typeId || activeDowntime.typeId === 'PENDING' ? (
+                            <div className="flex items-center gap-2 bg-blue-500/10 p-3 rounded-xl border border-blue-500/20">
+                               <Info size={14} className="text-blue-400 flex-shrink-0" />
+                               <p className="text-[9px] font-bold text-blue-300 leading-tight">
+                                 L'arrêt sera qualifié automatiquement à la reprise du cycle.
+                               </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : (isInitialSelection || categorizingLogId) ? (
+                      <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
+                        <div className="flex items-center justify-center gap-3">
+                           <div className="flex flex-col items-center">
+                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 leading-none mb-1">
+                               {isInitialSelection ? 'Initialisation' : 'Qualification'}
+                             </h3>
+                             <p className="text-xl font-black text-white italic tracking-tighter uppercase leading-none">
+                                {isInitialSelection ? 'Type d\'arrêt' : 'Cause détectée'}
+                             </p>
+                           </div>
+                           {isInitialSelection && (
+                            <button 
+                              onClick={() => setIsInitialSelection(false)}
+                              className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+
+                        {!selectedStopType ? (
+                          <div className="relative">
+                            <div 
+                              ref={scrollRef}
+                              className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory px-1 items-center"
+                            >
+                              {downtimeTypes.map((type) => (
+                                <button
+                                  key={type.id}
+                                  onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
+                                  className="flex-shrink-0 w-[45%] sm:w-[30%] lg:w-[28%] aspect-square bg-slate-800/40 rounded-2xl border border-white/5 flex flex-col items-center justify-center gap-2 transition-all hover:bg-blue-600 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-lg"
+                                >
+                                  <div className="w-12 h-12 rounded-2xl bg-slate-900/50 flex items-center justify-center text-2xl group-hover:bg-white/20 transition-all shadow-inner">
+                                    {type.icon || '⚠️'}
+                                  </div>
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-center px-2 leading-tight text-slate-400 group-hover:text-white">
+                                    {type.name}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                            
+                            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#0a111f] to-transparent pointer-events-none z-10" />
+                            <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#0a111f] to-transparent pointer-events-none z-10" />
+                            
+                            <button 
+                              onClick={() => scroll('left')}
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
+                            >
+                              <ChevronLeft size={16} />
+                            </button>
+                            <button 
+                              onClick={() => scroll('right')}
+                              className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
+                            >
+                              <ChevronRight size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-slate-800/40 rounded-3xl p-6 border border-white/5 space-y-6"
+                          >
+                            <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                              <div className="text-3xl">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
+                              <div>
+                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Type sélectionné</p>
+                                 <p className="text-sm font-black text-white uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
+                              </div>
+                            </div>
+
+                            {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('AUTRE') ? (
+                              <div className="space-y-4">
+                                <textarea 
+                                  className="w-full p-5 bg-slate-900/50 border border-white/5 rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                                  placeholder="Décrivez la raison..."
+                                  value={downtimeDescription}
+                                  onChange={e => setDowntimeDescription(e.target.value)}
+                                  rows={3}
+                                />
+                                <button 
+                                  onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
+                                  disabled={!downtimeDescription.trim()}
+                                  className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-50"
+                                >
+                                  Confirmer
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="grid gap-3">
+                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center">Choisir le programme cible</p>
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                   {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                                    <button 
+                                      key={p.id}
+                                      onClick={() => {
+                                        setSelectedProgrammeForChange(p.id);
+                                        setTimeout(() => {
+                                          if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
+                                          else handleCategorizeStop(selectedStopType!);
+                                        }, 0);
+                                      }}
+                                      className="p-5 bg-slate-800/50 hover:bg-blue-600 border border-white/5 rounded-2xl font-black text-[11px] text-white transition-all flex items-center justify-between group"
+                                    >
+                                      <span className="uppercase italic tracking-tight">{p.name}</span>
+                                      <Plus size={16} className="text-slate-500 group-hover:text-white" />
+                                    </button>
+                                   ))}
+                                 </div>
+                              </div>
+                            )}
+                            
+                            <button 
+                               onClick={() => {
+                                 setSelectedStopType(null);
+                                 setSelectedProgrammeForChange(null);
+                               }}
+                               className="w-full py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-2"
+                            >
+                               <ArrowLeft size={14} /> {t('back_to_selection') || 'Retour aux catégories'}
+                            </button>
+                          </motion.div>
+                        )}
                       </div>
                     ) : (
                       <div className="w-full flex flex-col gap-2.5 max-w-md mx-auto">
@@ -780,149 +943,9 @@ export default function OperatorScreen() {
                         </button>
                       </div>
                     )}
-                  </div>
                 </div>
-
-                {/* QUALIFICATION SECTION */}
-                <AnimatePresence mode="wait">
-                  {(isInitialSelection || categorizingLogId) && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 30 }}
-                      transition={{ type: "spring", damping: 20, stiffness: 100 }}
-                      className="bg-slate-900 rounded-[2rem] p-6 border border-white/5 shadow-2xl"
-                    >
-                      <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-2">
-                           <div className="w-1.5 h-6 bg-blue-600 rounded-full" />
-                           <div>
-                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 leading-none mb-0.5">
-                               {isInitialSelection ? 'Initialisation' : 'Qualification'}
-                             </h3>
-                             <p className="text-base font-black text-white italic tracking-tighter uppercase leading-none">
-                                {isInitialSelection ? 'Type d\'arrêt' : 'Cause détectée'}
-                             </p>
-                           </div>
-                        </div>
-                        {isInitialSelection && (
-                          <button 
-                            onClick={() => setIsInitialSelection(false)}
-                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all active:scale-90"
-                          >
-                            <X size={20} />
-                          </button>
-                        )}
-                      </div>
-
-                      {!selectedStopType ? (
-                        <div className="relative group">
-                          <div 
-                            ref={scrollRef}
-                            className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory px-1 items-center"
-                          >
-                            {downtimeTypes.map((type) => (
-                              <button
-                                key={type.id}
-                                onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
-                                className="flex-shrink-0 w-[40%] sm:w-[30%] lg:w-[22%] aspect-[4/3] bg-slate-800/40 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-2 transition-all hover:bg-blue-600 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-lg"
-                              >
-                                <div className="w-10 h-10 rounded-xl bg-slate-900/50 flex items-center justify-center text-xl group-hover:bg-white/20 transition-all shadow-inner">
-                                  {type.icon || '⚠️'}
-                                </div>
-                                <span className="text-[8px] font-black uppercase tracking-wider text-center px-2 leading-tight text-slate-400 group-hover:text-white">
-                                  {type.name}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                          
-                          <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-slate-900 to-transparent pointer-events-none z-10" />
-                          <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-slate-900 to-transparent pointer-events-none z-10" />
-                          
-                          <button 
-                            onClick={() => scroll('left')}
-                            className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
-                          >
-                            <ChevronLeft size={16} />
-                          </button>
-                          <button 
-                            onClick={() => scroll('right')}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
-                          >
-                            <ChevronRight size={16} />
-                          </button>
-                        </div>
-                      ) : (
-                        <motion.div 
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="space-y-4"
-                        >
-                          <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
-                            <div className="text-2xl">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
-                            <div>
-                               <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Type sélectionné</p>
-                               <p className="text-xs font-black text-white uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
-                            </div>
-                          </div>
-
-                          {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('AUTRE') ? (
-                            <div className="space-y-4">
-                              <textarea 
-                                className="w-full p-5 bg-slate-800/50 border border-white/5 rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600"
-                                placeholder="Décrivez la raison..."
-                                value={downtimeDescription}
-                                onChange={e => setDowntimeDescription(e.target.value)}
-                                rows={3}
-                              />
-                              <button 
-                                onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
-                                disabled={!downtimeDescription.trim()}
-                                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-50"
-                              >
-                                Confirmer
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="grid gap-2">
-                               <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest px-2">Choisir le programme cible</p>
-                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                 {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
-                                  <button 
-                                    key={p.id}
-                                    onClick={() => {
-                                      setSelectedProgrammeForChange(p.id);
-                                      setTimeout(() => {
-                                        if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
-                                        else handleCategorizeStop(selectedStopType!);
-                                      }, 0);
-                                    }}
-                                    className="p-4 bg-slate-800/50 hover:bg-blue-600 border border-white/5 rounded-2xl font-black text-[10px] text-white transition-all flex items-center justify-between group"
-                                  >
-                                    <span className="uppercase italic tracking-tight">{p.name}</span>
-                                    <Plus size={14} className="text-slate-500 group-hover:text-white" />
-                                  </button>
-                                 ))}
-                               </div>
-                            </div>
-                          )}
-                          
-                          <button 
-                             onClick={() => {
-                               setSelectedStopType(null);
-                               setSelectedProgrammeForChange(null);
-                             }}
-                             className="w-full py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
-                          >
-                             ← Retour aux catégories
-                          </button>
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
+            </div>
 
               {/* RIGHT COLUMN: PRODUCTION & HISTORY */}
               <div className="lg:col-span-5 space-y-6">
