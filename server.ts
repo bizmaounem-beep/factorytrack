@@ -32,8 +32,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 20 * 1024 * 1024 }, // Increase to 20MB
   fileFilter: (req, file, cb) => {
+    console.log(`Receiving file: ${file.originalname} (${file.mimetype})`);
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -341,17 +342,22 @@ async function startServer() {
 
   // Upload Route
   app.post('/api/upload', (req, res) => {
+    console.log('Upload request received');
     upload.single('photo')(req, res, (err) => {
       if (err instanceof multer.MulterError) {
+        console.error('Multer Error:', err);
         return res.status(400).json({ error: `Erreur Multer: ${err.message}` });
       } else if (err) {
+        console.error('Upload Error:', err);
         return res.status(400).json({ error: err.message });
       }
       
       if (!req.file) {
+        console.error('No file in request');
         return res.status(400).json({ error: 'Aucun fichier envoyé.' });
       }
 
+      console.log('File uploaded successfully:', req.file.filename);
       res.json({ 
         url: `/uploads/${req.file.filename}`, 
         path: req.file.filename 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
@@ -164,6 +164,10 @@ export default function PilotScreen() {
     description: '',
     lineId: ''
   });
+  const [selectedImagePaths, setSelectedImagePaths] = useState<string[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
 
   // Auto-select machine if pilot is already assigned in DB
@@ -489,6 +493,62 @@ export default function PilotScreen() {
     }
   };
 
+  const uploadFile = async (file: Blob | File, preview: string) => {
+    setIsUploading(true);
+    
+    // Client-side size check (20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      alert('Le fichier est trop volumineux (max 20Mo).');
+      setIsUploading(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('photo', file, 'photo.jpg');
+  
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(`Réponse inattendue (${res.status}): ${text.substring(0, 50)}`);
+      }
+
+      if (res.ok && data.path) {
+        setSelectedImagePaths(prev => [...prev, data.path]);
+        setImagePreviews(prev => [...prev, preview]);
+      } else {
+        throw new Error(data.error || `Erreur ${res.status}`);
+      }
+    } catch (e: any) {
+      console.error('Erreur upload:', e);
+      alert(`Erreur de téléchargement: ${e.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleTakeStorePhoto = async () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach((file: File) => {
+        const preview = URL.createObjectURL(file);
+        uploadFile(file, preview);
+      });
+    }
+  };
+
   const handleManualStop = async (data: typeof manualStopForm) => {
     if (!user || !selectedMachineId || !data.lineId) return;
 
@@ -518,10 +578,13 @@ export default function PilotScreen() {
         shiftId: currentShiftId,
         startTime: new Date(data.startTime).toISOString(),
         endTime: new Date(data.endTime).toISOString(),
-        duration: Math.floor(durationMs / 1000)
+        duration: Math.floor(durationMs / 1000),
+        images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined
       });
       
       setShowManualStopModal(false);
+      setSelectedImagePaths([]);
+      setImagePreviews([]);
       setManualStopForm({
         ...manualStopForm,
         typeId: '',

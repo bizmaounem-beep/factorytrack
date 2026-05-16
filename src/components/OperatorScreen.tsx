@@ -341,6 +341,14 @@ export default function OperatorScreen() {
   
   const uploadFile = async (file: Blob | File, preview: string) => {
     setIsUploading(true);
+    
+    // Client-side size check (20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      alert('Le fichier est trop volumineux (max 20Mo).');
+      setIsUploading(false);
+      return;
+    }
+
     const formData = new FormData();
     formData.append('photo', file, 'photo.jpg');
   
@@ -349,16 +357,25 @@ export default function OperatorScreen() {
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
-      if (data.path) {
+      
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(`Réponse inattendue (${res.status}): ${text.substring(0, 50)}`);
+      }
+
+      if (res.ok && data.path) {
         setSelectedImagePaths(prev => [...prev, data.path]);
         setImagePreviews(prev => [...prev, preview]);
       } else {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data.error || `Erreur ${res.status}`);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erreur upload:', e);
-      alert('Erreur lors du téléchargement de l\'image.');
+      alert(`Erreur de téléchargement: ${e.message}`);
     } finally {
       setIsUploading(false);
     }
