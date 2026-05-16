@@ -137,10 +137,17 @@ async function startServer() {
       try {
         const pragma = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
         const columns = pragma.map(p => p.name);
+        
         if (!columns.includes('shiftId')) {
           console.log(`Migration: Adding shiftId column to ${table}...`);
           db.exec(`ALTER TABLE ${table} ADD COLUMN shiftId TEXT;`);
         }
+        
+        if (table === 'downtime_logs' && !columns.includes('operatorId')) {
+          console.log(`Migration: Adding operatorId column to downtime_logs...`);
+          db.exec(`ALTER TABLE downtime_logs ADD COLUMN operatorId TEXT;`);
+        }
+
         if (table === 'lines' && !columns.includes('isActive')) {
           console.log(`Migration: Adding isActive column to lines...`);
           db.exec(`ALTER TABLE lines ADD COLUMN isActive INTEGER DEFAULT 1;`);
