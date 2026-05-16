@@ -1516,7 +1516,7 @@ export default function AdminPanel() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl border border-gray-100"
+            className="bg-white w-full max-w-sm md:max-w-xl rounded-[32px] p-6 md:p-8 space-y-6 shadow-2xl border border-gray-100 max-h-[95vh] overflow-y-auto"
           >
             <div className="space-y-0.5">
               <h3 className="text-base font-black tracking-tight text-gray-900 uppercase italic leading-none">
@@ -1594,11 +1594,11 @@ export default function AdminPanel() {
               )}
 
               {modalType === 'downtime_log' && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('machine')}</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('machine')}</label>
                     <select 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
                       value={modalData.machineId || ''}
                       onChange={e => {
                         const mId = e.target.value;
@@ -1609,10 +1609,10 @@ export default function AdminPanel() {
                       {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</label>
                     <select 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
                       disabled={!modalData.machineId}
                       value={modalData.lineId || ''}
                       onChange={e => setModalData({...modalData, lineId: e.target.value})}
@@ -1623,10 +1623,10 @@ export default function AdminPanel() {
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('operator')}</label>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('operator')}</label>
                     <select 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
                       value={modalData.operatorId || ''}
                       onChange={e => setModalData({...modalData, operatorId: e.target.value})}
                     >
@@ -1636,10 +1636,10 @@ export default function AdminPanel() {
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('downtime_reason')}</label>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('downtime_reason')}</label>
                     <select 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
                       value={modalData.typeId || ''}
                       onChange={e => setModalData({...modalData, typeId: e.target.value})}
                     >
@@ -1647,11 +1647,11 @@ export default function AdminPanel() {
                       {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_time')}</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_time')}</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs"
                       value={modalData.startTime ? format(new Date(modalData.startTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1666,11 +1666,11 @@ export default function AdminPanel() {
                       }}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_time')}</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_time')}</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs"
                       value={modalData.endTime ? format(new Date(modalData.endTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1685,16 +1685,16 @@ export default function AdminPanel() {
                       }}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('description_comment')}</label>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('description_comment')}</label>
                     <textarea 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs min-h-[80px]"
                       placeholder={t('comments')}
                       value={modalData.description || ''}
                       onChange={e => setModalData({...modalData, description: e.target.value})}
                     />
                   </div>
-                </>
+                </div>
               )}
 
               {modalType === 'programme' && (
