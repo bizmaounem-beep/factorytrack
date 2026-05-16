@@ -1,6 +1,6 @@
 {
   "name": "Factorycloud",
   "description": "Industrial production tracking and downtime monitoring system for factory environments.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

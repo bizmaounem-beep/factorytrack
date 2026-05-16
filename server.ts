@@ -249,32 +249,46 @@ async function startServer() {
   }
 
   const app = express();
-  
+
   // Trust proxy is required when running behind a reverse proxy (like Nginx in our container)
   // to correctly handle X-Forwarded-For headers for rate limiting and IP detection.
   app.set('trust proxy', 1);
-  
-  // Static files for uploads
-  app.use('/uploads', express.static(UPLOADS_DIR));
-  
-  // Security Middlewares
+
+  // Security Middlewares - MUST BE BEFORE ROUTES to handle CORS Preflights etc
   app.use(helmet({
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  
+  // Debug middleware for all requests
+  app.use((req, res, next) => {
+    console.log(`[REQ] ${req.method} ${req.url}`);
+    next();
+  });
 
-  // UPLOAD ROUTE - HIGH PRIORITY
-  app.post('/api/upload', (req, res) => {
-    console.log('[UPLOAD] Request received at /api/upload');
+  // Static files for uploads
+  app.use('/uploads', express.static(UPLOADS_DIR));
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+  
+  // UPLOAD ROUTE - ABSOLUTE TOP PRIORITY
+  app.post(['/api/upload', '/api/upload/'], (req, res) => {
+    console.log('[UPLOAD] POST request to /api/upload');
+    console.log('[UPLOAD] Headers:', JSON.stringify(req.headers, null, 2));
+    
     upload.single('photo')(req, res, (err) => {
       if (err) {
         console.error('[UPLOAD] Multer error:', err);
-        return res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message || 'Multer error' });
       }
       if (!req.file) {
-        console.error('[UPLOAD] No file');
-        return res.status(400).json({ error: 'Fichier manquant' });
+        console.error('[UPLOAD] No file was found in the request. Body keys:', Object.keys(req.body || {}));
+        return res.status(400).json({ error: 'Fichier manquant (Photo non reçue par le serveur)' });
       }
       console.log('[UPLOAD] Success:', req.file.filename);
       res.json({ 
@@ -282,6 +296,16 @@ async function startServer() {
         path: req.file.filename 
       });
     });
+  });
+
+  // API Catch-all for debugging 404s before they hit Vite/SPA fallback
+  app.all('/api/*', (req, res, next) => {
+    // If we are here, it means no previous /api route matched
+    console.warn(`[API 404] No route matched: ${req.method} ${req.url}`);
+    if (req.accepts('json')) {
+      return res.status(404).json({ error: `Route API inconnue: ${req.method} ${req.url}` });
+    }
+    next();
   });
 
   const httpServer = createServer(app);
@@ -336,11 +360,6 @@ async function startServer() {
   };
 
   // API Endpoints
-  app.use('/api', (req, res, next) => {
-    console.log(`[API] ${req.method} ${req.url}`);
-    next();
-  });
-
   const getServerShiftId = () => {
     try {
       const now = new Date();
