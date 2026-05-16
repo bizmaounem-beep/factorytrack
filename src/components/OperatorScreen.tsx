@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
@@ -63,8 +63,8 @@ export default function OperatorScreen() {
   const [selectedProgrammeForChange, setSelectedProgrammeForChange] = useState<string | null>(null);
   const [palletInput, setPalletInput] = useState('1');
   const [downtimeDescription, setDowntimeDescription] = useState('');
-  const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImagePaths, setSelectedImagePaths] = useState<string[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,6 +89,7 @@ export default function OperatorScreen() {
     endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     description: ''
   });
+  const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
 
   // Session Persistence
   useEffect(() => {
@@ -306,18 +307,19 @@ export default function OperatorScreen() {
     if (Capacitor.isNativePlatform()) {
       try {
         const image = await CapCamera.getPhoto({
-          quality: 90,
+          quality: 80,
           allowEditing: false,
           resultType: CameraResultType.Uri,
           source: CameraSource.Prompt,
-          saveToGallery: true
+          saveToGallery: true,
+          width: 1200 // Resizing for efficiency
         });
-
+  
         if (image.webPath) {
-          setImagePreview(image.webPath);
-          const response = await fetch(image.webPath);
+          const preview = image.webPath;
+          const response = await fetch(preview);
           const blob = await response.blob();
-          uploadFile(blob);
+          uploadFile(blob, preview);
         }
       } catch (e) {
         console.error('Erreur caméra:', e);
@@ -326,20 +328,22 @@ export default function OperatorScreen() {
       fileInputRef.current?.click();
     }
   };
-
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImagePreview(URL.createObjectURL(file));
-      uploadFile(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach((file: File) => {
+        const preview = URL.createObjectURL(file);
+        uploadFile(file, preview);
+      });
     }
   };
-
-  const uploadFile = async (file: Blob) => {
+  
+  const uploadFile = async (file: Blob | File, preview: string) => {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('photo', file, 'photo.jpg');
-
+  
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
@@ -347,14 +351,14 @@ export default function OperatorScreen() {
       });
       const data = await res.json();
       if (data.path) {
-        setSelectedImagePath(data.path);
+        setSelectedImagePaths(prev => [...prev, data.path]);
+        setImagePreviews(prev => [...prev, preview]);
       } else {
         throw new Error(data.error || 'Upload failed');
       }
     } catch (e) {
       console.error('Erreur upload:', e);
       alert('Erreur lors du téléchargement de l\'image.');
-      setImagePreview(null);
     } finally {
       setIsUploading(false);
     }
@@ -393,7 +397,7 @@ export default function OperatorScreen() {
         description: isChangeProg 
           ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
           : (downtimeDescription.trim() || undefined),
-        image_path: selectedImagePath || undefined,
+        images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined,
         operatorId: user.id,
         shiftId: currentShiftId,
         startTime: new Date().toISOString()
@@ -412,8 +416,8 @@ export default function OperatorScreen() {
       setSelectedStopType(null);
       setSelectedProgrammeForChange(null);
       setDowntimeDescription('');
-      setSelectedImagePath(null);
-      setImagePreview(null);
+      setSelectedImagePaths([]);
+      setImagePreviews([]);
     } catch (error) {
       console.error('Error starting qualified downtime:', error);
       alert('Erreur: Impossible de démarrer l\'arrêt.');
@@ -469,7 +473,7 @@ export default function OperatorScreen() {
         description: isChangeProg 
           ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
           : (downtimeDescription.trim() || categorizingLog?.description || undefined),
-        image_path: selectedImagePath || undefined
+        images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined
       };
 
       if (user) {
@@ -495,8 +499,8 @@ export default function OperatorScreen() {
 
       setSelectedStopType(null);
       setDowntimeDescription('');
-      setSelectedImagePath(null);
-      setImagePreview(null);
+      setSelectedImagePaths([]);
+      setImagePreviews([]);
     } catch (error) {
       console.error('Error categorizing downtime:', error);
     }
@@ -908,7 +912,7 @@ export default function OperatorScreen() {
                               {downtimeTypes.map((type) => (
                                 <button
                                   key={type.id}
-                                  onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
+                                  onClick={() => setSelectedStopType(type.id)}
                                   className="flex-shrink-0 w-[45%] sm:w-[30%] lg:w-[28%] aspect-square bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center gap-2 transition-all hover:bg-blue-600 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-sm"
                                 >
                                   <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-2xl group-hover:bg-white/20 transition-all shadow-inner">
@@ -951,12 +955,28 @@ export default function OperatorScreen() {
                               </div>
                             </div>
 
-                            {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('AUTRE') ? (
+                            {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('FORMAT') && !selectedProgrammeForChange ? (
+                              <div className="grid gap-3">
+                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center">Choisir le programme cible</p>
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                   {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                                    <button 
+                                      key={p.id}
+                                      onClick={() => setSelectedProgrammeForChange(p.id)}
+                                      className="p-5 bg-white hover:bg-blue-600 border border-gray-100 rounded-2xl font-black text-[11px] text-slate-800 transition-all flex items-center justify-between group"
+                                    >
+                                      <span className="uppercase italic tracking-tight group-hover:text-white">{p.name}</span>
+                                      <Plus size={16} className="text-slate-500 group-hover:text-white" />
+                                    </button>
+                                   ))}
+                                 </div>
+                              </div>
+                            ) : (
                               <div className="space-y-4">
                                 <div className="space-y-4">
                                   <textarea 
                                     className="w-full p-5 bg-gray-100 border border-gray-200 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400"
-                                    placeholder="Décrivez la raison..."
+                                    placeholder={t('description') + " (optionnel)..."}
                                     value={downtimeDescription}
                                     onChange={e => setDowntimeDescription(e.target.value)}
                                     rows={3}
@@ -967,72 +987,53 @@ export default function OperatorScreen() {
                                     <input 
                                       type="file" 
                                       accept="image/*" 
+                                      multiple
                                       className="hidden" 
                                       ref={fileInputRef}
                                       onChange={handleFileChange}
                                     />
-                                    {!imagePreview ? (
-                                      <button
-                                        onClick={handleTakeStorePhoto}
-                                        disabled={isUploading}
-                                        className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-blue-600 hover:border-blue-500/50 transition-all group"
-                                      >
-                                        <Camera size={24} className="group-hover:scale-110 transition-transform" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">
-                                          {isUploading ? 'Téléchargement...' : 'Ajouter une photo'}
-                                        </span>
-                                      </button>
-                                    ) : (
-                                      <div className="relative aspect-video rounded-2xl overflow-hidden border border-gray-200 bg-gray-100">
-                                        <img 
-                                          src={imagePreview} 
-                                          alt="Preview" 
-                                          className="w-full h-full object-cover"
-                                        />
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                    
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {imagePreviews.map((prev, idx) => (
+                                        <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100 group/img">
+                                          <img 
+                                            src={prev} 
+                                            alt={`Preview ${idx}`} 
+                                            className="w-full h-full object-cover"
+                                          />
                                           <button
                                             onClick={() => {
-                                              setImagePreview(null);
-                                              setSelectedImagePath(null);
+                                              setImagePreviews(prevs => prevs.filter((_, i) => i !== idx));
+                                              setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
                                             }}
-                                            className="w-12 h-12 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-xl active:scale-95 transition-all"
+                                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition-all opacity-0 group-hover/img:opacity-100"
                                           >
-                                            <Trash size={20} />
+                                            <X size={12} />
                                           </button>
                                         </div>
-                                      </div>
-                                    )}
+                                      ))}
+                                      {imagePreviews.length < 5 && (
+                                        <button
+                                          onClick={handleTakeStorePhoto}
+                                          disabled={isUploading}
+                                          className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-blue-600 hover:border-blue-500/50 transition-all group"
+                                        >
+                                          <Camera size={20} className="group-hover:scale-110 transition-transform" />
+                                          <span className="text-[7px] font-black uppercase tracking-widest leading-none">
+                                            {isUploading ? '...' : '+ Photo'}
+                                          </span>
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                                 <button 
                                   onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
-                                  disabled={!downtimeDescription.trim() || isUploading}
-                                  className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-50"
+                                  disabled={isUploading}
+                                  className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all text-center"
                                 >
-                                  Confirmer
+                                  {isInitialSelection ? 'Valider l\'arrêt' : 'Enregistrer Qualification'}
                                 </button>
-                              </div>
-                            ) : (
-                              <div className="grid gap-3">
-                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center">Choisir le programme cible</p>
-                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                   {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
-                                    <button 
-                                      key={p.id}
-                                      onClick={() => {
-                                        setSelectedProgrammeForChange(p.id);
-                                        setTimeout(() => {
-                                          if (isInitialSelection) handleConfirmStartDowntime(selectedStopType!);
-                                          else handleCategorizeStop(selectedStopType!);
-                                        }, 0);
-                                      }}
-                                      className="p-5 bg-white hover:bg-blue-600 border border-gray-100 rounded-2xl font-black text-[11px] text-slate-800 transition-all flex items-center justify-between group"
-                                    >
-                                      <span className="uppercase italic tracking-tight group-hover:text-white">{p.name}</span>
-                                      <Plus size={16} className="text-slate-500 group-hover:text-white" />
-                                    </button>
-                                   ))}
-                                 </div>
                               </div>
                             )}
                             
@@ -1245,6 +1246,23 @@ export default function OperatorScreen() {
                                      </span>
                                    </p>
                                  </div>
+                                 {log.images && (
+                                   <div className="flex gap-1 mt-2">
+                                     {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => (
+                                       <div 
+                                         key={i} 
+                                         className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-pointer hover:scale-110 transition-all"
+                                         onClick={() => setSelectedFullImage(img)}
+                                       >
+                                         <img 
+                                           src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} 
+                                           className="w-full h-full object-cover" 
+                                           referrerPolicy="no-referrer"
+                                         />
+                                       </div>
+                                     ))}
+                                   </div>
+                                 )}
                               </div>
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1318,7 +1336,7 @@ export default function OperatorScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
@@ -1404,7 +1422,7 @@ export default function OperatorScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[200] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
@@ -1461,7 +1479,7 @@ export default function OperatorScreen() {
 
                 <button 
                   onClick={() => setShowFeatureInfo(false)}
-                  className="w-full py-4 bg-gray-900 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+                  className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-lg hover:bg-blue-500"
                 >
                   Compris
                 </button>
@@ -1478,7 +1496,7 @@ export default function OperatorScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9 }}
@@ -1515,6 +1533,40 @@ export default function OperatorScreen() {
                   </button>
                 </div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* IMAGE PREVIEW MODAL */}
+      <AnimatePresence>
+        {selectedFullImage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedFullImage(null)}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex items-center justify-center p-4 cursor-pointer"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="relative max-w-4xl w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <img 
+                src={selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`}
+                alt="Downtime Evidence" 
+                className="w-full h-auto max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                referrerPolicy="no-referrer"
+              />
+              <button 
+                onClick={() => setSelectedFullImage(null)}
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors bg-white/10 p-2 rounded-full backdrop-blur-md"
+              >
+                <X size={24} />
+              </button>
             </motion.div>
           </motion.div>
         )}

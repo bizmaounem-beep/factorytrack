@@ -72,4 +72,5 @@ export interface DowntimeLog {
   endTime?: string;
   duration?: number;
   description?: string;
+  images?: string[];
 }

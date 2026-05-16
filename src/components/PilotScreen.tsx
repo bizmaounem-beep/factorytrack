@@ -11,7 +11,7 @@ import {
   ExternalLink, Plus, History, Timer, Pencil, 
   Trash2, Menu, X, ArrowLeft, Clock, Square, 
   Play, TrendingUp, AlertTriangle, CheckCircle2,
-  Box, LayoutDashboard, Info
+  Box, LayoutDashboard, Info, Camera
 } from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -164,6 +164,7 @@ export default function PilotScreen() {
     description: '',
     lineId: ''
   });
+  const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
 
   // Auto-select machine if pilot is already assigned in DB
   useEffect(() => {
@@ -1456,7 +1457,29 @@ export default function PilotScreen() {
                                   <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3 text-right">
-                                  <div className="flex justify-end gap-1">
+                                  <div className="flex justify-end gap-1 items-center">
+                                    {log.image_path && (
+                                      <button 
+                                        onClick={() => setSelectedFullImage(log.image_path)}
+                                        className="text-white bg-blue-500 p-1 rounded-lg hover:bg-blue-600 transition-colors"
+                                        title="Voir la photo"
+                                      >
+                                        <Camera size={14} />
+                                      </button>
+                                    )}
+                                    {log.images && (
+                                      <div className="flex -space-x-2">
+                                        {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => (
+                                          <button 
+                                            key={i}
+                                            onClick={() => setSelectedFullImage(img)}
+                                            className="w-6 h-6 rounded-full border-2 border-white bg-blue-500 flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm"
+                                          >
+                                            <Camera size={10} />
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                     <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                                     <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                                   </div>
@@ -1477,7 +1500,7 @@ export default function PilotScreen() {
 
     {/* DELETE CONFIRMATION */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
           <div className="bg-white rounded-[32px] p-6 max-w-xs w-full space-y-4 shadow-2xl">
              <div className="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center mx-auto">
                <Trash2 size={24} />
@@ -1496,7 +1519,7 @@ export default function PilotScreen() {
 
       {/* EDIT MODAL */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1598,7 +1621,7 @@ export default function PilotScreen() {
 
       {/* ASSIGN MODAL */}
       {isAssigning && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1673,7 +1696,7 @@ export default function PilotScreen() {
       )}
       {/* DOWNTIME PICKER MODAL */}
       {declaringDowntimeLineId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1711,7 +1734,7 @@ export default function PilotScreen() {
 
       {/* MANUAL STOP MODAL */}
       {showManualStopModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1801,7 +1824,7 @@ export default function PilotScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
@@ -1876,6 +1899,40 @@ export default function PilotScreen() {
                   FERMER
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* IMAGE PREVIEW MODAL */}
+      <AnimatePresence>
+        {selectedFullImage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedFullImage(null)}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 cursor-pointer"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="relative max-w-4xl w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <img 
+                src={selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`}
+                alt="Downtime Evidence" 
+                className="w-full h-auto max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                referrerPolicy="no-referrer"
+              />
+              <button 
+                onClick={() => setSelectedFullImage(null)}
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors bg-white/10 p-2 rounded-full backdrop-blur-md"
+              >
+                <X size={24} />
+              </button>
             </motion.div>
           </motion.div>
         )}

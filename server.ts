@@ -151,6 +151,7 @@ async function startServer() {
         endTime TEXT,
         duration INTEGER,
         description TEXT,
+        images TEXT,
         image_path TEXT
       );
 
@@ -183,6 +184,11 @@ async function startServer() {
         if (table === 'downtime_logs' && !columns.includes('image_path')) {
           console.log(`Migration: Adding image_path column to downtime_logs...`);
           db.exec(`ALTER TABLE downtime_logs ADD COLUMN image_path TEXT;`);
+        }
+
+        if (table === 'downtime_logs' && !columns.includes('images')) {
+          console.log(`Migration: Adding images column to downtime_logs...`);
+          db.exec(`ALTER TABLE downtime_logs ADD COLUMN images TEXT;`);
         }
 
         if (table === 'lines' && !columns.includes('isActive')) {
@@ -272,6 +278,7 @@ async function startServer() {
     message: { error: 'Trop de tentatives de connexion. Réessayez dans une minute.' },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
   });
 
   // Sanitization helper
