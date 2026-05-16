@@ -262,7 +262,27 @@ async function startServer() {
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
   app.use(cors());
-  app.use(express.json({ limit: '5mb' })); // Increased limit for potential base64 but we use multer
+  app.use(express.json({ limit: '10mb' }));
+
+  // UPLOAD ROUTE - HIGH PRIORITY
+  app.post('/api/upload', (req, res) => {
+    console.log('[UPLOAD] Request received at /api/upload');
+    upload.single('photo')(req, res, (err) => {
+      if (err) {
+        console.error('[UPLOAD] Multer error:', err);
+        return res.status(400).json({ error: err.message });
+      }
+      if (!req.file) {
+        console.error('[UPLOAD] No file');
+        return res.status(400).json({ error: 'Fichier manquant' });
+      }
+      console.log('[UPLOAD] Success:', req.file.filename);
+      res.json({ 
+        url: `/uploads/${req.file.filename}`, 
+        path: req.file.filename 
+      });
+    });
+  });
 
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
@@ -316,6 +336,11 @@ async function startServer() {
   };
 
   // API Endpoints
+  app.use('/api', (req, res, next) => {
+    console.log(`[API] ${req.method} ${req.url}`);
+    next();
+  });
+
   const getServerShiftId = () => {
     try {
       const now = new Date();
@@ -339,31 +364,6 @@ async function startServer() {
     }
     return null;
   };
-
-  // Upload Route
-  app.post('/api/upload', (req, res) => {
-    console.log('Upload request received');
-    upload.single('photo')(req, res, (err) => {
-      if (err instanceof multer.MulterError) {
-        console.error('Multer Error:', err);
-        return res.status(400).json({ error: `Erreur Multer: ${err.message}` });
-      } else if (err) {
-        console.error('Upload Error:', err);
-        return res.status(400).json({ error: err.message });
-      }
-      
-      if (!req.file) {
-        console.error('No file in request');
-        return res.status(400).json({ error: 'Aucun fichier envoyé.' });
-      }
-
-      console.log('File uploaded successfully:', req.file.filename);
-      res.json({ 
-        url: `/uploads/${req.file.filename}`, 
-        path: req.file.filename 
-      });
-    });
-  });
 
   app.get('/api/db/:collection', (req, res) => {
     try {
