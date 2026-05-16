@@ -8,7 +8,8 @@ import {
   Users, Factory, Package, Timer, History, 
   Download, Plus, Trash2, LayoutDashboard,
   Box, Terminal, Activity, Pencil, Menu, X, Clock,
-  TrendingUp, AlertTriangle, CheckCircle2
+  TrendingUp, AlertTriangle, CheckCircle2,
+  Camera, Eye
 } from 'lucide-react';
 import { cn, formatDuration, formatMinutes, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import ExcelJS from 'exceljs';
@@ -107,6 +108,7 @@ export default function AdminPanel() {
   const [modalData, setModalData] = useState<any>({});
   const [selectedMachineForLine, setSelectedMachineForLine] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
+  const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
 
   const openModal = (type: typeof modalType, data: any = {}) => {
     setModalType(type);
@@ -578,7 +580,7 @@ export default function AdminPanel() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row transition-colors duration-300 font-sans">
       {/* MOBILE HEADER */}
       <header className="md:hidden bg-white border-b border-gray-200 px-3 py-1 flex justify-between items-center sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-1.5">
@@ -592,7 +594,7 @@ export default function AdminPanel() {
             <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
               A
             </div>
-            <h1 className="font-black text-sm tracking-tighter text-gray-900 leading-none">FACTORY<span className="text-blue-600">CLOUD</span></h1>
+            <h1 className="font-black text-sm tracking-tighter text-gray-900 leading-none uppercase italic">FACTORY<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -650,7 +652,7 @@ export default function AdminPanel() {
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
                       activeTab === tab.id 
                         ? "bg-blue-600 text-white shadow-lg shadow-blue-50" 
-                        : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                        : "text-gray-400 hover:bg-gray-50"
                     )}
                   >
                     <tab.icon size={16} strokeWidth={2.5} />
@@ -658,10 +660,7 @@ export default function AdminPanel() {
                   </button>
                 ))}
                 
-                <div className="mt-auto pt-4 border-t border-gray-100 space-y-4">
-                  <div className="px-2">
-                    <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">{t('settings')}</p>
-                  </div>
+                <div className="mt-auto pt-4 border-t border-gray-100 space-y-2">
                   <button 
                     onClick={logout}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
@@ -1433,7 +1432,16 @@ export default function AdminPanel() {
                                     </span>
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 text-right">
-                                    <div className="flex justify-end gap-1">
+                                    <div className="flex justify-end gap-1 items-center">
+                                      {log.image_path && (
+                                        <button 
+                                          onClick={() => setSelectedFullImage(log.image_path)}
+                                          className="text-white bg-blue-500 p-1 rounded-lg hover:bg-blue-600 transition-colors"
+                                          title="Voir la photo"
+                                        >
+                                          <Camera size={14} />
+                                        </button>
+                                      )}
                                       <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                       <button onClick={() => initiateDelete('downtime_logs', log.id, `${t('stop_recorded')} ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                     </div>
@@ -1685,6 +1693,28 @@ export default function AdminPanel() {
                       onChange={e => setModalData({...modalData, description: e.target.value})}
                     />
                   </div>
+                  {modalData.image_path && (
+                    <div className="md:col-span-2 space-y-1.5">
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Photo de l'arrêt</label>
+                      <div className="relative group overflow-hidden rounded-2xl border border-gray-100 aspect-video bg-black/5">
+                        <img 
+                          src={`/uploads/${modalData.image_path}`} 
+                          alt="Downtime" 
+                          className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => setSelectedFullImage(modalData.image_path)}
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Eye className="text-white" size={32} />
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setModalData({...modalData, image_path: null})}
+                        className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline"
+                      >
+                        Supprimer la photo
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1838,6 +1868,35 @@ export default function AdminPanel() {
           </motion.div>
         </div>
       )}
+
+      {/* LIGHTBOX */}
+      <AnimatePresence>
+        {selectedFullImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-4 md:p-12"
+            onClick={() => setSelectedFullImage(null)}
+          >
+            <button 
+              className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"
+              onClick={() => setSelectedFullImage(null)}
+            >
+              <X size={40} />
+            </button>
+            <motion.img
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              src={`/uploads/${selectedFullImage}`}
+              alt="Pleine résolution"
+              className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* CONFIRM DELETE MODAL */}
       {confirmDelete && (

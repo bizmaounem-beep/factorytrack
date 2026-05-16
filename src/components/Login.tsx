@@ -35,7 +35,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4 transition-colors duration-300">
+      
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -45,7 +46,7 @@ export default function Login() {
           <div className="mx-auto w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-2">
             <Lock size={20} />
           </div>
-          <h1 className="text-xl font-black text-gray-900 tracking-tighter italic">PILOT<span className="text-blue-600">CLOUD</span></h1>
+          <h1 className="text-xl font-black text-gray-900 tracking-tighter italic uppercase">PILOT<span className="text-blue-600">CLOUD</span></h1>
           <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Enter PIN</p>
         </div>
 
@@ -93,7 +94,7 @@ export default function Login() {
           <button
             onClick={handleSubmit}
             disabled={pin.length < 4}
-            className="h-12 rounded-lg flex items-center justify-center bg-blue-600 text-white disabled:bg-gray-200 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-100"
+            className="h-12 rounded-lg flex items-center justify-center bg-blue-600 text-white disabled:bg-gray-200 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-100 disabled:shadow-none"
           >
             <ArrowRight size={20} />
           </button>

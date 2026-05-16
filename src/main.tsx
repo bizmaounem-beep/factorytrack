@@ -5,6 +5,7 @@ import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

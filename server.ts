@@ -9,8 +9,39 @@ import cors from 'cors';
 import bcrypt from 'bcrypt';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
 
 const SALT_ROUNDS = 10;
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Multer configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'downtime-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Uniquement des images sont autorisées.'));
+    }
+  }
+});
+
 const ALLOWED_COLLECTIONS = [
   'users', 'machines', 'lines', 'programmes', 
   'downtime_types', 'production_logs', 'downtime_logs', 'shifts'
@@ -119,7 +150,8 @@ async function startServer() {
         startTime TEXT,
         endTime TEXT,
         duration INTEGER,
-        description TEXT
+        description TEXT,
+        image_path TEXT
       );
 
       CREATE TABLE IF NOT EXISTS shifts (
@@ -146,6 +178,11 @@ async function startServer() {
         if (table === 'downtime_logs' && !columns.includes('operatorId')) {
           console.log(`Migration: Adding operatorId column to downtime_logs...`);
           db.exec(`ALTER TABLE downtime_logs ADD COLUMN operatorId TEXT;`);
+        }
+
+        if (table === 'downtime_logs' && !columns.includes('image_path')) {
+          console.log(`Migration: Adding image_path column to downtime_logs...`);
+          db.exec(`ALTER TABLE downtime_logs ADD COLUMN image_path TEXT;`);
         }
 
         if (table === 'lines' && !columns.includes('isActive')) {
@@ -206,12 +243,19 @@ async function startServer() {
 
   const app = express();
   
+  // Trust proxy is required when running behind a reverse proxy (like Nginx in our container)
+  // to correctly handle X-Forwarded-For headers for rate limiting and IP detection.
+  app.set('trust proxy', 1);
+  
+  // Static files for uploads
+  app.use('/uploads', express.static(UPLOADS_DIR));
+  
   // Security Middlewares
   app.use(helmet({
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
   app.use(cors());
-  app.use(express.json({ limit: '1mb' })); // Limit body size to prevent huge payload attacks
+  app.use(express.json({ limit: '5mb' })); // Increased limit for potential base64 but we use multer
 
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
@@ -287,6 +331,26 @@ async function startServer() {
     }
     return null;
   };
+
+  // Upload Route
+  app.post('/api/upload', (req, res) => {
+    upload.single('photo')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: `Erreur Multer: ${err.message}` });
+      } else if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ error: 'Aucun fichier envoyé.' });
+      }
+
+      res.json({ 
+        url: `/uploads/${req.file.filename}`, 
+        path: req.file.filename 
+      });
+    });
+  });
 
   app.get('/api/db/:collection', (req, res) => {
     try {

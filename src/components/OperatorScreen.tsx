@@ -9,11 +9,13 @@ import {
   Play, Square, Settings, Timer, Package, AlertCircle, 
   CheckCircle, Factory, Monitor, Activity, Plus, Minus, 
   ArrowLeft, X, Clock, Check, Edit, Trash2, History,
-  ChevronRight, ChevronLeft, Info
+  ChevronRight, ChevronLeft, Info, Camera, Trash
 } from 'lucide-react';
 import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
 import { motion, AnimatePresence } from 'motion/react';
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 
 export default function OperatorScreen() {
   const { user, logout } = useAuth();
@@ -61,6 +63,10 @@ export default function OperatorScreen() {
   const [selectedProgrammeForChange, setSelectedProgrammeForChange] = useState<string | null>(null);
   const [palletInput, setPalletInput] = useState('1');
   const [downtimeDescription, setDowntimeDescription] = useState('');
+  const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeLine = lines.find(l => l.id === selectedLineId) || null;
   const activeProgramme = activeLine ? availableProgrammes.find(p => p.id === activeLine.currentProgrammeId) || null : null;
@@ -296,6 +302,64 @@ export default function OperatorScreen() {
     }
   };
 
+  const handleTakeStorePhoto = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const image = await CapCamera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Uri,
+          source: CameraSource.Prompt,
+          saveToGallery: true
+        });
+
+        if (image.webPath) {
+          setImagePreview(image.webPath);
+          const response = await fetch(image.webPath);
+          const blob = await response.blob();
+          uploadFile(blob);
+        }
+      } catch (e) {
+        console.error('Erreur caméra:', e);
+      }
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImagePreview(URL.createObjectURL(file));
+      uploadFile(file);
+    }
+  };
+
+  const uploadFile = async (file: Blob) => {
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('photo', file, 'photo.jpg');
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.path) {
+        setSelectedImagePath(data.path);
+      } else {
+        throw new Error(data.error || 'Upload failed');
+      }
+    } catch (e) {
+      console.error('Erreur upload:', e);
+      alert('Erreur lors du téléchargement de l\'image.');
+      setImagePreview(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleConfirmStartDowntime = async (typeId: string) => {
     if (!selectedLineId || !user || !activeLine) return;
 
@@ -329,6 +393,7 @@ export default function OperatorScreen() {
         description: isChangeProg 
           ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
           : (downtimeDescription.trim() || undefined),
+        image_path: selectedImagePath || undefined,
         operatorId: user.id,
         shiftId: currentShiftId,
         startTime: new Date().toISOString()
@@ -347,6 +412,8 @@ export default function OperatorScreen() {
       setSelectedStopType(null);
       setSelectedProgrammeForChange(null);
       setDowntimeDescription('');
+      setSelectedImagePath(null);
+      setImagePreview(null);
     } catch (error) {
       console.error('Error starting qualified downtime:', error);
       alert('Erreur: Impossible de démarrer l\'arrêt.');
@@ -401,7 +468,8 @@ export default function OperatorScreen() {
         typeId,
         description: isChangeProg 
           ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
-          : (downtimeDescription.trim() || categorizingLog?.description || undefined)
+          : (downtimeDescription.trim() || categorizingLog?.description || undefined),
+        image_path: selectedImagePath || undefined
       };
 
       if (user) {
@@ -427,6 +495,8 @@ export default function OperatorScreen() {
 
       setSelectedStopType(null);
       setDowntimeDescription('');
+      setSelectedImagePath(null);
+      setImagePreview(null);
     } catch (error) {
       console.error('Error categorizing downtime:', error);
     }
@@ -525,16 +595,16 @@ export default function OperatorScreen() {
 
   if (!selectedMachineId) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col">
-        <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-6 border-b border-white/10 shrink-0">
+      <div className="min-h-screen bg-slate-100 flex flex-col transition-colors duration-300">
+        <header className="h-16 bg-white text-slate-900 flex items-center justify-between px-6 border-b border-slate-200 shrink-0 shadow-sm">
           <div className="flex items-center gap-1.5">
             <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
               A
             </div>
-            <span className="text-[14px] font-black uppercase tracking-widest italic">FACTORY<span className="text-blue-400">CLOUD</span></span>
+            <span className="text-[14px] font-black uppercase tracking-widest italic">FACTORY<span className="text-blue-600">CLOUD</span></span>
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={handleLogout} className="bg-white/10 hover:bg-red-600 px-4 py-1.5 rounded font-black text-[12px] uppercase tracking-widest transition-colors">{t('logout')}</button>
+          <div className="flex items-center gap-3">
+            <button onClick={handleLogout} className="bg-slate-100 hover:bg-red-600 hover:text-white px-4 py-1.5 rounded font-black text-[12px] uppercase tracking-widest transition-colors text-slate-600 border border-slate-200">{t('logout')}</button>
           </div>
         </header>
 
@@ -561,17 +631,19 @@ export default function OperatorScreen() {
 
   if (!selectedLineId) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col">
-        <header className="h-16 bg-slate-900 text-white flex items-center justify-between px-6 border-b border-white/10 shrink-0">
-          <button onClick={() => {
-            if (selectedLineId) handleGoBackFromLine();
-            else setSelectedMachineId(null);
-          }} className="hover:text-blue-400 transition-colors">
-            <ArrowLeft size={24} />
-          </button>
-          <span className="text-[15px] font-black uppercase tracking-widest">{machines.find(m => m.id === selectedMachineId)?.name}</span>
+      <div className="min-h-screen bg-slate-100 flex flex-col transition-colors duration-300">
+        <header className="h-16 bg-white text-slate-900 flex items-center justify-between px-6 border-b border-slate-200 shrink-0 shadow-sm">
           <div className="flex items-center gap-4">
-            <button onClick={handleLogout} className="bg-white/10 hover:bg-red-600 px-4 py-1.5 rounded font-black text-[12px] uppercase tracking-widest transition-colors">{t('logout')}</button>
+            <button onClick={() => {
+              if (selectedLineId) handleGoBackFromLine();
+              else setSelectedMachineId(null);
+            }} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+              <ArrowLeft size={24} />
+            </button>
+            <span className="text-[15px] font-black uppercase tracking-widest italic">{machines.find(m => m.id === selectedMachineId)?.name}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={handleLogout} className="bg-slate-100 hover:bg-red-600 hover:text-white px-4 py-1.5 rounded font-black text-[12px] uppercase tracking-widest transition-colors text-slate-600 border border-slate-200">{t('logout')}</button>
           </div>
         </header>
 
@@ -586,7 +658,7 @@ export default function OperatorScreen() {
                 const operatorName = users.find(u => u.id === l.currentOperatorId)?.name;
 
                 return (
-                  <button
+                   <button
                     key={l.id}
                     disabled={isBusy}
                     onClick={() => handleSelectLine(l)}
@@ -596,10 +668,10 @@ export default function OperatorScreen() {
                     )}
                   >
                     <div className="absolute top-2 right-2">
-                      <span className={cn(
-                        "w-2 h-2 rounded-full",
-                        l.status === 'RUNNING' ? "bg-green-500 animate-pulse" : 
-                        l.status === 'STOPPED' ? "bg-red-500" : "bg-slate-300"
+                       <span className={cn(
+                         "w-2 h-2 rounded-full",
+                         l.status === 'RUNNING' ? "bg-green-500 animate-pulse" : 
+                         l.status === 'STOPPED' ? "bg-red-500" : "bg-slate-300"
                       )} />
                     </div>
                     <Monitor size={24} className={cn("text-slate-300", !isBusy && "group-hover:text-blue-500 transition-colors")} />
@@ -622,22 +694,22 @@ export default function OperatorScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0c10] text-slate-100 font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden">
-      <header className="sticky top-0 z-50 bg-[#0a0c10]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 shrink-0">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden transition-colors duration-300">
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200 px-4 py-3 shrink-0">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Factory size={22} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tighter italic leading-none">
+              <h1 className="text-lg font-black tracking-tighter italic leading-none text-gray-900">
                 PILOT<span className="text-blue-500">CLOUD</span>
               </h1>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Operator Hub</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end leading-none mr-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:flex flex-col items-end leading-none mr-2">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{user?.name}</span>
               <span className="text-[8px] font-bold text-blue-500/80 uppercase tracking-widest leading-none mt-1">{activeLine?.name}</span>
             </div>
@@ -666,12 +738,12 @@ export default function OperatorScreen() {
               <button
                 key={line.id}
                 onClick={() => handleSelectLine(line)}
-                className="group relative overflow-hidden p-5 bg-slate-900/40 border border-white/5 rounded-2xl text-left hover:border-blue-500/50 transition-all hover:bg-slate-900 shadow-lg active:scale-[0.98]"
+                className="group relative overflow-hidden p-5 bg-white border border-gray-100 rounded-2xl text-left hover:border-blue-500/50 transition-all hover:bg-gray-50 shadow-sm active:scale-[0.98]"
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/5 blur-[40px] group-hover:bg-blue-600/10 transition-colors" />
                 <div className="flex justify-between items-center relative z-10">
                   <div>
-                    <h3 className="text-xl font-black text-white italic tracking-tighter mb-0.5 leading-none uppercase">{line.name}</h3>
+                    <h3 className="text-xl font-black text-slate-800 italic tracking-tighter mb-0.5 leading-none uppercase">{line.name}</h3>
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         "w-1.5 h-1.5 rounded-full",
@@ -690,7 +762,7 @@ export default function OperatorScreen() {
             <div className="flex items-center justify-between mb-4">
               <button 
                 onClick={handleGoBackFromLine}
-                className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors group px-1"
+                className="flex items-center gap-1.5 text-slate-500 hover:text-blue-600 transition-colors group px-1"
               >
                 <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
                 <span className="text-[8px] font-black uppercase tracking-[0.15em] italic">{t('back_to_selection')}</span>
@@ -706,12 +778,12 @@ export default function OperatorScreen() {
               <div className="lg:col-span-7 space-y-6">
                 {/* MAIN STATUS CARD */}
                 <div className={cn(
-                  "relative overflow-hidden p-6 sm:p-8 rounded-[2rem] border transition-all duration-700 shadow-xl",
+                  "relative overflow-hidden p-6 sm:p-8 rounded-[2rem] border transition-all duration-700 shadow-sm",
                   activeLine?.status === 'RUNNING' 
-                    ? "bg-emerald-500/5 border-emerald-500/10 shadow-emerald-500/5" 
-                    : "bg-rose-500/5 border-rose-500/10 shadow-rose-500/5"
+                    ? "bg-emerald-50 border-emerald-100 shadow-emerald-500/5" 
+                    : "bg-rose-50 border-rose-100 shadow-rose-500/5"
                 )}>
-                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white to-transparent pointer-events-none" />
                   
                   <div className="flex flex-col items-center text-center relative z-10">
                     <div className={cn(
@@ -721,11 +793,11 @@ export default function OperatorScreen() {
                       {activeLine?.status === 'RUNNING' ? <Activity size={28} className="text-white" /> : <AlertCircle size={28} className="text-white" />}
                     </div>
 
-                    <h2 className="text-3xl font-black text-white italic tracking-tighter mb-1.5 leading-none uppercase">
+                    <h2 className="text-3xl font-black text-slate-900 italic tracking-tighter mb-1.5 leading-none uppercase">
                       {activeLine?.name}
                     </h2>
                     
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-black/30 rounded-full border border-white/5 backdrop-blur-md mb-6">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-gray-100 backdrop-blur-md mb-6">
                       <span className={cn(
                         "w-1.5 h-1.5 rounded-full",
                         activeLine?.status === 'RUNNING' ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
@@ -740,23 +812,23 @@ export default function OperatorScreen() {
 
                     {activeDowntime && !categorizingLogId ? (
                       <div className="space-y-4 w-full max-w-md mx-auto">
-                        <div className="bg-black/40 rounded-2xl p-5 border border-white/5 backdrop-blur-3xl shadow-inner group">
+                        <div className="bg-white rounded-2xl p-5 border border-gray-100 backdrop-blur-3xl shadow-sm group">
                           <div className="flex items-center justify-center gap-2 text-rose-500 mb-2">
                             <Timer size={18} className="animate-pulse" />
                             <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-60">Durée d'Arrêt</span>
                           </div>
-                          <p className="text-4xl font-black tracking-tighter tabular-nums text-white group-hover:scale-105 transition-transform duration-500">
+                          <p className="text-4xl font-black tracking-tighter tabular-nums text-slate-900 group-hover:scale-105 transition-transform duration-500">
                             {formatDowntimeDisplay(timer)}
                           </p>
                           {lines.filter(l => l.machineId === activeLine?.machineId && l.activeDowntimeId === activeDowntime.id).length > 1 && (
-                            <div className="flex items-center justify-center gap-1 mt-1 text-blue-400 animate-pulse">
+                            <div className="flex items-center justify-center gap-1 mt-1 text-blue-600 animate-pulse">
                               <Activity size={10} />
                               <span className="text-[8px] font-black uppercase tracking-widest">Arrêt Groupé Intelligent</span>
                             </div>
                           )}
                           {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
                             <div className="mt-3">
-                              <span className="px-5 py-1.5 bg-white/5 border border-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest inline-flex items-center gap-2">
+                              <span className="px-5 py-1.5 bg-gray-50 border border-gray-100 rounded-full text-[9px] font-black text-slate-500 uppercase tracking-widest inline-flex items-center gap-2">
                                  {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
                               </span>
                             </div>
@@ -764,31 +836,31 @@ export default function OperatorScreen() {
                         </div>
                         <button
                           onClick={handleStopDowntime}
-                          className="w-full py-4 bg-white text-black rounded-xl font-black text-xs uppercase tracking-[0.15em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2.5 hover:bg-emerald-50"
+                          className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-[0.15em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2.5 hover:bg-emerald-500 shadow-emerald-500/10"
                         >
                           <Play size={18} fill="currentColor" /> Relancer la Ligne
                         </button>
 
-                        <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
                           <div className="flex items-center justify-between">
                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Statut Opérationnel</span>
-                            <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-rose-500/20">
+                            <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full text-[8px] font-black uppercase tracking-widest border border-rose-200">
                               Ligne Stoppée
                             </span>
                           </div>
                           
                           {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
-                            <div className="flex items-start gap-3 border-t border-white/5 pt-3">
-                              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-lg flex-shrink-0">
+                            <div className="flex items-start gap-3 border-t border-gray-100 pt-3">
+                              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-lg flex-shrink-0 shadow-sm border border-gray-100">
                                 {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.icon || '⚠️'}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Motif Détecté</p>
-                                <p className="text-xs font-black text-white uppercase truncate">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Motif Détecté</p>
+                                <p className="text-xs font-black text-slate-900 uppercase truncate">
                                   {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
                                 </p>
                                 {activeDowntime.description && (
-                                  <p className="mt-1 text-[10px] font-medium text-slate-400 italic line-clamp-2">
+                                  <p className="mt-1 text-[10px] font-medium text-slate-500 italic line-clamp-2">
                                     "{activeDowntime.description}"
                                   </p>
                                 )}
@@ -797,9 +869,9 @@ export default function OperatorScreen() {
                           )}
                           
                           {!activeDowntime.typeId || activeDowntime.typeId === 'PENDING' ? (
-                            <div className="flex items-center gap-2 bg-blue-500/10 p-3 rounded-xl border border-blue-500/20">
-                               <Info size={14} className="text-blue-400 flex-shrink-0" />
-                               <p className="text-[9px] font-bold text-blue-300 leading-tight">
+                            <div className="flex items-center gap-2 bg-blue-50 p-3 rounded-xl border border-blue-100">
+                               <Info size={14} className="text-blue-500 flex-shrink-0" />
+                               <p className="text-[9px] font-bold text-blue-700 leading-tight">
                                  L'arrêt sera qualifié automatiquement à la reprise du cycle.
                                </p>
                             </div>
@@ -810,17 +882,17 @@ export default function OperatorScreen() {
                       <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
                         <div className="flex items-center justify-center gap-3">
                            <div className="flex flex-col items-center">
-                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 leading-none mb-1">
+                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 leading-none mb-1">
                                {isInitialSelection ? 'Initialisation' : 'Qualification'}
                              </h3>
-                             <p className="text-xl font-black text-white italic tracking-tighter uppercase leading-none">
+                             <p className="text-xl font-black text-slate-900 italic tracking-tighter uppercase leading-none">
                                 {isInitialSelection ? 'Type d\'arrêt' : 'Cause détectée'}
                              </p>
                            </div>
                            {isInitialSelection && (
                             <button 
                               onClick={() => setIsInitialSelection(false)}
-                              className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all"
+                              className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-gray-200 transition-all"
                             >
                               <X size={16} />
                             </button>
@@ -837,30 +909,30 @@ export default function OperatorScreen() {
                                 <button
                                   key={type.id}
                                   onClick={() => isInitialSelection ? handleConfirmStartDowntime(type.id) : handleCategorizeStop(type.id)}
-                                  className="flex-shrink-0 w-[45%] sm:w-[30%] lg:w-[28%] aspect-square bg-slate-800/40 rounded-2xl border border-white/5 flex flex-col items-center justify-center gap-2 transition-all hover:bg-blue-600 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-lg"
+                                  className="flex-shrink-0 w-[45%] sm:w-[30%] lg:w-[28%] aspect-square bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center gap-2 transition-all hover:bg-blue-600 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-sm"
                                 >
-                                  <div className="w-12 h-12 rounded-2xl bg-slate-900/50 flex items-center justify-center text-2xl group-hover:bg-white/20 transition-all shadow-inner">
+                                  <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-2xl group-hover:bg-white/20 transition-all shadow-inner">
                                     {type.icon || '⚠️'}
                                   </div>
-                                  <span className="text-[9px] font-black uppercase tracking-wider text-center px-2 leading-tight text-slate-400 group-hover:text-white">
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-center px-2 leading-tight text-slate-500 group-hover:text-white">
                                     {type.name}
                                   </span>
                                 </button>
                               ))}
                             </div>
                             
-                            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#0a111f] to-transparent pointer-events-none z-10" />
-                            <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#0a111f] to-transparent pointer-events-none z-10" />
+                            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#F8FAFC] to-transparent pointer-events-none z-10" />
+                            <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#F8FAFC] to-transparent pointer-events-none z-10" />
                             
                             <button 
                               onClick={() => scroll('left')}
-                              className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white backdrop-blur-xl border border-gray-100 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
                             >
                               <ChevronLeft size={16} />
                             </button>
                             <button 
                               onClick={() => scroll('right')}
-                              className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
+                              className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white backdrop-blur-xl border border-gray-100 flex items-center justify-center shadow-xl z-20 hover:bg-blue-600 transition-colors"
                             >
                               <ChevronRight size={16} />
                             </button>
@@ -869,28 +941,72 @@ export default function OperatorScreen() {
                           <motion.div 
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="bg-slate-800/40 rounded-3xl p-6 border border-white/5 space-y-6"
+                            className="bg-white rounded-3xl p-6 border border-gray-100 space-y-6 shadow-lg"
                           >
-                            <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                               <div className="text-3xl">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
                               <div>
                                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Type sélectionné</p>
-                                 <p className="text-sm font-black text-white uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
+                                 <p className="text-sm font-black text-slate-900 uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
                               </div>
                             </div>
 
                             {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('AUTRE') ? (
                               <div className="space-y-4">
-                                <textarea 
-                                  className="w-full p-5 bg-slate-900/50 border border-white/5 rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600"
-                                  placeholder="Décrivez la raison..."
-                                  value={downtimeDescription}
-                                  onChange={e => setDowntimeDescription(e.target.value)}
-                                  rows={3}
-                                />
+                                <div className="space-y-4">
+                                  <textarea 
+                                    className="w-full p-5 bg-gray-100 border border-gray-200 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400"
+                                    placeholder="Décrivez la raison..."
+                                    value={downtimeDescription}
+                                    onChange={e => setDowntimeDescription(e.target.value)}
+                                    rows={3}
+                                  />
+                                  
+                                  {/* PHOTO SECTION */}
+                                  <div className="space-y-3">
+                                    <input 
+                                      type="file" 
+                                      accept="image/*" 
+                                      className="hidden" 
+                                      ref={fileInputRef}
+                                      onChange={handleFileChange}
+                                    />
+                                    {!imagePreview ? (
+                                      <button
+                                        onClick={handleTakeStorePhoto}
+                                        disabled={isUploading}
+                                        className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-blue-600 hover:border-blue-500/50 transition-all group"
+                                      >
+                                        <Camera size={24} className="group-hover:scale-110 transition-transform" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">
+                                          {isUploading ? 'Téléchargement...' : 'Ajouter une photo'}
+                                        </span>
+                                      </button>
+                                    ) : (
+                                      <div className="relative aspect-video rounded-2xl overflow-hidden border border-gray-200 bg-gray-100">
+                                        <img 
+                                          src={imagePreview} 
+                                          alt="Preview" 
+                                          className="w-full h-full object-cover"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                          <button
+                                            onClick={() => {
+                                              setImagePreview(null);
+                                              setSelectedImagePath(null);
+                                            }}
+                                            className="w-12 h-12 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-xl active:scale-95 transition-all"
+                                          >
+                                            <Trash size={20} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                                 <button 
                                   onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
-                                  disabled={!downtimeDescription.trim()}
+                                  disabled={!downtimeDescription.trim() || isUploading}
                                   className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-50"
                                 >
                                   Confirmer
@@ -910,9 +1026,9 @@ export default function OperatorScreen() {
                                           else handleCategorizeStop(selectedStopType!);
                                         }, 0);
                                       }}
-                                      className="p-5 bg-slate-800/50 hover:bg-blue-600 border border-white/5 rounded-2xl font-black text-[11px] text-white transition-all flex items-center justify-between group"
+                                      className="p-5 bg-white hover:bg-blue-600 border border-gray-100 rounded-2xl font-black text-[11px] text-slate-800 transition-all flex items-center justify-between group"
                                     >
-                                      <span className="uppercase italic tracking-tight">{p.name}</span>
+                                      <span className="uppercase italic tracking-tight group-hover:text-white">{p.name}</span>
                                       <Plus size={16} className="text-slate-500 group-hover:text-white" />
                                     </button>
                                    ))}
@@ -951,7 +1067,7 @@ export default function OperatorScreen() {
               <div className="lg:col-span-5 space-y-6">
                 {/* PRODUCTION CONTROLS */}
                 <div className={cn(
-                  "bg-slate-900 rounded-[2rem] p-6 border border-white/5 shadow-xl relative overflow-hidden group transition-all duration-500",
+                  "bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm relative overflow-hidden group transition-all duration-500",
                   flashFeedback ? "ring-2 ring-emerald-500" : ""
                 )}>
                   <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-[80px]" />
@@ -961,48 +1077,48 @@ export default function OperatorScreen() {
                       <div className="w-8 h-8 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20">
                         <Package size={16} className="text-purple-500" />
                       </div>
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Missions & Saisie</h3>
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Missions & Saisie</h3>
                     </div>
                     {activeLine?.status === 'RUNNING' && (
                       <motion.div 
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20"
+                        className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100"
                       >
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest leading-none">Actif</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest leading-none">Actif</span>
                       </motion.div>
                     )}
                   </div>
 
                   {!activeProgramme ? (
-                    <div className="text-center py-6 bg-black/20 rounded-2xl border border-dashed border-white/5">
+                    <div className="text-center py-6 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{t('no_programme')}</p>
                       <div className="grid grid-cols-1 gap-2 mt-4 px-3">
                         {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
                           <button
                             key={p.id}
                             onClick={() => handleSelectProgramme(p.id)}
-                            className="w-full p-4 bg-slate-800 rounded-xl border border-white/5 text-left flex justify-between items-center group/btn hover:bg-blue-600 transition-all font-black active:scale-95"
+                            className="w-full p-4 bg-white rounded-xl border border-gray-200 text-left flex justify-between items-center group/btn hover:bg-blue-600 transition-all font-black active:scale-95"
                           >
-                            <span className="text-[10px] uppercase italic tracking-tight">{p.name}</span>
-                            <Play size={14} className="text-slate-600 group-hover/btn:text-white" fill="currentColor" />
+                            <span className="text-[10px] uppercase italic tracking-tight group-hover/btn:text-white">{p.name}</span>
+                            <Play size={14} className="text-slate-400 group-hover/btn:text-white" fill="currentColor" />
                           </button>
                         ))}
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      <div className="flex justify-between items-end bg-black/30 p-6 rounded-[2rem] border border-white/5 shadow-inner">
+                      <div className="flex justify-between items-end bg-gray-50 p-6 rounded-[2rem] border border-gray-100 shadow-sm">
                         <div className="space-y-1">
-                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Programme Actuel</p>
-                          <h4 className="text-xl font-black text-white italic tracking-tighter truncate max-w-[180px] uppercase">{activeProgramme.name}</h4>
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Programme Actuel</p>
+                          <h4 className="text-xl font-black text-slate-900 italic tracking-tighter truncate max-w-[180px] uppercase">{activeProgramme.name}</h4>
                         </div>
                         <div className="text-right">
-                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Palettes</p>
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Palettes</p>
                           <div className="flex items-baseline justify-end gap-1.5">
-                            <p className="text-3xl font-black text-white font-mono tracking-tighter tabular-nums">{activeProgramme.producedPallets || 0}</p>
-                            <span className="text-[9px] font-black text-slate-600 uppercase">Unit</span>
+                            <p className="text-3xl font-black text-slate-900 font-mono tracking-tighter tabular-nums">{activeProgramme.producedPallets || 0}</p>
+                            <span className="text-[9px] font-black text-slate-500 uppercase">Unit</span>
                           </div>
                         </div>
                       </div>
@@ -1012,7 +1128,7 @@ export default function OperatorScreen() {
                           <div className="flex flex-col gap-4">
                             <div className="relative">
                               <div className="flex justify-between items-center px-4 mb-3">
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Saisie Rapide</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Saisie Rapide</p>
                                 <button 
                                   onClick={async () => {
                                     const count = parseInt(palletInput);
@@ -1033,16 +1149,16 @@ export default function OperatorScreen() {
                                     setFlashFeedback(true);
                                     setTimeout(() => setFlashFeedback(false), 500);
                                   }}
-                                  className="flex items-center gap-1.5 px-2 py-0.5 text-blue-500 bg-blue-50 rounded-lg transition-colors font-black text-[9px] uppercase border border-blue-50 hover:bg-blue-500 hover:text-white"
+                                  className="flex items-center gap-1.5 px-2 py-0.5 text-blue-600 bg-blue-50 rounded-lg transition-colors font-black text-[9px] uppercase border border-blue-100 hover:bg-blue-600 hover:text-white"
                                 >
                                   <Plus size={12} />
                                   Ajouter
                                 </button>
                               </div>
-                              <div className="flex items-center bg-black/40 p-2 rounded-2xl border border-white/5 shadow-inner">
+                              <div className="flex items-center bg-gray-50 p-2 rounded-2xl border border-gray-100 shadow-sm">
                                 <input 
                                   type="number"
-                                  className="flex-1 bg-transparent border-none text-3xl font-black text-white text-center font-mono outline-none"
+                                  className="flex-1 bg-transparent border-none text-3xl font-black text-slate-900 text-center font-mono outline-none"
                                   value={palletInput}
                                   onChange={e => setPalletInput(e.target.value)}
                                   placeholder="0"
@@ -1051,21 +1167,21 @@ export default function OperatorScreen() {
                             </div>
 
 
-                            <div className="pt-6 border-t border-white/5 space-y-3">
+                            <div className="pt-6 border-t border-gray-100 space-y-3">
                               <button 
                                 onClick={() => {
                                   if(window.confirm("Voulez-vous clôturer ce programme ?")) {
                                     handleAddPallets(0);
                                   }
                                 }}
-                                className="w-full py-4 bg-white/5 hover:bg-white/10 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-white/5 transition-all flex items-center justify-center gap-2 italic"
+                                className="w-full py-4 bg-gray-50 hover:bg-gray-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-gray-100 transition-all flex items-center justify-center gap-2 italic"
                               >
                                  Terminer Mission Programme
                               </button>
                               
                               <button 
                                 onClick={() => setShowStopConfirmation(true)}
-                                className="w-full py-4 bg-slate-950 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-rose-600/10 hover:text-rose-500 border border-white/5 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-4 bg-white text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-rose-50 hover:text-rose-600 border border-gray-100 transition-all flex items-center justify-center gap-2"
                               >
                                 Arrêter la Production
                               </button>
@@ -1077,7 +1193,7 @@ export default function OperatorScreen() {
                   )}
 
                   {activeLine?.status === 'IDLE' && (
-                    <div className="space-y-4 pt-4 border-t border-white/5 text-center">
+                    <div className="space-y-4 pt-4 border-t border-gray-100 text-center">
                       <button 
                         onClick={handleStartProduction}
                         className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
@@ -1089,15 +1205,15 @@ export default function OperatorScreen() {
                 </div>
 
                 {/* ACTIVITY LOGS */}
-                <div className="bg-slate-900 rounded-[2rem] p-6 border border-white/5 shadow-xl relative overflow-hidden">
+                <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm relative overflow-hidden">
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-2">
-                      <History size={16} className="text-blue-500" />
+                      <History size={16} className="text-blue-600" />
                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Activité Récente</h3>
                     </div>
                     <button 
                       onClick={() => setShowManualStopModal(true)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 text-blue-500 rounded-full border border-blue-500/20 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
                     >
                       <Plus size={14} />
                       <span className="text-[9px] font-black uppercase tracking-widest">Manuel</span>
@@ -1111,20 +1227,20 @@ export default function OperatorScreen() {
                       .map(log => {
                         const type = downtimeTypes.find(t => t.id === log.typeId);
                         return (
-                          <div key={log.id} className="group relative bg-black/20 rounded-2xl p-4 border border-white/5 hover:border-blue-500/30 transition-all flex items-center justify-between">
+                          <div key={log.id} className="group relative bg-gray-50 rounded-2xl p-4 border border-gray-100 hover:border-blue-100 transition-all flex items-center justify-between shadow-sm">
                             <div className="flex items-center gap-4">
-                              <div className="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-2xl shadow-inner transition-transform group-hover:scale-105">
+                              <div className="w-11 h-11 rounded-xl bg-white border border-gray-50 flex items-center justify-center text-2xl shadow-inner transition-transform group-hover:scale-105">
                                 {type?.icon || '⚠️'}
                               </div>
                               <div>
-                                 <p className="text-[11px] font-black text-white uppercase tracking-tight italic leading-none mb-1.5">
+                                 <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight italic leading-none mb-1.5">
                                    {type?.name || 'Inconnu'}
                                  </p>
                                  <div className="flex items-center gap-2">
-                                   <Clock size={10} className="text-slate-600" />
+                                   <Clock size={10} className="text-slate-400" />
                                    <p className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">
                                      {format(parseISO(log.startTime), 'HH:mm')} - {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '--:--'}
-                                     <span className="ml-2 text-blue-500/80">
+                                     <span className="ml-2 text-blue-600">
                                        {log.duration ? formatDowntimeDisplay(log.duration) : 'En cours'}
                                      </span>
                                    </p>
@@ -1134,13 +1250,13 @@ export default function OperatorScreen() {
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => handleEditStopRequest(log)}
-                                className="p-2 text-slate-500 hover:text-blue-500 transition-all"
+                                className="p-2 text-slate-400 hover:text-blue-600 transition-all"
                               >
                                 <Edit size={14} />
                               </button>
                               <button 
                                 onClick={() => handleDeleteStop(log.id)}
-                                className="p-2 text-slate-500 hover:text-rose-500 transition-all"
+                                className="p-2 text-slate-400 hover:text-rose-600 transition-all"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -1149,9 +1265,9 @@ export default function OperatorScreen() {
                         );
                       })}
                     {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
-                      <div className="py-12 text-center bg-black/10 rounded-2xl border border-dashed border-white/5">
-                         <Activity size={24} className="mx-auto text-slate-800 mb-2 opacity-20" />
-                         <p className="text-[10px] font-black uppercase text-slate-700 tracking-[0.2em] italic">Historique vide</p>
+                      <div className="py-12 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-100">
+                         <Activity size={24} className="mx-auto text-slate-300 mb-2 opacity-20" />
+                         <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] italic">Historique vide</p>
                       </div>
                     )}
                   </div>
@@ -1168,7 +1284,7 @@ export default function OperatorScreen() {
           <motion.footer 
             initial={{ y: 60 }}
             animate={{ y: 0 }}
-            className="fixed bottom-0 inset-x-0 bg-black/80 backdrop-blur-xl border-t border-white/5 px-4 py-2.5 z-40"
+            className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-xl border-t border-gray-100 px-4 py-2.5 z-40"
           >
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center gap-3">
@@ -1177,8 +1293,8 @@ export default function OperatorScreen() {
                   activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]"
                 )} />
                 <div className="leading-none">
-                  <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Status Ligne</p>
-                  <p className="text-[9px] font-black text-white uppercase italic tracking-tighter">
+                  <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Status Ligne</p>
+                  <p className="text-[9px] font-black text-slate-900 uppercase italic tracking-tighter">
                     {activeLine?.status === 'RUNNING' ? 'Production Active' : 'Arrêt Détecté'}
                   </p>
                 </div>
@@ -1186,8 +1302,8 @@ export default function OperatorScreen() {
               
               <div className="flex gap-2">
                  <div className="text-right leading-none">
-                    <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Performance</p>
-                    <p className="text-[9px] font-black text-white italic">94% <span className="text-[6px] text-emerald-500 font-bold ml-0.5">OEE</span></p>
+                    <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Performance</p>
+                    <p className="text-[9px] font-black text-slate-900 italic">94% <span className="text-[6px] text-emerald-600 font-bold ml-0.5">OEE</span></p>
                  </div>
               </div>
             </div>
@@ -1207,14 +1323,14 @@ export default function OperatorScreen() {
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-slate-950 rounded-[3rem] w-full max-w-md shadow-3xl overflow-hidden border border-white/10"
+              className="bg-white rounded-[3rem] w-full max-w-md shadow-3xl overflow-hidden border border-gray-100"
             >
-              <div className="bg-slate-900 px-8 py-6 border-b border-white/5 flex justify-between items-center">
+              <div className="bg-blue-600 px-8 py-6 border-b border-blue-500 flex justify-between items-center text-white">
                  <h3 className="text-sm font-black uppercase tracking-widest italic">{editingLogId ? 'Modifier l\'arrêt' : t('add_manual_stop')}</h3>
                  <button onClick={() => {
                    setShowManualStopModal(false);
                    setEditingLogId(null);
-                 }} className="text-slate-500 hover:text-white transition-colors">
+                 }} className="text-white/70 hover:text-white transition-colors">
                    <X size={20} />
                  </button>
               </div>
@@ -1222,38 +1338,38 @@ export default function OperatorScreen() {
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('start_time')}</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('start_time')}</label>
                     <input 
                       type="datetime-local"
                       min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500"
+                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black text-slate-900 outline-none focus:border-blue-500"
                       value={manualStopForm.startTime}
                       onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('end_time')}</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('end_time')}</label>
                     <input 
                       type="datetime-local"
                       min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500"
+                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black text-slate-900 outline-none focus:border-blue-500"
                       value={manualStopForm.endTime}
                       onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
                     />
                   </div>
                 </div>
 
-                <div className="bg-blue-600/10 p-4 rounded-2xl border border-blue-500/20 flex items-center justify-between">
+                <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center justify-between font-bold">
                   <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{t('total_duration')}</p>
-                  <p className="text-xl font-black text-white font-mono">{calculateManualDuration()}</p>
+                  <p className="text-xl font-black text-blue-900 font-mono">{calculateManualDuration()}</p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('reason')}</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('reason')}</label>
                   <select 
-                    className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-xs font-black text-white outline-none focus:border-blue-500 appearance-none"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black text-slate-900 outline-none focus:border-blue-500 appearance-none"
                     value={manualStopForm.typeId}
                     onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
                   >
@@ -1270,7 +1386,7 @@ export default function OperatorScreen() {
                       }
                       handleManualStop(manualStopForm);
                     }}
-                    className="flex-1 bg-blue-600 text-white font-black uppercase py-4 rounded-2xl text-xs shadow-xl active:scale-95 transition-all tracking-widest hover:bg-blue-500"
+                    className="flex-1 bg-blue-600 text-white font-black uppercase py-4 rounded-2xl text-xs shadow-xl active:scale-95 transition-all tracking-widest hover:bg-blue-500 shadow-blue-100"
                   >
                     {editingLogId ? 'Enregistrer' : t('validate')}
                   </button>
@@ -1293,7 +1409,7 @@ export default function OperatorScreen() {
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-slate-900 border border-white/10 rounded-[2.5rem] w-full max-w-2xl shadow-3xl overflow-hidden"
+              className="bg-white border border-gray-200 rounded-[2.5rem] w-full max-w-2xl shadow-3xl overflow-hidden"
             >
               <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-start">
@@ -1302,70 +1418,50 @@ export default function OperatorScreen() {
                       <Activity size={24} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-white italic tracking-tighter uppercase leading-none mb-1">Arrêts Groupés Intelligents</h3>
+                      <h3 className="text-xl font-black text-gray-900 italic tracking-tighter uppercase leading-none mb-1">Arrêts Groupés Intelligents</h3>
                       <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Fonctionnalité AgroSync v2.4</p>
                     </div>
                   </div>
-                  <button onClick={() => setShowFeatureInfo(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-colors">
+                  <button onClick={() => setShowFeatureInfo(false)} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors">
                     <X size={20} />
                   </button>
                 </div>
 
                 <div className="grid gap-6">
                   <section className="space-y-3">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                       Détection de Proximité Temporelle
                     </h4>
-                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
+                    <p className="text-xs font-bold text-slate-600 leading-relaxed pl-3.5 border-l border-gray-100">
                       Le système analyse en continu les temps de début d'incident. Si deux arrêts ou plus du même type surviennent sur différentes lignes d'une même machine dans une fenêtre de 2 minutes, ils sont automatiquement identifiés comme un incident lié.
                     </p>
                   </section>
 
                   <section className="space-y-3">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                       L'Action de Groupe : Propagation
                     </h4>
-                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
+                    <p className="text-xs font-bold text-slate-600 leading-relaxed pl-3.5 border-l border-gray-100">
                       Lorsqu'un opérateur déclare un arrêt, l'application vérifie si une autre ligne a déjà déclaré le même motif récemment. Si c'est le cas, elle se connecte à cet arrêt existant. Sinon, elle propage l'état d'arrêt à toutes les autres lignes concernées pour synchroniser la machine.
                     </p>
                   </section>
 
-                  <section className="space-y-3">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      Consolidation des Données
-                    </h4>
-                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
-                      Au lieu de multiplier les entrées, AgroSync enregistre ces arrêts comme un seul événement global dans la base de données. Cela simplifie drastiquement vos rapports de production et évite de gonfler artificiellement les statistiques d'indisponibilité.
-                    </p>
-                  </section>
-
-                  <section className="space-y-3">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      Interface Opérateur Intelligente
-                    </h4>
-                    <p className="text-xs font-bold text-slate-300 leading-relaxed pl-3.5 border-l border-white/10">
-                      L'application informe visuellement les opérateurs qu'un arrêt a déjà été déclaré par un collègue ou par le système. Un indicateur "Arrêt Groupé" s'affiche sur le chronomètre pour confirmer que la synchronisation est active.
-                    </p>
-                  </section>
-
-                  <section className="space-y-3 p-4 bg-blue-600/5 rounded-2xl border border-blue-500/10">
+                  <section className="space-y-3 p-4 bg-blue-50 rounded-2xl border border-blue-100">
                     <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
                       <Activity size={12} />
                       Avantage Industriel
                     </h4>
-                    <p className="text-xs font-bold text-blue-100/80 leading-relaxed">
-                      Cette automatisation réduit la charge mentale des opérateurs qui n'ont plus à saisir manuellement chaque arrêt sur chaque ligne. Elle garantit une précision absolue dans le suivi des temps d'arrêt réels et facilite l'analyse des causes racines (Root Cause Analysis).
+                    <p className="text-xs font-bold text-blue-800/80 leading-relaxed">
+                      Cette automatisation réduit la charge mentale des opérateurs qui n'ont plus à saisir manuellement chaque arrêt sur chaque ligne. Elle garantit une précision absolue dans le suivi des temps d'arrêt réels et facilite l'analyse des causes racines.
                     </p>
                   </section>
                 </div>
 
                 <button 
                   onClick={() => setShowFeatureInfo(false)}
-                  className="w-full py-4 bg-white text-black rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+                  className="w-full py-4 bg-gray-900 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
                 >
                   Compris
                 </button>
@@ -1387,16 +1483,16 @@ export default function OperatorScreen() {
             <motion.div 
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              className="bg-slate-950 rounded-[3rem] w-full max-w-sm shadow-3xl overflow-hidden border border-white/10"
+              className="bg-white rounded-[3rem] w-full max-w-sm shadow-3xl overflow-hidden border border-gray-100"
             >
               <div className="p-10 text-center space-y-8">
-                <div className="w-24 h-24 bg-rose-600/10 rounded-full flex items-center justify-center mx-auto text-rose-500 border border-rose-500/20">
+                <div className="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto text-rose-500 border border-rose-100 shadow-inner">
                   <AlertCircle size={48} />
                 </div>
                 
                 <div className="space-y-2">
-                  <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Arrêter Production ?</h3>
-                  <p className="text-slate-500 font-bold text-sm leading-relaxed">
+                  <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">Arrêter Production ?</h3>
+                  <p className="text-slate-400 font-bold text-sm leading-relaxed">
                     Cette action va clôturer la session de production actuelle.
                   </p>
                 </div>
@@ -1407,13 +1503,13 @@ export default function OperatorScreen() {
                       handleStopProduction();
                       setShowStopConfirmation(false);
                     }}
-                    className="w-full bg-rose-600 hover:bg-rose-500 text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                    className="w-full bg-rose-600 hover:bg-rose-500 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all shadow-rose-100"
                   >
                     Confirmer l'arrêt
                   </button>
                   <button 
                     onClick={() => setShowStopConfirmation(false)}
-                    className="w-full py-4 text-slate-500 font-black uppercase text-xs tracking-widest hover:text-white transition-colors"
+                    className="w-full py-4 text-slate-400 font-black uppercase text-xs tracking-widest hover:text-slate-900 transition-colors"
                   >
                     Annuler
                   </button>

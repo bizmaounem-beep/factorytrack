@@ -1717,9 +1717,9 @@ export default function PilotScreen() {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col"
           >
-            <div className="p-6 bg-slate-900 text-white">
+            <div className="p-6 bg-blue-600 text-white">
               <h2 className="text-xl font-black tracking-tight uppercase italic">Saisie Manuelle</h2>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-none mt-1">
+              <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest leading-none mt-1">
                 Ligne: {lines.find(l => l.id === manualStopForm.lineId)?.name}
               </p>
             </div>
@@ -1871,7 +1871,7 @@ export default function PilotScreen() {
 
                 <button 
                   onClick={() => setShowFeatureInfo(false)}
-                  className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
                 >
                   FERMER
                 </button>

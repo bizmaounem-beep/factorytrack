@@ -80,26 +80,26 @@ export default function App() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md"
           >
-            <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl">
+            <div className="bg-white text-slate-900 p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-inner">
                   <Download size={20} className="text-white" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold leading-tight">Installer Factorycloud</h4>
-                  <p className="text-[10px] text-gray-400 font-medium">Pour un accès rapide et hors-ligne</p>
+                  <p className="text-[10px] text-gray-500 font-medium">Pour un accès rapide et hors-ligne</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={handleInstall}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-lg transition-colors shadow-lg shadow-blue-900/20"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-lg transition-colors shadow-lg shadow-blue-500/20"
                 >
                   INSTALLER
                 </button>
                 <button 
                   onClick={() => setShowInstallBanner(false)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400"
                 >
                   <X size={18} />
                 </button>
