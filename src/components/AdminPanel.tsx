@@ -1177,9 +1177,9 @@ export default function AdminPanel() {
                         startTime: new Date().toISOString(),
                         operatorId: user?.id || '',
                       })}
-                      className="p-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-100 active:scale-95 transition-all flex items-center gap-2"
+                      className="p-1.5 px-3 bg-green-600 hover:bg-green-700 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg shadow-green-100 active:scale-95 transition-all flex items-center gap-1.5"
                     >
-                      <Plus size={14} strokeWidth={3} /> {t('add_manual_stop') || 'Saisir un arrêt manuel'}
+                      <Plus size={12} strokeWidth={3} /> {t('add_downtime_log')}
                     </button>
                   </div>
                   
@@ -1459,9 +1459,9 @@ export default function AdminPanel() {
                       startTime: new Date().toISOString(),
                       operatorId: user?.id || '',
                     })}
-                    className="p-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-100 active:scale-95 transition-all flex items-center gap-2"
+                    className="p-2 px-4 bg-green-600 hover:bg-green-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-green-100 active:scale-95 transition-all flex items-center gap-2"
                   >
-                    <Plus size={14} strokeWidth={3} /> {t('add_manual_stop') || 'Saisir un arrêt manuel'}
+                    <Plus size={14} strokeWidth={3} /> {t('add_downtime_log')}
                   </button>
                 </div>
               <div className="grid md:grid-cols-2 gap-4">
