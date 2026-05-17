@@ -278,7 +278,7 @@ async function startServer() {
   });
 
   // 2. CORS & BASIC SECURITY
-  app.use(cors());
+  app.use(cors({ origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173', credentials: true }));
   app.use(helmet({
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
@@ -324,8 +324,8 @@ async function startServer() {
   });
 
   // Body parsers for other API routes
-  apiRouter.use(express.json({ limit: '50mb' }));
-  apiRouter.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  apiRouter.use(express.json({ limit: '1mb' }));
+  apiRouter.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
   // Sanitize helper (available in scope)
   const sanitizeValue = (val: any) => {
@@ -366,6 +366,9 @@ async function startServer() {
       const { collection } = req.params;
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const rows = db.prepare(`SELECT * FROM ${collection}`).all();
+      if (collection === 'users') {
+        return res.json(rows.map(({ pin, ...u }: any) => u));
+      }
       res.json(rows);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
@@ -376,6 +379,10 @@ async function startServer() {
       const { collection, id } = req.params;
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const row = db.prepare(`SELECT * FROM ${collection} WHERE id = ?`).get(id);
+      if (collection === 'users' && row) {
+        const { pin, ...safeRow } = row as any;
+        return res.json(safeRow);
+      }
       res.json(row);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
