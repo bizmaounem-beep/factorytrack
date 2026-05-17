@@ -355,6 +355,9 @@ export default function OperatorScreen() {
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
+        headers: {
+          'Accept': 'application/json'
+        },
         body: formData
       });
       
@@ -364,11 +367,13 @@ export default function OperatorScreen() {
         data = await res.json();
       } else {
         const text = await res.text();
-        throw new Error(`Réponse inattendue (${res.status}): ${text.substring(0, 50)}`);
+        console.error('Server non-JSON response:', text);
+        throw new Error(`Le serveur a répondu avec un format invalide (${res.status})`);
       }
 
-      if (res.ok && data.path) {
-        setSelectedImagePaths(prev => [...prev, data.path]);
+      if (res.ok && (data.path || data.success)) {
+        const filePath = data.path || (data.url ? data.url.replace('/uploads/', '') : '');
+        setSelectedImagePaths(prev => [...prev, filePath]);
         setImagePreviews(prev => [...prev, preview]);
       } else {
         throw new Error(data.error || `Erreur ${res.status}`);

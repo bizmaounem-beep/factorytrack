@@ -254,58 +254,51 @@ async function startServer() {
   // to correctly handle X-Forwarded-For headers for rate limiting and IP detection.
   app.set('trust proxy', 1);
 
-  // Security Middlewares - MUST BE BEFORE ROUTES to handle CORS Preflights etc
-  app.use(helmet({
-    contentSecurityPolicy: false, // Vite handles CSP in dev
-  }));
-  app.use(cors());
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  
-  // Debug middleware for all requests
+  // 1. PURE LOGGING (No body parsing yet)
   app.use((req, res, next) => {
-    console.log(`[REQ] ${req.method} ${req.url}`);
+    console.log(`[SERVER] incoming: ${req.method} ${req.url}`);
     next();
   });
 
-  // Static files for uploads
-  app.use('/uploads', express.static(UPLOADS_DIR));
+  // 2. CORS & BASIC SECURITY
+  app.use(cors());
+  app.use(helmet({
+    contentSecurityPolicy: false, // Vite handles CSP in dev
+  }));
 
-  // Health check
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
-  });
-  
-  // UPLOAD ROUTE - ABSOLUTE TOP PRIORITY
+  // 3. UPLOAD ROUTE - BEFORE ANY BODY PARSERS that might interfere with multer
   app.post(['/api/upload', '/api/upload/'], (req, res) => {
-    console.log('[UPLOAD] POST request to /api/upload');
-    console.log('[UPLOAD] Headers:', JSON.stringify(req.headers, null, 2));
-    
+    console.log('[UPLOAD-API] START matching route');
     upload.single('photo')(req, res, (err) => {
       if (err) {
-        console.error('[UPLOAD] Multer error:', err);
-        return res.status(400).json({ error: err.message || 'Multer error' });
+        console.error('[UPLOAD-API] MULTER ERROR:', err);
+        return res.status(400).json({ error: err.message || 'Erreur Multer' });
       }
+      
       if (!req.file) {
-        console.error('[UPLOAD] No file was found in the request. Body keys:', Object.keys(req.body || {}));
-        return res.status(400).json({ error: 'Fichier manquant (Photo non reçue par le serveur)' });
+        console.error('[UPLOAD-API] NO FILE. Content-Type:', req.headers['content-type']);
+        return res.status(400).json({ error: 'Fichier manquant. Assurez-vous d\'envoyer un champ "photo" de type fichier.' });
       }
-      console.log('[UPLOAD] Success:', req.file.filename);
-      res.json({ 
+
+      console.log('[UPLOAD-API] SUCCESS:', req.file.filename);
+      res.status(200).json({ 
+        success: true,
         url: `/uploads/${req.file.filename}`, 
         path: req.file.filename 
       });
     });
   });
 
-  // API Catch-all for debugging 404s before they hit Vite/SPA fallback
-  app.all('/api/*', (req, res, next) => {
-    // If we are here, it means no previous /api route matched
-    console.warn(`[API 404] No route matched: ${req.method} ${req.url}`);
-    if (req.accepts('json')) {
-      return res.status(404).json({ error: `Route API inconnue: ${req.method} ${req.url}` });
-    }
-    next();
+  // 4. GENERAL BODY PARSERS (for other API routes)
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Dynamic static files for uploads
+  app.use('/uploads', express.static(UPLOADS_DIR));
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
   const httpServer = createServer(app);
@@ -588,6 +581,18 @@ async function startServer() {
       console.error('Login error:', e);
       res.status(500).json({ error: 'Erreur interne du serveur' });
     }
+  });
+
+  // 5. API Catch-all for debugging 404s (Placed AFTER all defined routes)
+  app.all('/api/*', (req, res, next) => {
+    console.warn(`[API 404] No route matched: ${req.method} ${req.url}`);
+    if (req.accepts('json') || req.path.startsWith('/api/')) {
+      return res.status(404).json({ 
+        error: `Route API inconnue: ${req.method} ${req.url}`,
+        tip: 'Vérifiez l\'URL de l\'API ou si la route est définie sur le serveur.' 
+      });
+    }
+    next();
   });
 
   // Vite setup
