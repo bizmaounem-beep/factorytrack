@@ -10,6 +10,7 @@ import bcrypt from 'bcrypt';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
+import { networkInterfaces } from 'os';
 
 const SALT_ROUNDS = 10;
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
@@ -278,24 +279,21 @@ async function startServer() {
   });
 
   // 2. CORS & BASIC SECURITY
-  const allowedOrigins = [
-    process.env.ALLOWED_ORIGIN,
-    process.env.APP_URL, // AI Studio dynamic URL
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ].filter(Boolean) as string[];
-
-  app.use(cors({ 
+  app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl)
+      // Allow requests with no origin (mobile apps, curl, Capacitor)
       if (!origin) return callback(null, true);
-      if (process.env.NODE_ENV !== 'production' || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+      // Allow localhost
+      if (origin.includes('localhost')) return callback(null, true);
+      // Allow local network IPs: 192.168.x.x, 10.x.x.x, 172.16-31.x.x
+      const isLAN = /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(origin);
+      if (isLAN) return callback(null, true);
+      // Allow explicit override from env
+      if (process.env.ALLOWED_ORIGIN && origin === process.env.ALLOWED_ORIGIN) 
+        return callback(null, true);
+      callback(new Error('Not allowed by CORS'));
     },
-    credentials: true 
+    credentials: true,
   }));
   app.use(helmet({
     contentSecurityPolicy: false, // Vite handles CSP in dev
@@ -527,7 +525,12 @@ async function startServer() {
   // Vite setup
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: {
+          server: httpServer,
+        }
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -557,6 +560,13 @@ async function startServer() {
       }
     });
     console.log('='.repeat(50) + '\n');
+
+    const nets = networkInterfaces();
+    for (const iface of Object.values(nets).flat()) {
+      if (iface?.family === 'IPv4' && !iface.internal) {
+        console.log(`[SERVER] LOCAL NETWORK: http://${iface.address}:${PORT}`);
+      }
+    }
   });
 }
 

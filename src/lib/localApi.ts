@@ -2,7 +2,18 @@
 import { io } from 'socket.io-client';
 
 const API_BASE = '/api/db';
-const socket = io();
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 10000,
+  transports: ['websocket', 'polling'],  // try WebSocket first, fall back to polling
+});
+
+socket.on('connect_error', (err) => {
+  console.warn('[Socket] Connection error, will retry:', err.message);
+});
 
 export const localApi = {
   async getCollection(collection: string) {
