@@ -82,6 +82,34 @@ export const localApi = {
     }
   },
 
+  async globalStop(machineId: string, data: any) {
+    try {
+      const res = await fetch(`/api/machine/${machineId}/global-stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Échec de l\'arrêt global');
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw new Error('Erreur de connexion');
+    }
+  },
+
+  async globalResume(machineId: string) {
+    try {
+      const res = await fetch(`/api/machine/${machineId}/global-resume`, {
+        method: 'POST'
+      });
+      if (!res.ok) throw new Error('Échec du redémarrage global');
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw new Error('Erreur de connexion');
+    }
+  },
+
   // Real-time updates with Socket.io
   onSnapshot(collection: string, callback: (docs: any[]) => void) {
     let timeout: any = null;

@@ -350,6 +350,72 @@ async function startServer() {
     res.json({ success: true, message: 'JSON API reaches here' });
   });
 
+  // --- SCADA GLOBAL ENDPOINTS ---
+  apiRouter.post('/machine/:id/global-stop', async (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { id: machineId } = req.params;
+      const { typeId, operatorId, description, images } = req.body;
+      const shiftId = getServerShiftId();
+      const startTime = new Date().toISOString();
+      const logId = Math.random().toString(36).substring(2, 11);
+
+      // 1. Create a single log entry for the global stop
+      db.prepare(`
+        INSERT INTO downtime_logs (id, machineId, lineId, typeId, operatorId, shiftId, startTime, description, images)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(logId, machineId, 'MACHINE_LEVEL', typeId, operatorId, shiftId, startTime, description || '', sanitizeValue(images));
+
+      // 2. Update all active lines for this machine
+      db.prepare(`
+        UPDATE lines 
+        SET activeDowntimeId = ?, status = 'STOPPED' 
+        WHERE machineId = ? AND isActive != 0
+      `).run(logId, machineId);
+
+      io.emit('db_change', { collection: 'downtime_logs' });
+      io.emit('db_change', { collection: 'lines' });
+      
+      res.json({ success: true, logId });
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  apiRouter.post('/machine/:id/global-resume', async (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { id: machineId } = req.params;
+      const endTime = new Date().toISOString();
+
+      // 1. Find all active downtime logs for this machine (including MACHINE_LEVEL)
+      const machineLines = db.prepare('SELECT id, activeDowntimeId FROM lines WHERE machineId = ?').all(machineId) as any[];
+      const downtimeIds = [...new Set(machineLines.map(l => l.activeDowntimeId).filter(Boolean))];
+
+      for (const logId of downtimeIds) {
+        const log = db.prepare('SELECT startTime FROM downtime_logs WHERE id = ?').get(logId) as any;
+        if (log) {
+          const duration = Math.floor((new Date(endTime).getTime() - new Date(log.startTime).getTime()) / 1000);
+          db.prepare('UPDATE downtime_logs SET endTime = ?, duration = ? WHERE id = ?').run(endTime, duration, logId);
+        }
+      }
+
+      // 2. Reset all lines for this machine
+      db.prepare(`
+        UPDATE lines 
+        SET activeDowntimeId = NULL, status = 'IDLE' 
+        WHERE machineId = ?
+      `).run(machineId);
+
+      io.emit('db_change', { collection: 'downtime_logs' });
+      io.emit('db_change', { collection: 'lines' });
+
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   // Body parsers for other API routes
   apiRouter.use(express.json({ limit: '1mb' }));
   apiRouter.use(express.urlencoded({ extended: true, limit: '1mb' }));

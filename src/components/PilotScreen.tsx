@@ -461,21 +461,7 @@ export default function PilotScreen() {
   const handleResumeMachine = async () => {
     if (!selectedMachineId) return;
     try {
-      const machineLines = lines.filter(l => l.machineId === selectedMachineId);
-      for (const line of machineLines) {
-        if (line.activeDowntimeId) {
-          const log = downLogs.find(l => l.id === line.activeDowntimeId);
-          if (log && !log.endTime) {
-            const endTime = new Date().toISOString();
-            const duration = Math.floor((new Date(endTime).getTime() - new Date(log.startTime).getTime()) / 1000);
-            await localApi.updateDoc('downtime_logs', log.id, { endTime, duration });
-          }
-          await localApi.updateDoc('lines', line.id, {
-            activeDowntimeId: null,
-            status: 'IDLE'
-          });
-        }
-      }
+      await localApi.globalResume(selectedMachineId);
     } catch (e) {
       console.error(e);
       alert('Erreur lors du redémarrage de la machine');
@@ -515,52 +501,35 @@ export default function PilotScreen() {
   const handleStartDowntime = async (lineId: string | null | 'global', typeId: string, description?: string) => {
     if (!user || !selectedMachineId) return;
     try {
-      const startTime = new Date().toISOString();
-      const currentShiftId = getCurrentShiftId(shifts);
-
-      // Check for recent downtime to consolidate
-      const windowMs = 2 * 60 * 1000;
-      const now = new Date().getTime();
-      const existingRecentDowntime = downLogs.find(log => 
-        log.machineId === selectedMachineId && 
-        log.typeId === typeId && 
-        !log.endTime && 
-        (now - new Date(log.startTime).getTime()) < windowMs
-      );
-
-      if (lineId && lineId !== 'global') {
-        const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
+      // Use new atomic global stop for machine-level events
+      if (lineId === 'global' || !lineId) {
+        await localApi.globalStop(selectedMachineId, {
+          typeId,
+          operatorId: user.id,
+          description: description || '',
+          images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined
+        });
+        setSelectedImagePaths([]);
+      } else {
+        const startTime = new Date().toISOString();
+        const currentShiftId = getCurrentShiftId(shifts);
+        
+        const log = await localApi.addDoc('downtime_logs', {
           machineId: selectedMachineId,
           lineId: lineId,
           typeId,
           operatorId: user.id,
           shiftId: currentShiftId,
           startTime,
-          description: description || ''
-        })).id;
+          description: description || '',
+          images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined
+        });
 
         await localApi.updateDoc('lines', lineId, {
-          activeDowntimeId: logId,
+          activeDowntimeId: log.id,
           status: 'STOPPED'
         });
-      } else {
-        const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
-          machineId: selectedMachineId,
-          lineId: 'MACHINE_LEVEL',
-          typeId,
-          operatorId: user.id,
-          shiftId: currentShiftId,
-          startTime,
-          description: description || ''
-        })).id;
-
-        const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false);
-        for (const line of machineLines) {
-          await localApi.updateDoc('lines', line.id, {
-            activeDowntimeId: logId,
-            status: 'STOPPED'
-          });
-        }
+        setSelectedImagePaths([]);
       }
       
       setDeclaringDowntimeLineId(null);
@@ -1329,239 +1298,247 @@ export default function PilotScreen() {
           <p className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">{t('machine_select')}</p>
         </div>
       ) : (
-          <motion.div 
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="p-1 sm:p-4 gap-2 sm:gap-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-          >
-            {lines.filter(l => l.machineId === selectedMachineId).map(line => {
-            const prog = programmes.find(p => p.id === line.currentProgrammeId);
-            const op = users.find(u => u.id === line.currentOperatorId);
-            const down = activeDowntimes[line.id];
-            const downType = downtimeTypes.find(t => t.id === down?.typeId);
-            const isMachineLevel = down?.lineId === 'MACHINE_LEVEL';
-            const isActive = line.isActive !== 0;
-
-            return (
-              <motion.div 
-                key={line.id}
-                variants={item}
-                layout
-                className={cn(
-                  "card transition-all flex flex-col overflow-hidden border-l-[6px] bg-white relative",
-                  !isActive ? "border-slate-300 opacity-60 grayscale-[0.7] scale-[0.98]" :
-                  line.status === 'RUNNING' ? "border-emerald-500 shadow-xl shadow-emerald-500/10" :
-                  line.status === 'STOPPED' ? "border-rose-500 shadow-xl shadow-rose-500/20 ring-2 ring-rose-500/10" : "border-slate-200"
-                )}
-              >
-                {!isActive && (
-                   <div className="absolute inset-0 bg-slate-100/40 flex items-center justify-center z-10 backdrop-blur-[2px]">
-                      <div className="bg-white/95 backdrop-blur-md px-6 py-4 rounded-[2.5rem] border border-slate-200 shadow-2xl flex flex-col items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
-                          <Square size={20} />
-                        </div>
-                        <span className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Ligne Désactivée</span>
-                        <button 
-                          onClick={() => handleToggleLineActive(line.id, false)}
-                          className="mt-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-200 active:scale-95 transition-all pointer-events-auto hover:bg-blue-700"
-                        >
-                          ACTIVER LA LIGNE
-                        </button>
-                      </div>
-                   </div>
-                )}
-
-                <div className={cn(
-                  "px-4 py-3 flex justify-between items-center border-b border-slate-50 shrink-0",
-                  !isActive ? "bg-slate-50" : line.status === 'RUNNING' ? "bg-emerald-50/30" : line.status === 'STOPPED' ? "bg-rose-50/50" : "bg-gray-50/30"
-                )}>
-                  <div className="leading-none">
-                    <h3 className={cn("font-black text-sm tracking-tight uppercase italic truncate max-w-[140px]", !isActive ? "text-slate-400" : "text-slate-900")}>{line.name}</h3>
-                    <div className="flex items-center gap-1.5 mt-2">
-                       <span className={cn(
-                        "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-[0.1em] flex items-center gap-1.5 shadow-sm border",
-                        !isActive ? "bg-slate-100 text-slate-400 border-slate-200" :
-                        line.status === 'RUNNING' ? "bg-emerald-500 text-white border-emerald-400" :
-                        line.status === 'STOPPED' ? "bg-rose-500 text-white border-rose-400" : "bg-slate-100 text-slate-500 border-slate-200"
-                      )}>
-                        <span className={cn(
-                          "w-1.5 h-1.5 rounded-full border border-white/40",
-                          line.status === 'RUNNING' ? "bg-white animate-pulse" : line.status === 'STOPPED' ? "bg-white" : "bg-slate-400"
-                        )} />
-                        {!isActive ? 'OFFLINE' : line.status === 'RUNNING' ? 'EN PRODUCTION' : 
-                         line.status === 'STOPPED' ? (isMachineLevel ? 'ARRÊT MACHINE' : 'ARRÊT LIGNE') : 'PRÊT / IDLE'}
-                      </span>
-                    </div>
+          <div className="p-2 sm:p-4 space-y-8">
+            {/* SCADA Global Controls */}
+            <div className="bg-slate-900 p-4 rounded-[2rem] border-4 border-slate-800 shadow-2xl flex flex-wrap items-center justify-between gap-4">
+               <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-rose-600 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-900/50 border-2 border-rose-400 animate-pulse">
+                     <AlertTriangle className="text-white" size={24} />
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {isActive && (
-                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-slate-100">
-                        {line.status === 'STOPPED' || down ? (
-                          <button 
-                            onClick={() => handleStopSpecificDowntime(line.id)}
-                            className="p-2 text-emerald-600 bg-emerald-50 rounded-lg active:scale-95 hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2"
-                            title="Relancer cette ligne"
-                          >
-                            <Play className="w-4 h-4" strokeWidth={3} />
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => setDeclaringDowntimeLineId(line.id)}
-                            className="p-2 text-rose-600 bg-rose-50 rounded-lg active:scale-95 hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center"
-                            title="Mettre la ligne à l'arrêt"
-                          >
-                            <Activity size={16} strokeWidth={3} />
-                          </button>
-                        )}
-                        <button 
-                          onClick={() => setIsAssigning(line.id)}
-                          className="p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center"
-                          title="Assigner un programme"
-                        >
-                          <Pencil size={16} strokeWidth={3} />
-                        </button>
-                        <button 
-                          onClick={() => handleToggleLineActive(line.id, true)}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                          title="Désactiver (Shutdown)"
-                        >
-                          <Square size={16} />
-                        </button>
-                      </div>
-                    )}
+                  <div>
+                    <h2 className="text-white font-black text-lg italic uppercase tracking-tighter leading-none">Console SCADA Directe</h2>
+                    <p className="text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Surveillance Temps Réel Active</p>
                   </div>
-                </div>
+               </div>
+               
+               <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => handleResumeMachine()}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800"
+                  >
+                    Redémarrage Global
+                  </button>
+                  <button 
+                    onClick={() => setDeclaringDowntimeLineId('global')}
+                    className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-rose-800 flex items-center gap-2"
+                  >
+                    <Square size={14} fill="currentColor" />
+                    Arrêt Global Machine
+                  </button>
+               </div>
+            </div>
 
-                <div className={cn("p-5 space-y-5 flex-1", !isActive && "pointer-events-none")}>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Programme</p>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center border", prog ? "bg-blue-50 border-blue-100 text-blue-600" : "bg-gray-50 border-gray-100 text-gray-300")}>
-                           <Package size={14} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-xs font-black truncate leading-tight uppercase italic",
-                            prog ? "text-slate-900" : "text-slate-300"
-                          )}>
-                            {prog ? prog.name : 'Vacent'}
-                          </p>
-                          <p className="text-[9px] font-bold text-slate-400 truncate tracking-tight">{prog?.parameters || 'Sans paramètres'}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Opérateur</p>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center border", op ? "bg-slate-100 border-slate-200 text-slate-600" : "bg-gray-50 border-gray-100 text-gray-300")}>
-                           <Users size={14} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-xs font-black truncate leading-tight uppercase",
-                            op ? "text-slate-800" : "text-slate-300 italic"
-                          )}>
-                            {op ? op.name : 'Poste Libre'}
-                          </p>
-                          <p className="text-[9px] font-bold text-slate-400">Shift {currentShift?.name}</p>
-                        </div>
-                      </div>
-                    </div>
+            {/* SCADA Track Rendering */}
+            {[
+              { name: 'MA FRODA', filter: (l: any) => l.name.toLowerCase().includes('mafroda') },
+              { name: 'ELI FAB', filter: (l: any) => l.name.toLowerCase().includes('elifab') },
+              { name: 'AUTRES LIGNES', filter: (l: any) => !l.name.toLowerCase().includes('mafroda') && !l.name.toLowerCase().includes('elifab') }
+            ].map(track => {
+              const trackLines = lines.filter(l => l.machineId === selectedMachineId && track.filter(l));
+              if (trackLines.length === 0) return null;
+
+              return (
+                <div key={track.name} className="space-y-4">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="h-0.5 flex-1 bg-slate-200" />
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] italic">{track.name}</h3>
+                    <div className="h-0.5 flex-1 bg-slate-200" />
                   </div>
-                  
-                  {line.tracksProduction !== 0 && (
-                    <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 group/prod relative overflow-hidden shadow-inner">
-                        <div className="absolute top-0 right-0 p-3 opacity-[0.03] rotate-12 transition-transform group-hover/prod:scale-125">
-                           <Box size={40} className="text-blue-600" />
-                        </div>
-                        <div className="flex justify-between items-end relative z-10">
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-2">Production Live</p>
-                            <p className="text-4xl font-black text-slate-900 leading-none tabular-nums flex items-end gap-2">
-                              {prog ? prog.producedPallets : '0'}
-                              <span className="text-xs text-blue-500 font-black uppercase mb-1 tracking-tighter">Palettes</span>
-                            </p>
-                          </div>
-                          {prog && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePalletTick(line.id, prog.id);
-                              }}
-                              className="bg-blue-600 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-200 active:scale-95 hover:bg-blue-700 transition-all border-4 border-white"
-                            >
-                              <Plus size={24} strokeWidth={4} />
-                            </button>
+
+                  <motion.div 
+                    variants={container}
+                    initial="hidden"
+                    animate="show"
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                  >
+                    {trackLines.map(line => {
+                      const prog = programmes.find(p => p.id === line.currentProgrammeId);
+                      const op = users.find(u => u.id === line.currentOperatorId);
+                      const down = activeDowntimes[line.id];
+                      const downType = downtimeTypes.find(t => t.id === down?.typeId);
+                      const isMachineLevel = down?.lineId === 'MACHINE_LEVEL';
+                      const isActive = line.isActive !== 0;
+
+                      return (
+                        <motion.div 
+                          key={line.id}
+                          variants={item}
+                          layout
+                          className={cn(
+                            "scada-card transition-all flex flex-col overflow-hidden border-2 rounded-[2.5rem] bg-white relative",
+                            !isActive ? "border-slate-200 opacity-80 grayscale bg-slate-50" :
+                            line.status === 'RUNNING' ? "border-emerald-500 shadow-xl shadow-emerald-500/10" :
+                            line.status === 'STOPPED' ? "border-rose-500 shadow-xl shadow-rose-500/20 ring-4 ring-rose-500/5 animate-pulse-slow" : "border-slate-200"
                           )}
-                        </div>
-                    </div>
-                  )}
+                        >
+                          {/* Active Line Overlay is removed for better look, replaced with gray state */}
+                          
+                          <div className={cn(
+                            "px-6 py-4 flex justify-between items-center border-b",
+                            !isActive ? "bg-slate-200" : line.status === 'RUNNING' ? "bg-emerald-50/50" : line.status === 'STOPPED' ? "bg-rose-50/80" : "bg-slate-50"
+                          )}>
+                            <div className="flex flex-col">
+                              <h3 className={cn("font-black text-base tracking-tighter uppercase italic truncate max-w-[160px]", !isActive ? "text-slate-500" : "text-slate-900")}>
+                                {line.name}
+                              </h3>
+                              <div className={cn(
+                                "flex items-center gap-2 mt-1 px-3 py-1 rounded-full w-fit text-[9px] font-black tracking-widest uppercase border",
+                                !isActive ? "bg-slate-300 text-slate-600 border-slate-400" :
+                                line.status === 'RUNNING' ? "bg-emerald-600 text-white border-emerald-700" :
+                                line.status === 'STOPPED' ? "bg-rose-600 text-white border-rose-700" : "bg-slate-100 text-slate-500"
+                              )}>
+                                <span className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  line.status === 'RUNNING' ? "bg-white animate-ping" : "bg-white"
+                                )} />
+                                {!isActive ? 'SHUTDOWN' : line.status === 'RUNNING' ? 'EN LIGNE' : 'ARRÊT'}
+                              </div>
+                            </div>
 
-                  {down && (
-                    <div className="space-y-4 animate-in slide-in-from-top-4 duration-500">
-                       <div className={cn(
-                         "p-5 rounded-[2rem] border shadow-2xl transition-all",
-                         isMachineLevel ? "bg-rose-600 text-white border-rose-500 shadow-rose-200" : "bg-rose-50 border-rose-100 text-rose-900 shadow-rose-100"
-                       )}>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-3 leading-none">
-                              <span className="text-3xl filter drop-shadow-sm">{downType?.icon}</span>
-                              <div className="space-y-1">
-                                <span className={cn("text-xs font-black uppercase tracking-tight italic", isMachineLevel ? "text-white" : "text-rose-900")}>
-                                  {isMachineLevel ? `MACHINE ARREST` : downType?.name}
-                                </span>
-                                <div className="flex items-center gap-1.5">
-                                  <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMachineLevel ? "bg-white" : "bg-rose-600")} />
-                                  <p className={cn("text-[9px] font-black uppercase tracking-widest", isMachineLevel ? "text-rose-100" : "text-rose-500")}>Surveillance active</p>
+                            <div className="flex gap-2">
+                               {isActive && (
+                                 <button 
+                                   onClick={() => handleToggleLineActive(line.id, true)}
+                                   className="p-3 bg-white text-slate-400 hover:text-rose-600 rounded-2xl shadow-sm border border-slate-100 transition-all hover:scale-110 active:scale-95"
+                                   title="Désactiver la ligne"
+                                 >
+                                   <Square size={18} />
+                                 </button>
+                               )}
+                               {!isActive && (
+                                 <button 
+                                   onClick={() => handleToggleLineActive(line.id, false)}
+                                   className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
+                                 >
+                                   DÉMARRER
+                                 </button>
+                               )}
+                            </div>
+                          </div>
+
+                          <div className={cn("p-6 space-y-6 flex-1", !isActive && "opacity-40 grayscale pointer-events-none")}>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Programme</span>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200">
+                                    <Package size={18} />
+                                  </div>
+                                  <div className="truncate">
+                                    <p className="font-black text-xs text-slate-900 truncate leading-none uppercase italic">{prog?.name || '---'}</p>
+                                    <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{prog?.parameters || 'Production Standby'}</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Opérateur</span>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 border border-blue-100">
+                                    <Users size={18} />
+                                  </div>
+                                  <div className="truncate">
+                                    <p className="font-black text-xs text-slate-900 truncate leading-none uppercase">{op?.name || 'POSTE VIDE'}</p>
+                                    <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">SHIFT {currentShift?.name || '...'}</p>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <div className={cn(
-                              "text-sm font-black px-3 py-1 rounded-[1rem] shadow-sm font-mono tabular-nums border",
-                              isMachineLevel ? "bg-white text-rose-600 border-white" : "bg-rose-600 text-white border-rose-500"
-                            )}>
-                              {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
-                            </div>
-                          </div>
-                          
-                          {down.description && (
-                            <div className={cn(
-                              "p-3 rounded-2xl border mb-3",
-                              isMachineLevel ? "bg-white/10 border-white/20" : "bg-white border-rose-100/50"
-                            )}>
-                               <p className={cn("text-[11px] font-bold leading-relaxed italic", isMachineLevel ? "text-rose-50" : "text-gray-700")}>
-                                 "{down.description}"
-                               </p>
-                            </div>
-                          )}
 
-                          {down.images && (
-                            <div className="flex flex-wrap gap-2 mt-3">
-                              {(typeof down.images === 'string' ? JSON.parse(down.images) as string[] : down.images as string[]).map((img, i) => (
+                            {/* Production Pulse */}
+                            {line.tracksProduction !== 0 && (
+                              <div className="relative overflow-hidden bg-slate-900/5 p-4 rounded-[1.5rem] border border-slate-100 flex justify-between items-end">
+                                <div>
+                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Flux Production</span>
+                                  <p className="text-3xl font-black text-slate-900 tabular-nums">
+                                    {prog?.producedPallets || 0}
+                                    <span className="ml-1 text-[10px] text-blue-600 uppercase">pal</span>
+                                  </p>
+                                </div>
+                                <Activity className="text-blue-200 animate-pulse" size={40} />
+                              </div>
+                            )}
+
+                            {/* Downtime Real-Time Info */}
+                            {down && (
+                              <div className="space-y-4 pt-2">
+                                <div className={cn(
+                                  "p-4 rounded-[1.5rem] border-2",
+                                  isMachineLevel ? "bg-rose-900 border-rose-600 text-white shadow-xl shadow-rose-200" : "bg-rose-50 border-rose-200 text-rose-900"
+                                )}>
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-2xl">{downType?.icon || '⚠️'}</span>
+                                      <div className="leading-none">
+                                        <p className="text-[10px] font-black uppercase tracking-widest">{isMachineLevel ? 'ARRÊT TOTAL' : 'ARRÊT LIGNE'}</p>
+                                        <p className="font-black text-xs italic uppercase truncate max-w-[120px]">{downType?.name}</p>
+                                      </div>
+                                    </div>
+                                    <div className="font-mono font-black text-xs bg-white text-rose-600 px-2 py-1 rounded-lg border border-rose-100">
+                                      {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
+                                    </div>
+                                  </div>
+                                  
+                                  {down.description && (
+                                    <p className={cn("text-[10px] p-2 rounded-xl mb-2", isMachineLevel ? "bg-white/10" : "bg-white/50 border border-rose-100")}>
+                                      "{down.description}"
+                                    </p>
+                                  )}
+
+                                  {down.images && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {(typeof down.images === 'string' ? JSON.parse(down.images) : down.images).map((img: string, i: number) => (
+                                        <button 
+                                          key={i} 
+                                          onClick={() => setSelectedFullImage(img)}
+                                          className="w-10 h-10 rounded-lg overflow-hidden border border-white shadow-sm hover:scale-110 transition-all"
+                                        >
+                                          <img src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  <button 
+                                    onClick={() => handleStopSpecificDowntime(line.id)}
+                                    className="w-full mt-3 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all"
+                                  >
+                                    Relancer Production
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Operator Controls if IDLE */}
+                            {isActive && !down && line.status !== 'STOPPED' && (
+                              <div className="grid grid-cols-2 gap-2 mt-auto">
                                 <button 
-                                  key={i}
-                                  onClick={() => setSelectedFullImage(img)}
-                                  className="w-14 h-14 rounded-[1.2rem] overflow-hidden border-2 border-white shadow-xl hover:scale-110 transition-transform active:scale-95"
+                                  onClick={() => setDeclaringDowntimeLineId(line.id)}
+                                  className="py-3 bg-rose-50 text-rose-600 rounded-2xl flex flex-col items-center gap-1 border border-rose-100 hover:bg-rose-600 hover:text-white transition-all active:scale-95"
                                 >
-                                  <img src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" alt="Downtime evidence" />
+                                  <Square size={14} fill="currentColor" />
+                                  <span className="text-[8px] font-black uppercase">Arrêt</span>
                                 </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                    </div>
-                  )}
+                                <button 
+                                  onClick={() => setIsAssigning(line.id)}
+                                  className="py-3 bg-blue-50 text-blue-600 rounded-2xl flex flex-col items-center gap-1 border border-blue-100 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+                                >
+                                  <Pencil size={14} />
+                                  <span className="text-[8px] font-black uppercase">Assigner</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </motion.div>
                 </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      )
-    ) : (
-      !selectedMachineId ? (
+              );
+            })}
+          </div>
+        )
+      ) : (
+        !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
              <History size={32} />

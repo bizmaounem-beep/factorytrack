@@ -831,7 +831,24 @@ export default function OperatorScreen() {
                 )}>
                   <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white to-transparent pointer-events-none" />
                   
-                  <div className="flex flex-col items-center text-center relative z-10">
+                  {activeLine?.isActive === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center relative z-10 w-full">
+                      <div className="w-20 h-20 bg-slate-100 rounded-[2rem] flex items-center justify-center mb-6 shadow-xl border-4 border-slate-200 animate-pulse">
+                        <Square size={32} className="text-slate-400" fill="currentColor" />
+                      </div>
+                      <h2 className="text-3xl font-black text-slate-900 italic tracking-tighter mb-3 leading-none uppercase">
+                        {activeLine?.name}
+                      </h2>
+                      <div className="px-6 py-2 bg-slate-900 text-white rounded-full text-[9px] font-black uppercase tracking-[0.3em] mb-6 border-b-4 border-slate-700 shadow-lg leading-none">
+                        MODE SHUTDOWN / ARRÊT FORCÉ
+                      </div>
+                      <p className="text-slate-500 font-bold max-w-sm text-sm leading-relaxed mb-8">
+                        Cette ligne est actuellement désactivée par le Pilote. 
+                        Toutes les opérations de saisie de production et d'arrêt sont suspendues jusqu'à réactivation.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-center relative z-10">
                     <div className={cn(
                       "w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-xl transform transition-transform duration-500 hover:scale-105 active:scale-95",
                       activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-emerald-500/20" : "bg-rose-500 shadow-rose-500/20"
@@ -1102,9 +1119,10 @@ export default function OperatorScreen() {
                         </button>
                       </div>
                     )}
+                  </div>
+                )}
                 </div>
               </div>
-            </div>
 
               {/* RIGHT COLUMN: PRODUCTION & HISTORY */}
               <div className="lg:col-span-5 space-y-6">
