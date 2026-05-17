@@ -123,15 +123,15 @@ export const localApi = {
   }
 };
 
-export const loginLocal = async (pin: string) => {
+export const loginLocal = async (username: string, password: string) => {
   try {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin })
+      body: JSON.stringify({ name: username, pin: password })
     });
     if (res.status === 401) {
-      throw new Error('Code PIN incorrect');
+      throw new Error('Identifiants incorrects');
     }
     if (!res.ok) {
       throw new Error('Erreur de connexion');
@@ -142,7 +142,7 @@ export const loginLocal = async (pin: string) => {
     }
     return res.json();
   } catch (e) {
-    if ((e as Error).message === 'Code PIN incorrect') throw e;
+    if ((e as Error).message === 'Identifiants incorrects') throw e;
     console.error('Login error:', e);
     throw new Error('Erreur de connexion');
   }

@@ -5,11 +5,12 @@ import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Line, Shift } from '../types';
 import { format, parseISO, isToday, startOfDay, endOfDay } from 'date-fns';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Play, Square, Settings, Timer, Package, AlertCircle, 
   CheckCircle, Factory, Monitor, Activity, Plus, Minus, 
   ArrowLeft, X, Clock, Check, Edit, Trash2, History,
-  ChevronRight, ChevronLeft, Info, Camera, Trash
+  ChevronRight, ChevronLeft, Info, Camera, Trash, Sun, Moon
 } from 'lucide-react';
 import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -20,6 +21,7 @@ import { Capacitor } from '@capacitor/core';
 export default function OperatorScreen() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const { 
     machines, 
     lines, 
@@ -746,6 +748,13 @@ export default function OperatorScreen() {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <button 
+              onClick={toggleTheme}
+              className="p-1 px-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Changer le thème"
+            >
+              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
             <div className="hidden sm:flex flex-col items-end leading-none mr-2">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{user?.name}</span>
               <span className="text-[8px] font-bold text-blue-500/80 uppercase tracking-widest leading-none mt-1">{activeLine?.name}</span>

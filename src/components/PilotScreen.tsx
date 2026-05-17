@@ -6,12 +6,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { DowntimeLog, Shift } from '../types';
 import { format, parseISO, isToday } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Monitor, LayoutGrid, Package, Users, Activity, 
   ExternalLink, Plus, History, Timer, Pencil, 
   Trash2, Menu, X, ArrowLeft, Clock, Square, 
   Play, TrendingUp, AlertTriangle, CheckCircle2,
-  Box, LayoutDashboard, Info, Camera
+  Box, LayoutDashboard, Info, Camera, Sun, Moon
 } from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -20,6 +21,7 @@ import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 export default function PilotScreen() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const { 
     machines, 
     users, 
@@ -33,6 +35,7 @@ export default function PilotScreen() {
 
   const [historyLineFilter, setHistoryLineFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_line') || '');
   const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_date') || '');
+  const [historyEndDateFilter, setHistoryEndDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_end_date') || '');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('pilot_history_type') as any) || 'production');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'monitor' | 'history'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -101,7 +104,7 @@ export default function PilotScreen() {
       .slice(0, 5);
 
     const teamPerformance = users
-      .filter(u => u.role === 'operator')
+      .filter(u => u.role === 'OPERATOR')
       .map(u => {
         const pallets = todayProd
           .filter(l => l.operatorId === u.id)
@@ -140,8 +143,9 @@ export default function PilotScreen() {
   useEffect(() => {
     sessionStorage.setItem('pilot_history_line', historyLineFilter);
     sessionStorage.setItem('pilot_history_date', historyDateFilter);
+    sessionStorage.setItem('pilot_history_end_date', historyEndDateFilter);
     sessionStorage.setItem('pilot_history_type', historyLogType);
-  }, [historyLineFilter, historyDateFilter, historyLogType]);
+  }, [historyLineFilter, historyDateFilter, historyEndDateFilter, historyLogType]);
   const [activeDowntimes, setActiveDowntimes] = useState<Record<string, DowntimeLog>>({});
 
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
@@ -704,6 +708,13 @@ export default function PilotScreen() {
         </div>
         <div className="flex items-center gap-2">
           <button 
+            onClick={toggleTheme}
+            className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Changer le thème"
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+          <button 
             onClick={handleLogout}
             className="p-1 px-1.5 border border-red-50 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[7px] uppercase"
           >
@@ -794,6 +805,12 @@ export default function PilotScreen() {
             <h1 className="font-black text-xl tracking-tighter uppercase italic">Pilot Monitor</h1>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button 
+              onClick={toggleTheme}
+              className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors hidden sm:block"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button 
               onClick={() => setActiveTab('dashboard')}
               className={cn(
@@ -1390,11 +1407,21 @@ export default function PilotScreen() {
                   </div>
 
                   <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</p>
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_date') || 'Début'}</p>
                      <input 
                       type="date"
                       value={historyDateFilter}
                       onChange={e => setHistoryDateFilter(e.target.value)}
+                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                     />
+                  </div>
+
+                  <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_date') || 'Fin'}</p>
+                     <input 
+                      type="date"
+                      value={historyEndDateFilter}
+                      onChange={e => setHistoryEndDateFilter(e.target.value)}
                       className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
                      />
                   </div>
@@ -1425,7 +1452,9 @@ export default function PilotScreen() {
                             {sortedProdLogs
                               .filter(log => {
                                 const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
-                                const matchDate = !historyDateFilter || log.timestamp.startsWith(historyDateFilter);
+                                const logDateOnly = log.timestamp.split('T')[0];
+                                const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
+                                                  (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
                                 return matchLine && matchDate;
                               })
                               .slice(0, 100).map(log => (
@@ -1487,7 +1516,9 @@ export default function PilotScreen() {
                           {sortedDownLogs
                             .filter(log => {
                               const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
-                              const matchDate = !historyDateFilter || log.startTime.startsWith(historyDateFilter);
+                              const logDateOnly = log.startTime.split('T')[0];
+                              const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
+                                                (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
                               return matchLine && matchDate;
                             })
                             .slice(0, 100).map(log => (
@@ -1672,6 +1703,34 @@ export default function PilotScreen() {
                         }
                       }}
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Photos</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(editModalData.images || []).map((img: string, i: number) => (
+                        <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200">
+                          <img src={`/uploads/${img}`} className="w-full h-full object-cover" alt="Preview" />
+                          <button 
+                            onClick={() => {
+                              const newImages = [...editModalData.images];
+                              newImages.splice(i, 1);
+                              setEditModalData({...editModalData, images: newImages});
+                            }}
+                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-all"
+                      >
+                        <Plus size={20} />
+                        <span className="text-[7px] font-black uppercase">Ajouter</span>
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -1861,13 +1920,39 @@ export default function PilotScreen() {
                </div>
 
                <div className="space-y-1">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Description / Commentaire</label>
-                 <textarea 
-                   className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                   placeholder="..."
-                   rows={2}
-                   value={manualStopForm.description}
-                   onChange={e => setManualStopForm({...manualStopForm, description: e.target.value})}
+                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Photos</label>
+                 <div className="flex flex-wrap gap-2">
+                   {imagePreviews.map((p, i) => (
+                     <div key={i} className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-200">
+                       <img src={p} className="w-full h-full object-cover" alt="Preview" />
+                       <button 
+                        onClick={() => {
+                          const newPreviews = [...imagePreviews];
+                          const newPaths = [...selectedImagePaths];
+                          newPreviews.splice(i, 1);
+                          newPaths.splice(i, 1);
+                          setImagePreviews(newPreviews);
+                          setSelectedImagePaths(newPaths);
+                        }}
+                        className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg"
+                       >
+                         <X size={10} />
+                       </button>
+                     </div>
+                   ))}
+                   <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all"
+                   >
+                     {isUploading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" /> : <Camera size={18} />}
+                   </button>
+                 </div>
+                 <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  className="hidden" 
+                  accept="image/*" 
                  />
                </div>
             </div>

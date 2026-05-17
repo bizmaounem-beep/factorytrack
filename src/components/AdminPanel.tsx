@@ -1,15 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, ChangeEvent } from 'react';
 import { localApi } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Users, Factory, Package, Timer, History, 
   Download, Plus, Trash2, LayoutDashboard,
   Box, Terminal, Activity, Pencil, Menu, X, Clock,
   TrendingUp, AlertTriangle, CheckCircle2,
-  Camera, Eye
+  Camera, Eye, Sun, Moon
 } from 'lucide-react';
 import { cn, formatDuration, formatMinutes, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import ExcelJS from 'exceljs';
@@ -19,6 +20,7 @@ import { format, startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-f
 export default function AdminPanel() {
   const { logout, user } = useAuth();
   const { t } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const { 
     users, 
     machines, 
@@ -108,12 +110,50 @@ export default function AdminPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalType, setModalType] = useState<'user' | 'machine' | 'line' | 'downtime' | 'programme' | 'production_log' | 'downtime_log' | 'shift'>('user');
   const [modalData, setModalData] = useState<any>({});
+  const [confirmPin, setConfirmPin] = useState('');
   const [selectedMachineForLine, setSelectedMachineForLine] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
   const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadFile = async (file: File) => {
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('photo', file, 'admin-upload.jpg');
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        body: formData
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.path) {
+        const currentImages = modalData.images || [];
+        setModalData({ ...modalData, images: [...currentImages, data.path] });
+      } else {
+        throw new Error(data.error || `Erreur ${res.status}`);
+      }
+    } catch (e: any) {
+      console.error('Upload error:', e);
+      alert(`Erreur de téléchargement: ${e.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach((file: File) => uploadFile(file));
+    }
+  };
 
   const openModal = (type: typeof modalType, data: any = {}) => {
     setModalType(type);
+    setConfirmPin('');
     // When editing a user, we don't want to show the hashed PIN
     const cleanData = type === 'user' && data.id ? { ...data, pin: '' } : { ...data };
     setModalData(cleanData);
@@ -134,8 +174,12 @@ export default function AdminPanel() {
         }
       }
       if (modalType === 'user') {
-        if (!modalData.name || !modalData.pin || !modalData.role) {
+        if (!modalData.name || (!editingId && !modalData.pin) || !modalData.role) {
           alert(t('fill_all_fields'));
+          return;
+        }
+        if (modalData.pin && modalData.pin !== confirmPin) {
+          alert(t('passwords_not_match') || 'Les mots de passe ne correspondent pas');
           return;
         }
       }
@@ -323,6 +367,12 @@ export default function AdminPanel() {
   const exportToExcel = async (type: 'production' | 'downtime') => {
     const workbook = new ExcelJS.Workbook();
     const dataSheet = workbook.addWorksheet('Data');
+
+    let photoSheet: ExcelJS.Worksheet | null = null;
+    if (type === 'downtime') {
+      photoSheet = workbook.addWorksheet('Photos');
+    }
+
     const dashboardSheet = workbook.addWorksheet('Dashboard');
     
     let fileName = "";
@@ -444,7 +494,8 @@ export default function AdminPanel() {
       });
 
     } else {
-      const photoSheet = workbook.addWorksheet('Photos');
+      // Photo sheet already created as 2nd tab
+      const photoSheetToUse = photoSheet!;
 
       dataSheet.columns = [
         { header: 'Arrêt #', key: 'id', width: 12 },
@@ -459,12 +510,12 @@ export default function AdminPanel() {
         { header: 'Description', key: 'desc', width: 40 },
       ];
 
-      photoSheet.columns = [
+      photoSheetToUse.columns = [
         { header: 'Arrêt #', key: 'id', width: 15 },
         { header: 'Machine', key: 'machine', width: 25 },
         { header: 'Galerie Photo', key: 'photo', width: 60 },
       ];
-      photoSheet.getRow(1).eachCell(cell => Object.assign(cell, headerStyle));
+      photoSheetToUse.getRow(1).eachCell(cell => Object.assign(cell, headerStyle));
 
       let photoRowIdx = 2;
 
@@ -498,7 +549,7 @@ export default function AdminPanel() {
         if (images.length > 0) {
            for (const imgPath of images) {
               const machineName = machines.find(m => m.id === log.machineId)?.name || '—';
-              const pRow = photoSheet.addRow({
+              const pRow = photoSheetToUse.addRow({
                  id: log.id.substring(0, 8),
                  machine: machineName,
                  photo: ''
@@ -518,7 +569,7 @@ export default function AdminPanel() {
                   extension: (extension === 'png' || extension === 'gif') ? extension : 'jpeg',
                 });
                 
-                photoSheet.addImage(imageId, {
+                photoSheetToUse.addImage(imageId, {
                   tl: { col: 2.1, row: photoRowIdx - 0.9 },
                   ext: { width: 420, height: 230 }
                 });
@@ -685,6 +736,13 @@ export default function AdminPanel() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={toggleTheme}
+            className="p-1 px-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Changer le thème"
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
           <button 
             onClick={logout}
             className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50"
@@ -1404,7 +1462,9 @@ export default function AdminPanel() {
                                 const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
                                 const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
                                 const matchOperator = !historyOperatorFilter || log.operatorId === historyOperatorFilter;
-                                const matchDate = !historyDateFilter || log.timestamp.startsWith(historyDateFilter);
+                                const logDateOnly = log.timestamp.split('T')[0];
+                                const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
+                                                  (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
                                 return matchMachine && matchLine && matchShift && matchOperator && matchDate;
                               })
                               .slice(0, 100).map(log => (
@@ -1479,7 +1539,9 @@ export default function AdminPanel() {
                                 const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
                                 const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
                                 const matchOperator = !historyOperatorFilter || log.operatorId === historyOperatorFilter;
-                                const matchDate = !historyDateFilter || log.startTime.startsWith(historyDateFilter);
+                                const logDateOnly = log.startTime.split('T')[0];
+                                const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
+                                                  (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
                                 return matchMachine && matchLine && matchShift && matchOperator && matchDate;
                               })
                               .slice(0, 100).map(log => (
@@ -1970,15 +2032,22 @@ export default function AdminPanel() {
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input 
-                      placeholder={editingId ? t('new_pin_placeholder') || 'Nouveau PIN (optionnel)' : t('pin')}
+                      placeholder={editingId ? t('new_password_placeholder') || 'Nouveau mot de passe (optionnel)' : t('password') || 'Mot de passe'}
                       type="password"
-                      inputMode="numeric"
-                      maxLength={4}
                       className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
                       value={modalData.pin || ''}
                       onChange={e => setModalData({...modalData, pin: e.target.value})}
                     />
+                    <input 
+                      placeholder={t('confirm_password') || 'Confirmer le mot de passe'}
+                      type="password"
+                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      value={confirmPin}
+                      onChange={e => setConfirmPin(e.target.value)}
+                    />
+                  </div>
                   <select 
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
                     value={modalData.role || ''}

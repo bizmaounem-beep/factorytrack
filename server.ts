@@ -213,6 +213,18 @@ async function startServer() {
         'admin-1', 'Admin', hashedAdminPin, 'ADMIN'
       );
 
+      // Default Pilot
+      const hashedPilotPin = await bcrypt.hash('2222', SALT_ROUNDS);
+      db.prepare('INSERT INTO users (id, name, pin, role) VALUES (?, ?, ?, ?)').run(
+        'pilot-1', 'Pilote Test', hashedPilotPin, 'PILOT'
+      );
+
+      // Default Operator
+      const hashedOpPin = await bcrypt.hash('3333', SALT_ROUNDS);
+      db.prepare('INSERT INTO users (id, name, pin, role) VALUES (?, ?, ?, ?)').run(
+        'op-1', 'Opérateur Test', hashedOpPin, 'OPERATOR'
+      );
+
       // Default Downtime Types
       const dtTypes = [
         { id: 'dt-1', name: 'Panne Machine', icon: '⚙️' },
@@ -228,9 +240,14 @@ async function startServer() {
         insertDT.run(dt.id, dt.name, dt.icon);
       }
 
-      // Sample machine and line
-      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m1', 'Machine Principale');
-      db.prepare('INSERT INTO lines (id, machineId, name, status) VALUES (?, ?, ?, ?)').run('l1', 'm1', 'Ligne de Production A', 'IDLE');
+      // Default production lines and machines
+      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m-a1', 'Machine A1');
+      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m-b2', 'Machine B2');
+      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m-c3', 'Machine C3');
+      
+      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l-1', 'm-a1', 'Ligne 1', 'IDLE', 1);
+      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l-2', 'm-b2', 'Ligne 2', 'IDLE', 0);
+      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l-3', 'm-c3', 'Ligne 3', 'IDLE', 1);
 
       // Default Shifts
       const defaultShifts = [

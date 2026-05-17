@@ -11,9 +11,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <LanguageProvider>
-        <DataProvider>
-          <App />
-        </DataProvider>
+        <ThemeProvider>
+          <DataProvider>
+            <App />
+          </DataProvider>
+        </ThemeProvider>
       </LanguageProvider>
     </AuthProvider>
   </StrictMode>,

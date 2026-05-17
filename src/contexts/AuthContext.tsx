@@ -4,7 +4,7 @@ import { loginLocal } from '../lib/localApi';
 
 interface AuthContextType {
   user: User | null;
-  login: (pin: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
 }
@@ -24,9 +24,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (pin: string) => {
+  const login = async (username: string, password: string) => {
     try {
-      const foundUser = await loginLocal(pin);
+      const foundUser = await loginLocal(username, password);
       
       if (foundUser) {
         setUser(foundUser);
