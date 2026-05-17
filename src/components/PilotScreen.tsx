@@ -41,6 +41,66 @@ export default function PilotScreen() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => sessionStorage.getItem('pilot_selected_machine') || '');
   const [globalTimer, setGlobalTimer] = useState(Date.now());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Critical Alerts Logic
+  const criticalAlerts = useMemo(() => {
+    if (!selectedMachineId) return [];
+    const alerts: { id: string; type: 'danger' | 'warning' | 'info'; title: string; desc: string; icon: any }[] = [];
+    
+    const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false);
+    
+    // 1. Long stops (> 20 mins)
+    machineLines.forEach(l => {
+      const down = downLogs.find(d => d.id === l.activeDowntimeId && !d.endTime);
+      if (down) {
+        const durSec = Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000);
+        if (durSec > 20 * 60) {
+          alerts.push({
+            id: `long-stop-${l.id}`,
+            type: 'danger',
+            title: `ARRÊT CRITIQUE : ${l.name}`,
+            desc: `En arrêt depuis ${formatDowntimeDisplay(durSec)} (${downtimeTypes.find(dt => dt.id === down.typeId)?.name})`,
+            icon: AlertTriangle
+          });
+        }
+      }
+    });
+
+    // 2. Stopped lines summary
+    const stoppedCount = machineLines.filter(l => l.status === 'STOPPED').length;
+    if (stoppedCount === machineLines.length && machineLines.length > 0) {
+       alerts.push({
+         id: 'full-machine-stop',
+         type: 'danger',
+         title: 'ARRÊT TOTAL MACHINE',
+         desc: 'Toutes les lignes actives sont actuellement à l\'arrêt.',
+         icon: Activity
+       });
+    } else if (stoppedCount > 0) {
+       alerts.push({
+         id: 'partial-stop',
+         type: 'warning',
+         title: 'ARRÊT PARTIEL',
+         desc: `${stoppedCount} ligne(s) sur ${machineLines.length} sont à l'arrêt.`,
+         icon: AlertTriangle
+       });
+    }
+
+    // 3. Inactive lines info
+    const inactiveCount = lines.filter(l => l.machineId === selectedMachineId && l.isActive === false).length;
+    if (inactiveCount > 0) {
+       alerts.push({
+         id: 'inactive-lines',
+         type: 'info',
+         title: 'LIGNES DÉSACTIVÉES',
+         desc: `${inactiveCount} ligne(s) sont hors production (Configuration Pilot).`,
+         icon: Info
+       });
+    }
+
+    return alerts;
+  }, [lines, selectedMachineId, downLogs, globalTimer, downtimeTypes]);
 
   useEffect(() => {
     const interval = setInterval(() => setGlobalTimer(Date.now()), 1000);
@@ -864,78 +924,112 @@ export default function PilotScreen() {
         </div>
         
         {activeTab === 'monitor' && selectedMachineId && (
-          <div className="flex flex-col gap-3 bg-gray-50/50 p-3 sm:p-5 rounded-2xl border border-gray-100 mb-3 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100">
-                  <LayoutGrid size={24} />
+          <div className="flex flex-col gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-gray-100 mb-4 shadow-xl shadow-slate-200/50">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-200 border-4 border-white">
+                  <LayoutGrid size={32} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none mb-1">Status Machine SCADA</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-lg font-black text-gray-900 tracking-tight">{machines.find(m => m.id === selectedMachineId)?.name}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[8px] font-black uppercase tracking-widest rounded-full border border-blue-100">SCADA LIVE V4.0</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none uppercase italic">
+                      {machines.find(m => m.id === selectedMachineId)?.name}
+                    </h2>
                     <button 
                       onClick={() => handleMachineSelect('')}
-                      className="text-[9px] font-black text-blue-600 uppercase hover:underline italic"
+                      className="text-[10px] font-black text-blue-600 uppercase hover:underline leading-none mt-1"
                     >
-                      ({t('change').toUpperCase()})
+                      ({t('change')})
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
+                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Efficience</p>
+                    <p className="text-lg font-black text-blue-600 leading-none tabular-nums">{analytics.availability.toFixed(1)}%</p>
+                 </div>
+                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Lignes Actives</p>
+                    <p className="text-lg font-black text-gray-800 leading-none tabular-nums">
+                      {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length}
+                    </p>
+                 </div>
+                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">En Arrêt</p>
+                    <p className="text-lg font-black text-rose-600 leading-none tabular-nums">
+                      {lines.filter(l => l.machineId === selectedMachineId && l.status === 'STOPPED' && l.isActive !== false).length}
+                    </p>
+                 </div>
+                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Prod Total</p>
+                    <p className="text-lg font-black text-emerald-600 leading-none tabular-nums">{analytics.totalPallets}</p>
+                 </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
-                  <div className="flex-1 sm:flex-none flex items-center gap-3 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 animate-pulse">
-                    <Activity size={18} />
-                    FULL MACHINE STOP
-                    <button 
-                      onClick={handleResumeMachine}
-                      className="ml-4 px-3 py-1 bg-white text-rose-600 rounded-lg hover:bg-rose-50 transition-all active:scale-95"
-                    >
-                      RELANCER
-                    </button>
-                  </div>
+                  <button 
+                    onClick={handleResumeMachine}
+                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
+                  >
+                    <Play size={20} fill="currentColor" />
+                    REDÉMARRAGE MACHINE
+                  </button>
                 ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).some(l => l.status === 'RUNNING') ? (
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 hover:bg-rose-700 active:scale-95 transition-all"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in"
                   >
-                    <Activity size={18} className="animate-pulse" />
-                    {t('stop_machine')}
+                    <Activity size={20} className="animate-pulse" />
+                    ARRÊT D'URGENCE GLOBAL
                   </button>
                 ) : (
                   <button 
                     onClick={handleResumeMachine}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
                   >
-                    <Activity size={18} />
-                    RELANCER LA MACHINE
+                    <Play size={20} fill="currentColor" />
+                    REPRISE DE LA MACHINE
                   </button>
                 )}
               </div>
             </div>
-            
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-               <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-black text-gray-600 uppercase tabular-nums">
-                    {lines.filter(l => l.machineId === selectedMachineId && l.status === 'RUNNING').length}/{lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length} Lignes en Prod
-                  </span>
-               </div>
-               <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-                  <div className="w-2 h-2 rounded-full bg-rose-500" />
-                  <span className="text-[10px] font-black text-gray-600 uppercase tabular-nums">
-                    {lines.filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId).length} Arrêts Actifs
-                  </span>
-               </div>
-               <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-                  <div className="w-2 h-2 rounded-full bg-slate-300" />
-                  <span className="text-[10px] font-black text-gray-600 uppercase tabular-nums">
-                    {lines.filter(l => l.machineId === selectedMachineId && l.isActive === false).length} Lignes Inactives
-                  </span>
-               </div>
-            </div>
+
+            {/* LIVE ALERTS SECTION */}
+            {criticalAlerts.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-3">
+                {criticalAlerts.map(alert => (
+                  <motion.div 
+                    key={alert.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-2xl border flex-1 min-w-[280px] shadow-sm",
+                      alert.type === 'danger' ? "bg-rose-50 border-rose-100 text-rose-800" :
+                      alert.type === 'warning' ? "bg-orange-50 border-orange-100 text-orange-800" : "bg-blue-50 border-blue-100 text-blue-800"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm",
+                      alert.type === 'danger' ? "bg-rose-600 text-white" :
+                      alert.type === 'warning' ? "bg-orange-500 text-white" : "bg-blue-600 text-white"
+                    )}>
+                      <alert.icon size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-tight leading-none mb-1">{alert.title}</p>
+                      <p className="text-[11px] font-bold opacity-80 leading-tight italic">{alert.desc}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1255,146 +1349,140 @@ export default function PilotScreen() {
                 variants={item}
                 layout
                 className={cn(
-                  "card transition-all flex flex-col overflow-hidden border-l-4 bg-white relative",
-                  !isActive ? "border-slate-300 opacity-70 grayscale-[0.5]" :
-                  line.status === 'RUNNING' ? "border-emerald-500 shadow-xl shadow-emerald-50/50" :
-                  line.status === 'STOPPED' ? "border-rose-500 shadow-xl shadow-rose-50/50" : "border-slate-200"
+                  "card transition-all flex flex-col overflow-hidden border-l-[6px] bg-white relative",
+                  !isActive ? "border-slate-300 opacity-60 grayscale-[0.7] scale-[0.98]" :
+                  line.status === 'RUNNING' ? "border-emerald-500 shadow-xl shadow-emerald-500/10" :
+                  line.status === 'STOPPED' ? "border-rose-500 shadow-xl shadow-rose-500/20 ring-2 ring-rose-500/10" : "border-slate-200"
                 )}
               >
                 {!isActive && (
-                   <div className="absolute inset-0 bg-slate-100/40 flex items-center justify-center z-10">
-                      <div className="bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl border border-slate-200 shadow-2xl flex flex-col items-center gap-2">
-                        <Square size={24} className="text-slate-400" />
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Ligne Désactivée</span>
+                   <div className="absolute inset-0 bg-slate-100/40 flex items-center justify-center z-10 backdrop-blur-[2px]">
+                      <div className="bg-white/95 backdrop-blur-md px-6 py-4 rounded-[2.5rem] border border-slate-200 shadow-2xl flex flex-col items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                          <Square size={20} />
+                        </div>
+                        <span className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] italic">Ligne Désactivée</span>
                         <button 
                           onClick={() => handleToggleLineActive(line.id, false)}
-                          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 active:scale-95 transition-all pointer-events-auto"
+                          className="mt-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-200 active:scale-95 transition-all pointer-events-auto hover:bg-blue-700"
                         >
-                          Réactiver
+                          ACTIVER LA LIGNE
                         </button>
                       </div>
                    </div>
                 )}
 
-                <div className="px-3 py-2.5 flex justify-between items-center border-b border-slate-50 shrink-0 bg-gray-50/30">
+                <div className={cn(
+                  "px-4 py-3 flex justify-between items-center border-b border-slate-50 shrink-0",
+                  !isActive ? "bg-slate-50" : line.status === 'RUNNING' ? "bg-emerald-50/30" : line.status === 'STOPPED' ? "bg-rose-50/50" : "bg-gray-50/30"
+                )}>
                   <div className="leading-none">
-                    <h3 className={cn("font-black text-xs tracking-tight uppercase italic truncate max-w-[120px]", !isActive ? "text-slate-400" : "text-slate-900")}>{line.name}</h3>
-                    <div className="flex items-center gap-1 mt-1.5">
+                    <h3 className={cn("font-black text-sm tracking-tight uppercase italic truncate max-w-[140px]", !isActive ? "text-slate-400" : "text-slate-900")}>{line.name}</h3>
+                    <div className="flex items-center gap-1.5 mt-2">
                        <span className={cn(
-                        "px-1.5 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm",
-                        !isActive ? "bg-slate-100 text-slate-400" :
-                        line.status === 'RUNNING' ? "bg-emerald-500 text-white" :
-                        line.status === 'STOPPED' ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-500"
+                        "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-[0.1em] flex items-center gap-1.5 shadow-sm border",
+                        !isActive ? "bg-slate-100 text-slate-400 border-slate-200" :
+                        line.status === 'RUNNING' ? "bg-emerald-500 text-white border-emerald-400" :
+                        line.status === 'STOPPED' ? "bg-rose-500 text-white border-rose-400" : "bg-slate-100 text-slate-500 border-slate-200"
                       )}>
                         <span className={cn(
-                          "w-1.5 h-1.5 rounded-full border border-white/30",
-                          line.status === 'RUNNING' ? "bg-white animate-pulse" : line.status === 'STOPPED' ? "bg-white" : "bg-slate-300"
+                          "w-1.5 h-1.5 rounded-full border border-white/40",
+                          line.status === 'RUNNING' ? "bg-white animate-pulse" : line.status === 'STOPPED' ? "bg-white" : "bg-slate-400"
                         )} />
-                        {!isActive ? 'DÉSACTIVÉE' : line.status === 'RUNNING' ? t('running') : 
-                         line.status === 'STOPPED' ? (isMachineLevel ? 'ARRÊT MACHINE' : t('stopped')) : t('idle')}
+                        {!isActive ? 'OFFLINE' : line.status === 'RUNNING' ? 'EN PRODUCTION' : 
+                         line.status === 'STOPPED' ? (isMachineLevel ? 'ARRÊT MACHINE' : 'ARRÊT LIGNE') : 'PRÊT / IDLE'}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-1">
-                    {isActive ? (
-                      <>
+                  <div className="flex items-center gap-2">
+                    {isActive && (
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-slate-100">
                         {line.status === 'STOPPED' || down ? (
                           <button 
                             onClick={() => handleStopSpecificDowntime(line.id)}
-                            className="p-1.5 text-emerald-600 bg-emerald-50 rounded-lg active:scale-95 hover:bg-emerald-100 transition-all shadow-md flex items-center gap-1 border border-emerald-100 h-8"
+                            className="p-2 text-emerald-600 bg-emerald-50 rounded-lg active:scale-95 hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2"
+                            title="Relancer cette ligne"
                           >
-                            <Play className="w-3.5 h-3.5" strokeWidth={3} />
-                            <span className="text-[9px] font-black uppercase tracking-tight">RELANCER</span>
+                            <Play className="w-4 h-4" strokeWidth={3} />
                           </button>
                         ) : (
-                          <div className="flex items-center gap-1">
-                            <button 
-                              onClick={() => setDeclaringDowntimeLineId(line.id)}
-                              className="p-1 px-1.5 text-rose-600 bg-rose-50 rounded-lg active:scale-95 hover:bg-rose-100 transition-all shadow-sm flex flex-col items-center justify-center border border-rose-100 h-8 leading-none"
-                              title="Déclarer un arrêt sur cette ligne"
-                            >
-                              <Activity size={10} strokeWidth={3} />
-                              <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">ARRÊT</span>
-                            </button>
-                            <button 
-                              onClick={() => {
-                                 setManualStopForm({
-                                   ...manualStopForm,
-                                   lineId: line.id,
-                                   startTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-                                   endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm")
-                                 });
-                                 setShowManualStopModal(true);
-                              }}
-                              className="p-1 px-1.5 text-slate-600 bg-slate-50 rounded-lg active:scale-95 hover:bg-slate-100 transition-all shadow-sm flex flex-col items-center justify-center border border-slate-200 h-8 leading-none"
-                              title="Saisir un arrêt manuel"
-                            >
-                              <History size={10} />
-                              <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">HISTO</span>
-                            </button>
-                          </div>
+                          <button 
+                            onClick={() => setDeclaringDowntimeLineId(line.id)}
+                            className="p-2 text-rose-600 bg-rose-50 rounded-lg active:scale-95 hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center"
+                            title="Mettre la ligne à l'arrêt"
+                          >
+                            <Activity size={16} strokeWidth={3} />
+                          </button>
                         )}
-                        <div className="h-4 w-px bg-slate-200 mx-0.5" />
+                        <button 
+                          onClick={() => setIsAssigning(line.id)}
+                          className="p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center"
+                          title="Assigner un programme"
+                        >
+                          <Pencil size={16} strokeWidth={3} />
+                        </button>
                         <button 
                           onClick={() => handleToggleLineActive(line.id, true)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all h-8"
-                          title="Désactiver la ligne"
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                          title="Désactiver (Shutdown)"
                         >
-                          <Square size={12} />
+                          <Square size={16} />
                         </button>
-                      </>
-                    ) : (
-                      <button 
-                        onClick={() => handleToggleLineActive(line.id, false)}
-                        className="p-1.5 bg-blue-600 text-white rounded-lg active:scale-95 hover:bg-blue-700 transition-all shadow-md flex items-center gap-1.5 px-3 h-8"
-                      >
-                        <Play size={12} fill="currentColor" />
-                        <span className="text-[9px] font-black uppercase tracking-tight">ACTIVER</span>
-                      </button>
+                      </div>
                     )}
                   </div>
                 </div>
 
-                <div className={cn("p-4 space-y-4 flex-1", !isActive && "pointer-events-none")}>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">Programme Actif</p>
+                <div className={cn("p-5 space-y-5 flex-1", !isActive && "pointer-events-none")}>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Programme</p>
                       <div className="flex items-center gap-2">
-                        <Package size={12} className={prog ? "text-blue-500" : "text-slate-200"} />
-                        <p className={cn(
-                          "text-[10px] font-black truncate leading-tight uppercase italic",
-                          prog ? "text-slate-900 underline decoration-blue-500/30" : "text-slate-300"
-                        )}>
-                          {prog ? prog.name : '—'}
-                        </p>
+                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center border", prog ? "bg-blue-50 border-blue-100 text-blue-600" : "bg-gray-50 border-gray-100 text-gray-300")}>
+                           <Package size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn(
+                            "text-xs font-black truncate leading-tight uppercase italic",
+                            prog ? "text-slate-900" : "text-slate-300"
+                          )}>
+                            {prog ? prog.name : 'Vacent'}
+                          </p>
+                          <p className="text-[9px] font-bold text-slate-400 truncate tracking-tight">{prog?.parameters || 'Sans paramètres'}</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">Opérateur</p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Opérateur</p>
                       <div className="flex items-center gap-2">
-                        <Users size={12} className={op ? "text-slate-400" : "text-slate-200"} />
-                        <p className={cn(
-                          "text-[10px] font-bold truncate leading-tight",
-                          op ? "text-slate-800" : "text-slate-300 italic"
-                        )}>
-                          {op ? op.name : 'Poste Libre'}
-                        </p>
+                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center border", op ? "bg-slate-100 border-slate-200 text-slate-600" : "bg-gray-50 border-gray-100 text-gray-300")}>
+                           <Users size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn(
+                            "text-xs font-black truncate leading-tight uppercase",
+                            op ? "text-slate-800" : "text-slate-300 italic"
+                          )}>
+                            {op ? op.name : 'Poste Libre'}
+                          </p>
+                          <p className="text-[9px] font-bold text-slate-400">Shift {currentShift?.name}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                   
                   {line.tracksProduction !== 0 && (
-                    <div className="bg-blue-50/40 p-3 rounded-2xl border border-blue-100/50 group/prod relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-2 opacity-[0.03] rotate-12 transition-transform group-hover/prod:scale-125">
-                           <Box size={32} className="text-blue-600" />
+                    <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 group/prod relative overflow-hidden shadow-inner">
+                        <div className="absolute top-0 right-0 p-3 opacity-[0.03] rotate-12 transition-transform group-hover/prod:scale-125">
+                           <Box size={40} className="text-blue-600" />
                         </div>
-                        <div className="flex justify-between items-end">
+                        <div className="flex justify-between items-end relative z-10">
                           <div>
-                            <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1.5">Production Shift</p>
-                            <p className="text-2xl font-black text-blue-900 leading-none tabular-nums flex items-end gap-1">
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-2">Production Live</p>
+                            <p className="text-4xl font-black text-slate-900 leading-none tabular-nums flex items-end gap-2">
                               {prog ? prog.producedPallets : '0'}
-                              <span className="text-[10px] text-blue-400 font-black uppercase mb-0.5 tracking-tighter">Palettes</span>
+                              <span className="text-xs text-blue-500 font-black uppercase mb-1 tracking-tighter">Palettes</span>
                             </p>
                           </div>
                           {prog && (
@@ -1403,9 +1491,9 @@ export default function PilotScreen() {
                                 e.stopPropagation();
                                 handlePalletTick(line.id, prog.id);
                               }}
-                              className="bg-white text-blue-600 p-2 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/5 active:scale-90 hover:bg-blue-600 hover:text-white transition-all border border-blue-100"
+                              className="bg-blue-600 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-200 active:scale-95 hover:bg-blue-700 transition-all border-4 border-white"
                             >
-                              <Plus size={18} strokeWidth={3} />
+                              <Plus size={24} strokeWidth={4} />
                             </button>
                           )}
                         </div>
@@ -1413,40 +1501,52 @@ export default function PilotScreen() {
                   )}
 
                   {down && (
-                    <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
-                       <div className="bg-rose-50 p-3 rounded-2xl border border-rose-100 shadow-sm">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2 text-rose-600 leading-none">
-                              <span className="text-xl">{downType?.icon}</span>
-                              <div className="space-y-0.5">
-                                <span className={cn("text-[10px] font-black uppercase tracking-tight italic", isMachineLevel ? "text-rose-800" : "text-rose-600")}>
-                                  {isMachineLevel ? `ARRÊT GÉNÉRAL : ${downType?.name}` : downType?.name}
+                    <div className="space-y-4 animate-in slide-in-from-top-4 duration-500">
+                       <div className={cn(
+                         "p-5 rounded-[2rem] border shadow-2xl transition-all",
+                         isMachineLevel ? "bg-rose-600 text-white border-rose-500 shadow-rose-200" : "bg-rose-50 border-rose-100 text-rose-900 shadow-rose-100"
+                       )}>
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3 leading-none">
+                              <span className="text-3xl filter drop-shadow-sm">{downType?.icon}</span>
+                              <div className="space-y-1">
+                                <span className={cn("text-xs font-black uppercase tracking-tight italic", isMachineLevel ? "text-white" : "text-rose-900")}>
+                                  {isMachineLevel ? `MACHINE ARREST` : downType?.name}
                                 </span>
-                                <p className="text-[8px] font-bold text-rose-400 uppercase tracking-widest">Incident en cours</p>
+                                <div className="flex items-center gap-1.5">
+                                  <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMachineLevel ? "bg-white" : "bg-rose-600")} />
+                                  <p className={cn("text-[9px] font-black uppercase tracking-widest", isMachineLevel ? "text-rose-100" : "text-rose-500")}>Surveillance active</p>
+                                </div>
                               </div>
                             </div>
-                            <span className="text-[11px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-md shadow-sm font-mono tabular-nums">
+                            <div className={cn(
+                              "text-sm font-black px-3 py-1 rounded-[1rem] shadow-sm font-mono tabular-nums border",
+                              isMachineLevel ? "bg-white text-rose-600 border-white" : "bg-rose-600 text-white border-rose-500"
+                            )}>
                               {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
-                            </span>
+                            </div>
                           </div>
                           
                           {down.description && (
-                            <div className="bg-white/80 p-2 rounded-xl border border-rose-100/50 mb-2">
-                               <p className="text-[10px] font-bold text-gray-700 leading-tight italic">
+                            <div className={cn(
+                              "p-3 rounded-2xl border mb-3",
+                              isMachineLevel ? "bg-white/10 border-white/20" : "bg-white border-rose-100/50"
+                            )}>
+                               <p className={cn("text-[11px] font-bold leading-relaxed italic", isMachineLevel ? "text-rose-50" : "text-gray-700")}>
                                  "{down.description}"
                                </p>
                             </div>
                           )}
 
                           {down.images && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
+                            <div className="flex flex-wrap gap-2 mt-3">
                               {(typeof down.images === 'string' ? JSON.parse(down.images) as string[] : down.images as string[]).map((img, i) => (
                                 <button 
                                   key={i}
                                   onClick={() => setSelectedFullImage(img)}
-                                  className="w-12 h-12 rounded-lg overflow-hidden border border-rose-200 shadow-sm hover:scale-105 transition-transform"
+                                  className="w-14 h-14 rounded-[1.2rem] overflow-hidden border-2 border-white shadow-xl hover:scale-110 transition-transform active:scale-95"
                                 >
-                                  <img src={`/uploads/${img}`} className="w-full h-full object-cover" alt="Downtime evidence" />
+                                  <img src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" alt="Downtime evidence" />
                                 </button>
                               ))}
                             </div>
@@ -1859,34 +1959,33 @@ export default function PilotScreen() {
         </div>
       )}
 
-      {/* ASSIGN MODAL */}
       {isAssigning && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-2">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]"
           >
             <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
               <div className="space-y-0.5">
-                <h2 className="text-lg font-black tracking-tight uppercase leading-none italic">{t('assign_program')}</h2>
-                <p className="text-blue-100 text-[8px] font-black uppercase tracking-widest opacity-80 leading-none">
+                <h2 className="text-base font-black tracking-tight uppercase leading-none italic">{t('assign_program')}</h2>
+                <p className="text-blue-100 text-[8px] font-black uppercase tracking-widest opacity-80 leading-none mt-1">
                   {t('line')}: {lines.find(l => l.id === isAssigning)?.name}
                 </p>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-4 md:p-6 overflow-y-auto space-y-6">
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                  <h3 className="text-[10px] font-black text-gray-700 uppercase tracking-widest mb-3">{t('new_program')}</h3>
+                  <h3 className="text-[9px] font-black text-gray-700 uppercase tracking-widest mb-3">{t('new_program')}</h3>
                   <div className="flex flex-col gap-2">
                     <input 
                       type="text"
                       value={newProgName}
                       onChange={e => setNewProgName(e.target.value)}
                       placeholder={t('program_name') + "..."}
-                      className="w-full p-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm"
+                      className="w-full p-2.5 bg-white rounded-xl border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs"
                     />
                     <div className="space-y-1">
                       <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
@@ -1895,23 +1994,21 @@ export default function PilotScreen() {
                         onChange={e => setNewProgParams(e.target.value)}
                         placeholder="Vitesse, Pression, etc..."
                         rows={2}
-                        className="w-full p-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs"
+                        className="w-full p-2.5 bg-white rounded-xl border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-[10px]"
                       />
                     </div>
                     <button 
                       disabled={!newProgName}
                       onClick={handleAssignProgramme}
-                      className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all shadow-md shadow-blue-100"
+                      className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all shadow-md shadow-blue-100"
                     >
                       {t('save_assign').toUpperCase()}
                     </button>
                   </div>
                 </div>
-
-
               </div>
             </div>
-
+            
             <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
               <button 
                 onClick={() => {
@@ -1936,19 +2033,19 @@ export default function PilotScreen() {
       )}
       {/* DOWNTIME PICKER MODAL */}
       {declaringDowntimeLineId && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-2">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]"
           >
-            <div className="p-6 bg-orange-600 text-white">
-              <h2 className="text-xl font-black tracking-tight uppercase italic">{t('machine_stop')}</h2>
-              <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80">
+            <div className="p-4 bg-orange-600 text-white">
+              <h2 className="text-lg font-black tracking-tight uppercase italic leading-none">{t('machine_stop')}</h2>
+              <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80 mt-1">
                 {declaringDowntimeLineId === 'global' ? t('general_stop') : `${t('line')} ${lines.find(l => l.id === declaringDowntimeLineId)?.name}`}
               </p>
             </div>
-            <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="p-4 space-y-4 overflow-y-auto">
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1">{t('reason')}</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1956,10 +2053,10 @@ export default function PilotScreen() {
                     <button
                       key={type.id}
                       onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id, manualStopForm.description)}
-                      className="p-4 border border-orange-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-50 transition-all group shadow-sm bg-white"
+                      className="p-3 border border-orange-50 rounded-2xl flex flex-col items-center gap-1 hover:bg-orange-50 transition-all group shadow-sm bg-white"
                     >
-                      <span className="text-2xl group-hover:scale-110 transition-transform">{type.icon}</span>
-                      <span className="text-[9px] font-black uppercase text-gray-700 text-center leading-tight">{type.name}</span>
+                      <span className="text-xl group-hover:scale-110 transition-transform">{type.icon}</span>
+                      <span className="text-[8px] font-black uppercase text-gray-700 text-center leading-tight">{type.name}</span>
                     </button>
                   ))}
                 </div>

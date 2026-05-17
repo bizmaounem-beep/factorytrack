@@ -1736,11 +1736,11 @@ export default function AdminPanel() {
 
       {/* MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white w-full max-w-[98%] sm:max-w-sm md:max-w-xl rounded-2xl md:rounded-[32px] p-3 md:p-8 space-y-3 md:space-y-6 shadow-2xl border border-gray-100 max-h-[92vh] overflow-y-auto"
+            className="bg-white w-full max-w-[98%] sm:max-w-sm md:max-w-xl rounded-2xl md:rounded-[32px] p-4 md:p-8 space-y-3 md:space-y-6 shadow-2xl border border-gray-100 max-h-[92vh] overflow-y-auto"
           >
             <div className="space-y-0.5">
               <h3 className="text-base font-black tracking-tight text-gray-900 uppercase italic leading-none">

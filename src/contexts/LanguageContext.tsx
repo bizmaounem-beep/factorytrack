@@ -184,7 +184,22 @@ export const translations: Translation = {
   all_lines: { fr: 'Toutes les lignes' },
   all_shifts: { fr: 'Toutes les équipes' },
   all_operators: { fr: 'Tous les opérateurs' },
-  new_pin_placeholder: { fr: 'Nouveau PIN (Laissez vide pour conserver)' }
+  new_pin_placeholder: { fr: 'Nouveau PIN (Laissez vide pour conserver)' },
+  
+  // SCADA specific
+  efficiency: { fr: 'Efficience' },
+  active_lines_count: { fr: 'Lignes Actives' },
+  stopped_lines_count: { fr: 'En Arrêt' },
+  total_prod: { fr: 'Prod Total' },
+  critical_stop: { fr: 'ARRÊT CRITIQUE' },
+  partial_stop: { fr: 'ARRÊT PARTIEL' },
+  machine_total_stop: { fr: 'ARRÊT TOTAL MACHINE' },
+  inactive_lines_info: { fr: 'LIGNES DÉSACTIVÉES' },
+  offline: { fr: 'OFFLINE' },
+  relaunch: { fr: 'Relancer' },
+  activate_line_btn: { fr: 'ACTIVER LA LIGNE' },
+  deactivate_line_btn: { fr: 'DÉSACTIVER (Shutdown)' },
+  live_production: { fr: 'Production Live' }
 };
 
 interface LanguageContextType {
