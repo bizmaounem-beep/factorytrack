@@ -77,9 +77,17 @@ export default function PilotScreen() {
     const activeLines = lines.filter(l => l.isActive !== false && l.machineId === selectedMachineId);
     
     // Calculate availability based on elapsed time in current shift
-    // Defaulting to 8 hours if no shift found
-    const shiftHours = 8;
-    const totalPossibleTime = activeLines.length * shiftHours * 60 * 60; 
+    let shiftDurationSec = 8 * 3600; // Fallback to 8h if no shift is active
+    if (currentShift) {
+      const [sh, sm] = currentShift.startTime.split(':').map(Number);
+      const [eh, em] = currentShift.endTime.split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+      shiftDurationSec = durationMin * 60;
+    }
+
+    const totalPossibleTime = activeLines.length * shiftDurationSec; 
     const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
     const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
 

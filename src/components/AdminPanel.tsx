@@ -51,9 +51,28 @@ export default function AdminPanel() {
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
     const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
-    // OEE Approximation (Availability focuses on running vs stopped)
-    // We'll calculate it for the last 8 hours as a baseline if we don't have a better window
-    const totalPossibleTime = lines.length * 8 * 60 * 60; // total seconds for all lines in 8h
+    // OEE Calculation (Availability) using real shift duration
+    const currentShift = shifts.find(s => {
+      const [sh, sm] = s.startTime.split(':').map(Number);
+      const [eh, em] = s.endTime.split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      const nowMin = today.getHours() * 60 + today.getMinutes();
+      if (endMin < startMin) return nowMin >= startMin || nowMin < endMin;
+      return nowMin >= startMin && nowMin < endMin;
+    });
+
+    let shiftDurationSec = 8 * 3600; // Fallback to 8h if no shift is active (e.g. gaps between shifts)
+    if (currentShift) {
+      const [sh, sm] = currentShift.startTime.split(':').map(Number);
+      const [eh, em] = currentShift.endTime.split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+      shiftDurationSec = durationMin * 60;
+    }
+
+    const totalPossibleTime = lines.length * shiftDurationSec;
     const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
     const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
 

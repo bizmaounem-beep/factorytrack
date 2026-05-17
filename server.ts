@@ -278,7 +278,25 @@ async function startServer() {
   });
 
   // 2. CORS & BASIC SECURITY
-  app.use(cors({ origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173', credentials: true }));
+  const allowedOrigins = [
+    process.env.ALLOWED_ORIGIN,
+    process.env.APP_URL, // AI Studio dynamic URL
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ].filter(Boolean) as string[];
+
+  app.use(cors({ 
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      if (process.env.NODE_ENV !== 'production' || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true 
+  }));
   app.use(helmet({
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
