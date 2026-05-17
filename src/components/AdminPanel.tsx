@@ -414,8 +414,10 @@ export default function AdminPanel() {
 
     } else {
       fileName = `Logs_Arrets_${dateStr}.xlsx`;
+      const photoSheet = workbook.addWorksheet('Photos');
 
       dataSheet.columns = [
+        { header: 'Arrêt #', key: 'id', width: 12 },
         { header: 'Heure_Debut', key: 'start', width: 20 },
         { header: 'Heure_Fin', key: 'end', width: 20 },
         { header: 'Durée (min)', key: 'duration', width: 15 },
@@ -427,11 +429,21 @@ export default function AdminPanel() {
         { header: 'Description', key: 'desc', width: 40 },
       ];
 
-      downLogs.forEach(log => {
+      photoSheet.columns = [
+        { header: 'Arrêt #', key: 'id', width: 15 },
+        { header: 'Machine', key: 'machine', width: 25 },
+        { header: 'Galerie Photo', key: 'photo', width: 60 },
+      ];
+      photoSheet.getRow(1).eachCell(cell => Object.assign(cell, headerStyle));
+
+      let photoRowIdx = 2;
+
+      for (const log of downLogs) {
         const durationSec = getLogDurationSec(log);
         const durationMin = log.endTime ? Number((durationSec / 60).toFixed(1)) : 'En cours';
         
         const row = dataSheet.addRow({
+          id: log.id.substring(0, 8),
           start: formatDateExcel(log.startTime),
           end: log.endTime ? formatDateExcel(log.endTime) : 'En cours',
           duration: durationMin,
@@ -443,6 +455,51 @@ export default function AdminPanel() {
           desc: log.description || '—'
         });
 
+        // Photos logic
+        const images: string[] = [];
+        if (log.image_path) images.push(log.image_path);
+        if (log.images) {
+           try {
+             const parsed = typeof log.images === 'string' ? JSON.parse(log.images) : log.images;
+             if (Array.isArray(parsed)) images.push(...parsed);
+           } catch (e) { console.error('Error parsing images log', e); }
+        }
+
+        if (images.length > 0) {
+           for (const imgPath of images) {
+              const machineName = machines.find(m => m.id === log.machineId)?.name || '—';
+              const pRow = photoSheet.addRow({
+                 id: log.id.substring(0, 8),
+                 machine: machineName,
+                 photo: ''
+              });
+              pRow.height = 180;
+              pRow.eachCell(cell => Object.assign(cell, cellStyle));
+              
+              try {
+                const imgUrl = imgPath.startsWith('http') || imgPath.startsWith('/') ? imgPath : `/uploads/${imgPath}`;
+                const response = await fetch(imgUrl);
+                if (!response.ok) throw new Error('Image not found');
+                const buffer = await response.arrayBuffer();
+                const extension = imgPath.split('.').pop()?.toLowerCase() || 'jpg';
+                
+                const imageId = workbook.addImage({
+                  buffer: buffer,
+                  extension: (extension === 'png' || extension === 'gif') ? extension : 'jpeg',
+                });
+                
+                photoSheet.addImage(imageId, {
+                  tl: { col: 2.1, row: photoRowIdx - 0.9 },
+                  ext: { width: 420, height: 230 }
+                });
+              } catch (err) {
+                console.error('Error adding image to Excel:', err);
+                pRow.getCell('photo').value = '[Image non disponible]';
+              }
+              photoRowIdx++;
+           }
+        }
+
         // Conditional Formatting: Duration > 30 minutes
         if (typeof durationMin === 'number' && durationMin > 30) {
           const durationCell = row.getCell('duration');
@@ -453,7 +510,7 @@ export default function AdminPanel() {
           };
           durationCell.font = { color: { argb: 'FF9C0006' }, bold: true };
         }
-      });
+      }
 
       // Dashboard Downtime
       dashboardSheet.getCell('A1').value = "ANALYSE PERFORMANCE - DASHBOARD ARRÊTS";
@@ -479,7 +536,7 @@ export default function AdminPanel() {
         const row = dashboardSheet.getRow(currentRow);
         row.values = [
           line.name, 
-          { formula: `SUMIF(Data!E:E, "${line.name}", Data!C:C)` }
+          { formula: `SUMIF(Data!F:F, "${line.name}", Data!D:D)` }
         ];
         row.eachCell(cell => {
           Object.assign(cell, cellStyle);

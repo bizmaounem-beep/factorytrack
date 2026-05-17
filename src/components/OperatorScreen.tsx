@@ -350,7 +350,7 @@ export default function OperatorScreen() {
     }
 
     const formData = new FormData();
-    formData.append('image', file, 'photo.jpg');
+    formData.append('photo', file, 'photo.jpg');
   
     try {
       console.log('[DEBUG] Starting upload to /api/upload');

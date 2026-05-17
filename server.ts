@@ -266,7 +266,26 @@ async function startServer() {
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
 
-  // 2.5 DIRECT UPLOAD ROUTE - REMOVED (Moving to apiRouter)
+  // 2.5 DIRECT UPLOAD ROUTE (FOR HIGHEST PRIORITY)
+  app.post(['/api/upload', '/api/upload/'], (req, res) => {
+    console.log(`[SERVER-UPLOAD] Incoming request at ${req.url}`);
+    upload.single('photo')(req, res, (err) => {
+      if (err) {
+        console.error('[SERVER-UPLOAD] Multer Error:', err);
+        return res.status(400).json({ error: err.message || 'Erreur multer' });
+      }
+      if (!req.file) {
+        console.error('[SERVER-UPLOAD] No file found in "photo" field');
+        return res.status(400).json({ error: 'Fichier absent du champ "photo"' });
+      }
+      console.log('[SERVER-UPLOAD] Saved:', req.file.filename);
+      res.status(200).json({ 
+        success: true,
+        url: `/uploads/${req.file.filename}`, 
+        path: req.file.filename 
+      });
+    });
+  });
 
   // 3. API ROUTES ROUTER
   const apiRouter = express.Router();
@@ -285,35 +304,6 @@ async function startServer() {
   // Test route
   apiRouter.get('/test-json', (req, res) => {
     res.json({ success: true, message: 'JSON API reaches here' });
-  });
-
-  // UPLOAD ROUTE (Harmonized with field name 'image')
-  apiRouter.post('/upload', (req, res) => {
-    console.log('[API-UPLOAD] Incoming POST /api/upload');
-    upload.single('image')(req, res, (err) => {
-      if (err) {
-        console.error('[API-UPLOAD] Multer Error:', err);
-        return res.status(400).json({ 
-          success: false, 
-          error: err.message || 'Erreur lors de l\'upload du fichier' 
-        });
-      }
-      
-      if (!req.file) {
-        console.error('[API-UPLOAD] No file in "image" field');
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Aucun fichier reçu (utilisez le champ "image")' 
-        });
-      }
-
-      console.log('[API-UPLOAD] Success:', req.file.filename);
-      res.status(200).json({ 
-        success: true,
-        url: `/uploads/${req.file.filename}`, 
-        path: req.file.filename 
-      });
-    });
   });
 
   // Body parsers for other API routes
