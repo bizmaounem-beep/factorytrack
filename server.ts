@@ -50,6 +50,7 @@ const ALLOWED_COLLECTIONS = [
 ];
 
 let db: Database.Database;
+let io: Server;
 
 async function startServer() {
   // Ensure the database file is writable before opening
@@ -84,6 +85,7 @@ async function startServer() {
     setInterval(performBackup, 24 * 60 * 60 * 1000);
     // Also run once at startup
     performBackup();
+
     db.pragma('journal_mode = WAL'); // Use WAL mode for better concurrency and write stability
     
     // Initialize database tables
@@ -522,7 +524,7 @@ async function startServer() {
   app.use('/uploads', express.static(UPLOADS_DIR));
 
   const httpServer = createServer(app);
-  const io = new Server(httpServer, {
+  io = new Server(httpServer, {
     cors: {
       origin: "*",
       methods: ["GET", "POST", "PUT", "DELETE"]
@@ -585,4 +587,6 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error('CRITICAL: Server failed to start:', err);
+});
