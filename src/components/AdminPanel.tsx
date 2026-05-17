@@ -1331,18 +1331,18 @@ export default function AdminPanel() {
                     <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('history')}</h2>
                     <button 
                       onClick={() => exportToExcel(historyLogType === 'production' ? 'production' : 'downtime')}
-                      className="p-1 px-2 md:p-1.5 md:px-3 bg-white border border-gray-200 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 transition-all flex items-center gap-1.5 shadow-sm"
+                      className="p-1 px-2 md:px-3 bg-white border border-gray-200 rounded-lg text-[7px] md:text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 transition-all flex items-center gap-1 shadow-sm"
                     >
-                      <Download size={10} className="md:w-3 md:h-3" /> {t('export')}
+                      <Download size={9} className="md:w-3 md:h-3" /> {t('export')}
                     </button>
                     <button 
                       onClick={() => openModal('downtime_log', {
                         startTime: new Date().toISOString(),
                         operatorId: user?.id || '',
                       })}
-                      className="p-1 px-2 md:p-1.5 md:px-4 bg-green-600 hover:bg-green-700 rounded-lg text-[8px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-green-200 active:scale-95 transition-all flex items-center gap-1.5 md:gap-2 border-2 border-green-500/20"
+                      className="p-1 px-2 md:px-4 bg-green-600 hover:bg-green-700 rounded-lg text-[8px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-lg active:scale-95 transition-all flex items-center gap-1 md:gap-2"
                     >
-                      <Plus size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" /> {t('add_downtime_log') || 'Saisir un arrêt manuel'}
+                      <Plus size={10} strokeWidth={3} className="md:w-3.5 md:h-3.5" /> {t('add_downtime_log') || 'Saisir un arrêt manuel'}
                     </button>
                   </div>
                   
@@ -1740,7 +1740,7 @@ export default function AdminPanel() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white w-full max-w-[95%] sm:max-w-sm md:max-w-xl rounded-[24px] md:rounded-[32px] p-4 md:p-8 space-y-4 md:space-y-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto"
+            className="bg-white w-full max-w-[98%] sm:max-w-sm md:max-w-xl rounded-2xl md:rounded-[32px] p-3 md:p-8 space-y-3 md:space-y-6 shadow-2xl border border-gray-100 max-h-[92vh] overflow-y-auto"
           >
             <div className="space-y-0.5">
               <h3 className="text-base font-black tracking-tight text-gray-900 uppercase italic leading-none">

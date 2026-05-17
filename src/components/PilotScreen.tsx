@@ -443,20 +443,24 @@ export default function PilotScreen() {
     }
   };
 
-  const handleStartDowntime = async (lineId: string | null | 'global', typeId: string) => {
+  const handleToggleLineActive = async (lineId: string, currentStatus: boolean) => {
+    try {
+      await localApi.updateDoc('lines', lineId, { isActive: !currentStatus });
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de la modification du statut de la ligne');
+    }
+  };
+
+  const handleStartDowntime = async (lineId: string | null | 'global', typeId: string, description?: string) => {
     if (!user || !selectedMachineId) return;
     try {
       const startTime = new Date().toISOString();
       const currentShiftId = getCurrentShiftId(shifts);
 
-      // --- CONSOLIDATED STOP LOGIC ---
-      // Requirement: "IF the same ARRET HAS set in all lines in the same time or even close in time 
-      // they will be set as one arret for the whole machine"
-      // Wait for a small window to see if another line already started this same downtime type
-      const machineLines = lines.filter(l => l.machineId === selectedMachineId);
-      const windowMs = 2 * 60 * 1000; // 2 minutes
+      // Check for recent downtime to consolidate
+      const windowMs = 2 * 60 * 1000;
       const now = new Date().getTime();
-
       const existingRecentDowntime = downLogs.find(log => 
         log.machineId === selectedMachineId && 
         log.typeId === typeId && 
@@ -465,7 +469,6 @@ export default function PilotScreen() {
       );
 
       if (lineId && lineId !== 'global') {
-        // Specific line stop
         const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
           machineId: selectedMachineId,
           lineId: lineId,
@@ -473,6 +476,7 @@ export default function PilotScreen() {
           operatorId: user.id,
           shiftId: currentShiftId,
           startTime,
+          description: description || ''
         })).id;
 
         await localApi.updateDoc('lines', lineId, {
@@ -480,16 +484,17 @@ export default function PilotScreen() {
           status: 'STOPPED'
         });
       } else {
-        // Global machine stop (all lines)
         const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
           machineId: selectedMachineId,
-          lineId: 'MACHINE_LEVEL', // Using a marker for machine level if needed or just first line
+          lineId: 'MACHINE_LEVEL',
           typeId,
           operatorId: user.id,
           shiftId: currentShiftId,
           startTime,
+          description: description || ''
         })).id;
 
+        const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false);
         for (const line of machineLines) {
           await localApi.updateDoc('lines', line.id, {
             activeDowntimeId: logId,
@@ -859,41 +864,78 @@ export default function PilotScreen() {
         </div>
         
         {activeTab === 'monitor' && selectedMachineId && (
-          <div className="flex justify-between items-center bg-gray-50/50 p-2 sm:p-4 rounded-2xl border border-gray-100 mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-50">
-                <LayoutGrid size={20} />
-              </div>
-              <div>
-                <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest leading-none mb-1">Status Machine</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-black text-gray-800">{machines.find(m => m.id === selectedMachineId)?.name}</p>
-                  <button 
-                    onClick={() => handleMachineSelect('')}
-                    className="text-[8px] font-bold text-blue-600 uppercase hover:underline"
-                  >
-                    ({t('change')})
-                  </button>
+          <div className="flex flex-col gap-3 bg-gray-50/50 p-3 sm:p-5 rounded-2xl border border-gray-100 mb-3 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-100">
+                  <LayoutGrid size={24} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none mb-1">Status Machine SCADA</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-lg font-black text-gray-900 tracking-tight">{machines.find(m => m.id === selectedMachineId)?.name}</p>
+                    <button 
+                      onClick={() => handleMachineSelect('')}
+                      className="text-[9px] font-black text-blue-600 uppercase hover:underline italic"
+                    >
+                      ({t('change').toUpperCase()})
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
+                  <div className="flex-1 sm:flex-none flex items-center gap-3 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 animate-pulse">
+                    <Activity size={18} />
+                    FULL MACHINE STOP
+                    <button 
+                      onClick={handleResumeMachine}
+                      className="ml-4 px-3 py-1 bg-white text-rose-600 rounded-lg hover:bg-rose-50 transition-all active:scale-95"
+                    >
+                      RELANCER
+                    </button>
+                  </div>
+                ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).some(l => l.status === 'RUNNING') ? (
+                  <button 
+                    onClick={() => setDeclaringDowntimeLineId('global')}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 hover:bg-rose-700 active:scale-95 transition-all"
+                  >
+                    <Activity size={18} className="animate-pulse" />
+                    {t('stop_machine')}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleResumeMachine}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
+                  >
+                    <Activity size={18} />
+                    RELANCER LA MACHINE
+                  </button>
+                )}
+              </div>
             </div>
-            {lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') ? (
-              <button 
-                onClick={() => setDeclaringDowntimeLineId('global')}
-                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-red-700 active:scale-95 transition-all animate-in fade-in zoom-in"
-              >
-                <Activity size={16} className="animate-pulse" />
-                {t('stop_machine')}
-              </button>
-            ) : lines.filter(l => l.machineId === selectedMachineId).some(l => l.activeDowntimeId) ? (
-              <button 
-                onClick={handleResumeMachine}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-700 active:scale-95 transition-all animate-in fade-in zoom-in"
-              >
-                <Activity size={16} />
-                {t('start_machine')}
-              </button>
-            ) : null}
+            
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+               <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-black text-gray-600 uppercase tabular-nums">
+                    {lines.filter(l => l.machineId === selectedMachineId && l.status === 'RUNNING').length}/{lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length} Lignes en Prod
+                  </span>
+               </div>
+               <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
+                  <div className="w-2 h-2 rounded-full bg-rose-500" />
+                  <span className="text-[10px] font-black text-gray-600 uppercase tabular-nums">
+                    {lines.filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId).length} Arrêts Actifs
+                  </span>
+               </div>
+               <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
+                  <div className="w-2 h-2 rounded-full bg-slate-300" />
+                  <span className="text-[10px] font-black text-gray-600 uppercase tabular-nums">
+                    {lines.filter(l => l.machineId === selectedMachineId && l.isActive === false).length} Lignes Inactives
+                  </span>
+               </div>
+            </div>
           </div>
         )}
 
@@ -1193,166 +1235,226 @@ export default function PilotScreen() {
           <p className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">{t('machine_select')}</p>
         </div>
       ) : (
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="p-1 sm:p-4 gap-2 sm:gap-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-        >
-          {lines.filter(l => l.machineId === selectedMachineId).map(line => {
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="p-1 sm:p-4 gap-2 sm:gap-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+          >
+            {lines.filter(l => l.machineId === selectedMachineId).map(line => {
             const prog = programmes.find(p => p.id === line.currentProgrammeId);
             const op = users.find(u => u.id === line.currentOperatorId);
             const down = activeDowntimes[line.id];
             const downType = downtimeTypes.find(t => t.id === down?.typeId);
+            const isMachineLevel = down?.lineId === 'MACHINE_LEVEL';
+            const isActive = line.isActive !== 0;
+
             return (
               <motion.div 
                 key={line.id}
                 variants={item}
                 layout
-                className="card transition-colors flex flex-col overflow-hidden border-l-4 border-slate-200 hover:border-blue-500 bg-white"
+                className={cn(
+                  "card transition-all flex flex-col overflow-hidden border-l-4 bg-white relative",
+                  !isActive ? "border-slate-300 opacity-70 grayscale-[0.5]" :
+                  line.status === 'RUNNING' ? "border-emerald-500 shadow-xl shadow-emerald-50/50" :
+                  line.status === 'STOPPED' ? "border-rose-500 shadow-xl shadow-rose-50/50" : "border-slate-200"
+                )}
               >
-                <div className="px-3 py-2 flex justify-between items-center border-b border-slate-50 shrink-0">
+                {!isActive && (
+                   <div className="absolute inset-0 bg-slate-100/40 flex items-center justify-center z-10">
+                      <div className="bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl border border-slate-200 shadow-2xl flex flex-col items-center gap-2">
+                        <Square size={24} className="text-slate-400" />
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Ligne Désactivée</span>
+                        <button 
+                          onClick={() => handleToggleLineActive(line.id, false)}
+                          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 active:scale-95 transition-all pointer-events-auto"
+                        >
+                          Réactiver
+                        </button>
+                      </div>
+                   </div>
+                )}
+
+                <div className="px-3 py-2.5 flex justify-between items-center border-b border-slate-50 shrink-0 bg-gray-50/30">
                   <div className="leading-none">
-                    <h3 className="font-black text-xs text-slate-900 truncate max-w-[100px]">{line.name}</h3>
-                    <div className="flex items-center gap-1 mt-1">
+                    <h3 className={cn("font-black text-xs tracking-tight uppercase italic truncate max-w-[120px]", !isActive ? "text-slate-400" : "text-slate-900")}>{line.name}</h3>
+                    <div className="flex items-center gap-1 mt-1.5">
                        <span className={cn(
-                        "px-1 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest flex items-center gap-0.5",
-                        line.status === 'RUNNING' ? "bg-emerald-50 text-emerald-600" :
-                        line.status === 'STOPPED' ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-400"
+                        "px-1.5 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm",
+                        !isActive ? "bg-slate-100 text-slate-400" :
+                        line.status === 'RUNNING' ? "bg-emerald-500 text-white" :
+                        line.status === 'STOPPED' ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-500"
                       )}>
                         <span className={cn(
-                          "w-1 h-1 rounded-full",
-                          line.status === 'RUNNING' ? "bg-emerald-500 animate-pulse" : line.status === 'STOPPED' ? "bg-rose-500" : "bg-slate-400"
+                          "w-1.5 h-1.5 rounded-full border border-white/30",
+                          line.status === 'RUNNING' ? "bg-white animate-pulse" : line.status === 'STOPPED' ? "bg-white" : "bg-slate-300"
                         )} />
-                        {line.status === 'RUNNING' ? t('running') : 
-                         line.status === 'STOPPED' ? t('stopped') : t('idle')}
+                        {!isActive ? 'DÉSACTIVÉE' : line.status === 'RUNNING' ? t('running') : 
+                         line.status === 'STOPPED' ? (isMachineLevel ? 'ARRÊT MACHINE' : t('stopped')) : t('idle')}
                       </span>
                     </div>
                   </div>
+                  
                   <div className="flex items-center gap-1">
-                    {line.status === 'STOPPED' || down ? (
-                      <button 
-                        onClick={() => handleStopSpecificDowntime(line.id)}
-                        className="p-1.5 text-emerald-600 bg-emerald-50 rounded-lg active:scale-95 hover:bg-emerald-100 transition-all shadow-sm flex items-center gap-1 border border-emerald-100 h-7"
-                      >
-                        <Play className="w-3 h-3" strokeWidth={3} />
-                        <span className="text-[9px] font-black uppercase tracking-tight">RELANCER</span>
-                      </button>
+                    {isActive ? (
+                      <>
+                        {line.status === 'STOPPED' || down ? (
+                          <button 
+                            onClick={() => handleStopSpecificDowntime(line.id)}
+                            className="p-1.5 text-emerald-600 bg-emerald-50 rounded-lg active:scale-95 hover:bg-emerald-100 transition-all shadow-md flex items-center gap-1 border border-emerald-100 h-8"
+                          >
+                            <Play className="w-3.5 h-3.5" strokeWidth={3} />
+                            <span className="text-[9px] font-black uppercase tracking-tight">RELANCER</span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={() => setDeclaringDowntimeLineId(line.id)}
+                              className="p-1 px-1.5 text-rose-600 bg-rose-50 rounded-lg active:scale-95 hover:bg-rose-100 transition-all shadow-sm flex flex-col items-center justify-center border border-rose-100 h-8 leading-none"
+                              title="Déclarer un arrêt sur cette ligne"
+                            >
+                              <Activity size={10} strokeWidth={3} />
+                              <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">ARRÊT</span>
+                            </button>
+                            <button 
+                              onClick={() => {
+                                 setManualStopForm({
+                                   ...manualStopForm,
+                                   lineId: line.id,
+                                   startTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+                                   endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm")
+                                 });
+                                 setShowManualStopModal(true);
+                              }}
+                              className="p-1 px-1.5 text-slate-600 bg-slate-50 rounded-lg active:scale-95 hover:bg-slate-100 transition-all shadow-sm flex flex-col items-center justify-center border border-slate-200 h-8 leading-none"
+                              title="Saisir un arrêt manuel"
+                            >
+                              <History size={10} />
+                              <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">HISTO</span>
+                            </button>
+                          </div>
+                        )}
+                        <div className="h-4 w-px bg-slate-200 mx-0.5" />
+                        <button 
+                          onClick={() => handleToggleLineActive(line.id, true)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all h-8"
+                          title="Désactiver la ligne"
+                        >
+                          <Square size={12} />
+                        </button>
+                      </>
                     ) : (
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => setDeclaringDowntimeLineId(line.id)}
-                          className="p-1 px-1.5 text-red-600 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all shadow-sm flex flex-col items-center justify-center border border-red-100 h-7 leading-none"
-                        >
-                          <Square size={8} fill="currentColor" />
-                          <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">AUTO</span>
-                        </button>
-                        <button 
-                          onClick={() => {
-                             setManualStopForm({
-                               ...manualStopForm,
-                               lineId: line.id,
-                               startTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-                               endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm")
-                             });
-                             setShowManualStopModal(true);
-                          }}
-                          className="p-1 px-1.5 text-slate-600 bg-slate-50 rounded-lg active:scale-95 hover:bg-slate-100 transition-all shadow-sm flex flex-col items-center justify-center border border-slate-200 h-7 leading-none"
-                        >
-                          <Clock size={8} />
-                          <span className="text-[7px] font-black uppercase tracking-tight mt-0.5">MANU</span>
-                        </button>
-                      </div>
-                    )}
-                    {prog && (
                       <button 
-                        onClick={() => handleReleaseLine(line.id)}
-                        className="p-1.5 text-red-500 bg-red-50 rounded-lg active:scale-95 hover:bg-red-100 transition-all border border-red-100 h-7"
+                        onClick={() => handleToggleLineActive(line.id, false)}
+                        className="p-1.5 bg-blue-600 text-white rounded-lg active:scale-95 hover:bg-blue-700 transition-all shadow-md flex items-center gap-1.5 px-3 h-8"
                       >
-                        <X className="w-3 h-3" strokeWidth={3} />
+                        <Play size={12} fill="currentColor" />
+                        <span className="text-[9px] font-black uppercase tracking-tight">ACTIVER</span>
                       </button>
                     )}
-                    <button 
-                      onClick={() => setIsAssigning(line.id)}
-                      className="p-1 px-1.5 text-blue-600 bg-blue-50 rounded-lg active:scale-95 hover:bg-blue-100 transition-all shadow-sm flex items-center gap-1 border border-blue-100 h-7"
-                    >
-                      <Plus className="w-3 h-3" strokeWidth={3} />
-                      <span className="text-[9px] font-black uppercase tracking-tight italic">
-                        {prog ? 'CHG' : 'ASS'}
-                      </span>
-                    </button>
                   </div>
                 </div>
 
-                <div className="p-3 grid grid-cols-2 gap-3 flex-1">
-                  <div className="space-y-0 text-left">
-                    <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Programme</p>
-                    <p className={cn(
-                      "text-[10px] font-black truncate leading-tight uppercase italic",
-                      prog ? "text-blue-900" : "text-slate-300"
-                    )}>
-                      {prog ? prog.name : '—'}
-                    </p>
-                  </div>
-                  <div className="space-y-0 text-left">
-                    <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Opérateur</p>
-                    <div className="flex items-center gap-1">
-                      {op && <div className="w-3 h-3 rounded-full bg-slate-100 flex items-center justify-center text-[7px] font-black text-slate-400 uppercase">{op.name.charAt(0)}</div>}
-                      <p className={cn(
-                        "text-[10px] font-bold truncate leading-tight",
-                        op ? "text-slate-800" : "text-slate-300 italic"
-                      )}>
-                        {op ? op.name : 'Vacent'}
-                      </p>
+                <div className={cn("p-4 space-y-4 flex-1", !isActive && "pointer-events-none")}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-0.5">
+                      <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">Programme Actif</p>
+                      <div className="flex items-center gap-2">
+                        <Package size={12} className={prog ? "text-blue-500" : "text-slate-200"} />
+                        <p className={cn(
+                          "text-[10px] font-black truncate leading-tight uppercase italic",
+                          prog ? "text-slate-900 underline decoration-blue-500/30" : "text-slate-300"
+                        )}>
+                          {prog ? prog.name : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">Opérateur</p>
+                      <div className="flex items-center gap-2">
+                        <Users size={12} className={op ? "text-slate-400" : "text-slate-200"} />
+                        <p className={cn(
+                          "text-[10px] font-bold truncate leading-tight",
+                          op ? "text-slate-800" : "text-slate-300 italic"
+                        )}>
+                          {op ? op.name : 'Poste Libre'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                   
                   {line.tracksProduction !== 0 && (
-                    <div className="col-span-2">
-                    <div className="flex justify-between items-center bg-blue-50/40 p-2 rounded-xl border border-blue-100/50 group/prod">
-                        <div>
-                          <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Production</p>
-                          <p className="text-xl font-black text-blue-600 leading-none tabular-nums group-hover/prod:scale-105 transition-transform origin-left">
-                            {prog ? prog.producedPallets : '0'}<span className="text-[9px] ml-1 text-blue-300 font-black">PAL.</span>
-                          </p>
+                    <div className="bg-blue-50/40 p-3 rounded-2xl border border-blue-100/50 group/prod relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-2 opacity-[0.03] rotate-12 transition-transform group-hover/prod:scale-125">
+                           <Box size={32} className="text-blue-600" />
                         </div>
-                        {prog && (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePalletTick(line.id, prog.id);
-                            }}
-                            className="bg-blue-600 text-white rounded-xl px-2 py-1 flex items-center gap-1 shadow-lg shadow-blue-500/20 active:scale-90 hover:bg-blue-500 transition-all border border-blue-400"
-                          >
-                            <Plus size={14} strokeWidth={3} />
-                            <span className="text-[9px] font-black uppercase italic tracking-tighter">AJOUTER</span>
-                          </button>
-                        )}
-                      </div>
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1.5">Production Shift</p>
+                            <p className="text-2xl font-black text-blue-900 leading-none tabular-nums flex items-end gap-1">
+                              {prog ? prog.producedPallets : '0'}
+                              <span className="text-[10px] text-blue-400 font-black uppercase mb-0.5 tracking-tighter">Palettes</span>
+                            </p>
+                          </div>
+                          {prog && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePalletTick(line.id, prog.id);
+                              }}
+                              className="bg-white text-blue-600 p-2 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/5 active:scale-90 hover:bg-blue-600 hover:text-white transition-all border border-blue-100"
+                            >
+                              <Plus size={18} strokeWidth={3} />
+                            </button>
+                          )}
+                        </div>
+                    </div>
+                  )}
+
+                  {down && (
+                    <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                       <div className="bg-rose-50 p-3 rounded-2xl border border-rose-100 shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-2 text-rose-600 leading-none">
+                              <span className="text-xl">{downType?.icon}</span>
+                              <div className="space-y-0.5">
+                                <span className={cn("text-[10px] font-black uppercase tracking-tight italic", isMachineLevel ? "text-rose-800" : "text-rose-600")}>
+                                  {isMachineLevel ? `ARRÊT GÉNÉRAL : ${downType?.name}` : downType?.name}
+                                </span>
+                                <p className="text-[8px] font-bold text-rose-400 uppercase tracking-widest">Incident en cours</p>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-md shadow-sm font-mono tabular-nums">
+                              {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
+                            </span>
+                          </div>
+                          
+                          {down.description && (
+                            <div className="bg-white/80 p-2 rounded-xl border border-rose-100/50 mb-2">
+                               <p className="text-[10px] font-bold text-gray-700 leading-tight italic">
+                                 "{down.description}"
+                               </p>
+                            </div>
+                          )}
+
+                          {down.images && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {(typeof down.images === 'string' ? JSON.parse(down.images) as string[] : down.images as string[]).map((img, i) => (
+                                <button 
+                                  key={i}
+                                  onClick={() => setSelectedFullImage(img)}
+                                  className="w-12 h-12 rounded-lg overflow-hidden border border-rose-200 shadow-sm hover:scale-105 transition-transform"
+                                >
+                                  <img src={`/uploads/${img}`} className="w-full h-full object-cover" alt="Downtime evidence" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                     </div>
                   )}
                 </div>
-
-                {down && (
-                  <div className="px-3 pb-3">
-                     <div className="bg-rose-50 p-2 rounded-xl flex justify-between items-center border border-rose-100 animate-in fade-in duration-300">
-                        <div className="flex items-center gap-2 text-rose-600 leading-none">
-                          <Activity size={14} className="animate-pulse" />
-                          <span className="text-[9px] font-black uppercase tracking-tight truncate max-w-[120px] italic">{downType?.name || 'Arrêt'}</span>
-                        </div>
-                        <span className="text-[9px] font-mono font-black text-white bg-rose-500 px-1.5 py-0.5 rounded shadow-sm">
-                          {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
-                        </span>
-                      </div>
-                      {lines.filter(otherL => otherL.machineId === selectedMachineId && otherL.activeDowntimeId === down.id).length > 1 && (
-                        <div className="pt-2 flex justify-center">
-                          <span className="bg-blue-600/10 text-blue-600 px-2 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest flex items-center gap-1 animate-pulse">
-                            <Activity size={8} /> Arrêt Groupé
-                          </span>
-                        </div>
-                      )}
-                  </div>
-                )}
               </motion.div>
             );
           })}
@@ -1846,17 +1948,33 @@ export default function PilotScreen() {
                 {declaringDowntimeLineId === 'global' ? t('general_stop') : `${t('line')} ${lines.find(l => l.id === declaringDowntimeLineId)?.name}`}
               </p>
             </div>
-            <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
-              {downtimeTypes.map(type => (
-                <button
-                  key={type.id}
-                  onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id)}
-                  className="p-4 border border-orange-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-50 transition-all group shadow-sm bg-white"
-                >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">{type.icon}</span>
-                  <span className="text-[9px] font-black uppercase text-gray-700 text-center leading-tight">{type.name}</span>
-                </button>
-              ))}
+            <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1">{t('reason')}</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {downtimeTypes.map(type => (
+                    <button
+                      key={type.id}
+                      onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id, manualStopForm.description)}
+                      className="p-4 border border-orange-50 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-50 transition-all group shadow-sm bg-white"
+                    >
+                      <span className="text-2xl group-hover:scale-110 transition-transform">{type.icon}</span>
+                      <span className="text-[9px] font-black uppercase text-gray-700 text-center leading-tight">{type.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1">{t('comment_description') || 'Commentaire / Description'}</label>
+                <textarea 
+                  className="w-full p-3 bg-orange-50/50 border border-orange-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all placeholder:text-gray-400 placeholder:italic"
+                  rows={2}
+                  placeholder="Expliquez la cause de l'arrêt..."
+                  value={manualStopForm.description}
+                  onChange={e => setManualStopForm({...manualStopForm, description: e.target.value})}
+                />
+              </div>
             </div>
             <div className="p-4 bg-gray-50 flex gap-3">
               <button 

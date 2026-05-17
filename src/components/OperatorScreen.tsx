@@ -1256,10 +1256,10 @@ export default function OperatorScreen() {
                     </div>
                     <button 
                       onClick={() => setShowManualStopModal(true)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-100 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
                     >
-                      <Plus size={14} />
-                      <span className="text-[9px] font-black uppercase tracking-widest">Manuel</span>
+                      <Plus size={12} />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Manuel</span>
                     </button>
                   </div>
 
