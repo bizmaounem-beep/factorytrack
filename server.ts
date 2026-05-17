@@ -446,9 +446,10 @@ async function startServer() {
 
   // Login Rate Limiting
   const loginLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, 
-    max: 10,
-    message: { error: 'Trop de tentatives.' },
+    windowMs: 15 * 60 * 1000, 
+    max: 5,
+    message: { error: 'Trop de tentatives. Veuillez attendre 15 minutes avant de réessayer.' },
+    skipSuccessfulRequests: true,
     standardHeaders: true,
     legacyHeaders: false,
     validate: { xForwardedForHeader: false },
@@ -457,21 +458,14 @@ async function startServer() {
   apiRouter.post('/login', loginLimiter, async (req, res) => {
     try {
       const { name, pin } = req.body;
-      if (!pin) return res.status(400).json({ error: 'PIN manquant' });
-      const pinStr = String(pin);
-      const nameStr = name ? sanitizeValue(name) : null;
-      let user;
-      if (nameStr) {
-        user = db.prepare('SELECT * FROM users WHERE name = ?').get(nameStr) as any;
-      } else {
-        const allUsers = db.prepare('SELECT * FROM users').all() as any[];
-        for (const u of allUsers) {
-          if (await bcrypt.compare(pinStr, u.pin)) { user = u; break; }
-        }
-      }
+      if (!name || !pin) return res.status(400).json({ error: 'Utilisateur et PIN requis' });
+      const user = db.prepare('SELECT * FROM users WHERE name = ?').get(sanitizeValue(name)) as any;
       if (user) {
-        const isValid = await bcrypt.compare(pinStr, user.pin);
-        if (isValid) return res.json(user);
+        const isValid = await bcrypt.compare(String(pin), user.pin);
+        if (isValid) {
+          const { pin: _hash, ...safeUser } = user;
+          return res.json(safeUser);
+        }
       }
       res.status(401).json({ error: 'Identifiants invalides' });
     } catch (e) { res.status(500).json({ error: 'Erreur interne' }); }
