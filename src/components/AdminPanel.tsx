@@ -1331,18 +1331,18 @@ export default function AdminPanel() {
                     <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('history')}</h2>
                     <button 
                       onClick={() => exportToExcel(historyLogType === 'production' ? 'production' : 'downtime')}
-                      className="p-1.5 px-3 bg-white border border-gray-200 rounded-lg text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 transition-all flex items-center gap-1.5 shadow-sm"
+                      className="p-1 px-2 md:p-1.5 md:px-3 bg-white border border-gray-200 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 transition-all flex items-center gap-1.5 shadow-sm"
                     >
-                      <Download size={12} /> {t('export')}
+                      <Download size={10} className="md:w-3 md:h-3" /> {t('export')}
                     </button>
                     <button 
                       onClick={() => openModal('downtime_log', {
                         startTime: new Date().toISOString(),
                         operatorId: user?.id || '',
                       })}
-                      className="p-1.5 px-4 bg-green-600 hover:bg-green-700 rounded-lg text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-green-200 active:scale-95 transition-all flex items-center gap-2 border-2 border-green-500/20"
+                      className="p-1 px-2 md:p-1.5 md:px-4 bg-green-600 hover:bg-green-700 rounded-lg text-[8px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-green-200 active:scale-95 transition-all flex items-center gap-1.5 md:gap-2 border-2 border-green-500/20"
                     >
-                      <Plus size={14} strokeWidth={3} /> {t('add_downtime_log') || 'Saisir un arrêt manuel'}
+                      <Plus size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" /> {t('add_downtime_log') || 'Saisir un arrêt manuel'}
                     </button>
                   </div>
                   
@@ -1668,9 +1668,9 @@ export default function AdminPanel() {
                     </div>
                     <button 
                       onClick={() => exportToExcel('production')}
-                      className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[9px] tracking-widest uppercase"
+                      className="w-full py-1.5 md:py-2.5 bg-blue-600 text-white rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"
                     >
-                      <Download size={14} strokeWidth={3} />
+                      <Download size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" />
                       {t('export')}
                     </button>
                  </div>
@@ -1688,9 +1688,9 @@ export default function AdminPanel() {
                     </div>
                     <button 
                       onClick={() => exportToExcel('downtime')}
-                      className="w-full py-2.5 bg-orange-600 text-white rounded-lg font-black shadow-lg shadow-orange-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[9px] tracking-widest uppercase"
+                      className="w-full py-1.5 md:py-2.5 bg-orange-600 text-white rounded-lg font-black shadow-lg shadow-orange-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"
                     >
-                      <Download size={14} strokeWidth={3} />
+                      <Download size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" />
                       {t('export')}
                     </button>
                  </div>
@@ -1740,7 +1740,7 @@ export default function AdminPanel() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white w-full max-w-sm md:max-w-xl rounded-[32px] p-6 md:p-8 space-y-6 shadow-2xl border border-gray-100 max-h-[95vh] overflow-y-auto"
+            className="bg-white w-full max-w-[95%] sm:max-w-sm md:max-w-xl rounded-[24px] md:rounded-[32px] p-4 md:p-8 space-y-4 md:space-y-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto"
           >
             <div className="space-y-0.5">
               <h3 className="text-base font-black tracking-tight text-gray-900 uppercase italic leading-none">
@@ -1759,7 +1759,7 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={t('shift_name')}
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
@@ -1768,7 +1768,7 @@ export default function AdminPanel() {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_time')}</label>
                       <input 
                         type="time"
-                        className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                        className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                         value={modalData.startTime || ''}
                         onChange={e => setModalData({...modalData, startTime: e.target.value})}
                       />
@@ -1777,7 +1777,7 @@ export default function AdminPanel() {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_time')}</label>
                       <input 
                         type="time"
-                        className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                        className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                         value={modalData.endTime || ''}
                         onChange={e => setModalData({...modalData, endTime: e.target.value})}
                       />
@@ -1792,7 +1792,7 @@ export default function AdminPanel() {
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('quantity')} ({t('pallets')})</label>
                     <input 
                       type="number"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                       value={modalData.count || ''}
                       onChange={e => setModalData({...modalData, count: e.target.value})}
                     />
@@ -1801,7 +1801,7 @@ export default function AdminPanel() {
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                       value={modalData.timestamp ? format(new Date(modalData.timestamp), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1997,12 +1997,12 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={t('program_name')}
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   <select 
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
                     value={modalData.machineId || ''}
                     onChange={e => setModalData({...modalData, machineId: e.target.value})}
                   >
@@ -2010,7 +2010,7 @@ export default function AdminPanel() {
                     {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                   <select 
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
                     disabled={!modalData.machineId}
                     value={modalData.lineId || ''}
                     onChange={e => setModalData({...modalData, lineId: e.target.value})}
@@ -2022,7 +2022,7 @@ export default function AdminPanel() {
                   </select>
                   {editingId && (
                     <select 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
                       value={modalData.status || 'ACTIVE'}
                       onChange={e => setModalData({...modalData, status: e.target.value})}
                     >
@@ -2034,8 +2034,8 @@ export default function AdminPanel() {
                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
                     <textarea 
                       placeholder="Pression, Vitesse, Température..."
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
-                      rows={3}
+                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs md:text-sm"
+                      rows={2}
                       value={modalData.parameters || ''}
                       onChange={e => setModalData({...modalData, parameters: e.target.value})}
                     />
@@ -2047,7 +2047,7 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={t('full_name')}
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
@@ -2055,20 +2055,20 @@ export default function AdminPanel() {
                     <input 
                       placeholder={editingId ? t('new_password_placeholder') || 'Nouveau mot de passe (optionnel)' : t('password') || 'Mot de passe'}
                       type="password"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                       value={modalData.pin || ''}
                       onChange={e => setModalData({...modalData, pin: e.target.value})}
                     />
                     <input 
                       placeholder={t('confirm_password') || 'Confirmer le mot de passe'}
                       type="password"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                       value={confirmPin}
                       onChange={e => setConfirmPin(e.target.value)}
                     />
                   </div>
                   <select 
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
                     value={modalData.role || ''}
                     onChange={e => setModalData({...modalData, role: e.target.value})}
                   >
@@ -2084,13 +2084,13 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={modalType === 'machine' ? t('machine_name') : t('line_name')}
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   {modalType === 'line' && (
                     <div className="space-y-2">
-                       <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                       <div className="flex items-center gap-3 p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100">
                         <input 
                           type="checkbox"
                           id="isActive"
@@ -2100,7 +2100,7 @@ export default function AdminPanel() {
                         />
                         <label htmlFor="isActive" className="text-sm font-bold text-gray-700">{t('active_service')}</label>
                       </div>
-                      <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                      <div className="flex items-center gap-3 p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100">
                         <input 
                           type="checkbox"
                           id="tracksProduction"
@@ -2119,13 +2119,13 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder="Nom du motif"
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   <input 
                     placeholder="Emoji (ex: 🛠️)"
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
                     value={modalData.icon || ''}
                     onChange={e => setModalData({...modalData, icon: e.target.value})}
                   />
@@ -2133,16 +2133,16 @@ export default function AdminPanel() {
               )}
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-2 md:pt-4">
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-4 font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all uppercase text-[10px] tracking-widest"
+                className="flex-1 py-3 md:py-4 font-black text-gray-400 hover:bg-gray-50 rounded-xl md:rounded-2xl transition-all uppercase text-[8px] md:text-[10px] tracking-widest"
               >
                 {t('cancel')}
               </button>
               <button 
                 onClick={handleModalSubmit}
-                className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-100 active:scale-95 transition-all uppercase text-[10px] tracking-widest"
+                className="flex-1 py-3 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black shadow-xl shadow-blue-50 active:scale-95 transition-all uppercase text-[8px] md:text-[10px] tracking-widest"
               >
                 {t('save')}
               </button>

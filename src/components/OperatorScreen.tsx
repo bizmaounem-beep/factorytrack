@@ -1380,135 +1380,135 @@ export default function OperatorScreen() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4"
           >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-[3rem] w-full max-w-md shadow-3xl overflow-hidden border border-gray-100"
-            >
-              <div className="bg-blue-600 px-8 py-6 border-b border-blue-500 flex justify-between items-center text-white">
-                 <h3 className="text-sm font-black uppercase tracking-widest italic">{editingLogId ? 'Modifier l\'arrêt' : t('add_manual_stop')}</h3>
-                 <button onClick={() => {
-                   setShowManualStopModal(false);
-                   setEditingLogId(null);
-                 }} className="text-white/70 hover:text-white transition-colors">
-                   <X size={20} />
-                 </button>
-              </div>
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                className="bg-white rounded-[2rem] w-full max-w-sm md:max-w-md shadow-3xl overflow-hidden border border-gray-100"
+              >
+                <div className="bg-blue-600 px-6 md:px-8 py-4 md:py-6 border-b border-blue-500 flex justify-between items-center text-white">
+                   <h3 className="text-[12px] md:text-sm font-black uppercase tracking-widest italic">{editingLogId ? 'Modifier l\'arrêt' : t('add_manual_stop')}</h3>
+                   <button onClick={() => {
+                     setShowManualStopModal(false);
+                     setEditingLogId(null);
+                   }} className="text-white/70 hover:text-white transition-colors">
+                     <X size={18} />
+                   </button>
+                </div>
 
-              <div className="p-8 space-y-6">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('start_time')}</label>
-                    <input 
-                      type="datetime-local"
-                      min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black text-slate-900 outline-none focus:border-blue-500"
-                      value={manualStopForm.startTime}
-                      onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
-                    />
+                <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+                  <div className="grid grid-cols-1 gap-3 md:gap-4">
+                    <div className="space-y-1 md:space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('start_time')}</label>
+                      <input 
+                        type="datetime-local"
+                        min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                        max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                        className="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black text-slate-900 outline-none focus:border-blue-500"
+                        value={manualStopForm.startTime}
+                        onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1 md:space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('end_time')}</label>
+                      <input 
+                        type="datetime-local"
+                        min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                        max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
+                        className="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black text-slate-900 outline-none focus:border-blue-500"
+                        value={manualStopForm.endTime}
+                        onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('end_time')}</label>
-                    <input 
-                      type="datetime-local"
-                      min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black text-slate-900 outline-none focus:border-blue-500"
-                      value={manualStopForm.endTime}
-                      onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
-                    />
+
+                  <div className="bg-blue-50 p-3 md:p-4 rounded-xl md:rounded-2xl border border-blue-100 flex items-center justify-between font-bold">
+                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{t('total_duration')}</p>
+                    <p className="text-lg md:text-xl font-black text-blue-900 font-mono">{calculateManualDuration()}</p>
                   </div>
-                </div>
 
-                <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center justify-between font-bold">
-                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{t('total_duration')}</p>
-                  <p className="text-xl font-black text-blue-900 font-mono">{calculateManualDuration()}</p>
-                </div>
+                  <div className="space-y-1 md:space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('reason')}</label>
+                    <select 
+                      className="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black text-slate-900 outline-none focus:border-blue-500 appearance-none"
+                      value={manualStopForm.typeId}
+                      onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
+                    >
+                      <option value="">{t('select_reason')}...</option>
+                      {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('reason')}</label>
-                  <select 
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black text-slate-900 outline-none focus:border-blue-500 appearance-none"
-                    value={manualStopForm.typeId}
-                    onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
-                  >
-                    <option value="">{t('select_reason')}...</option>
-                    {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Photos</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {manualImagePreviews.map((prev, idx) => (
-                      <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group/img">
-                        <img src={prev} className="w-full h-full object-cover" />
+                  <div className="space-y-1 md:space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Photos</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {manualImagePreviews.map((prev, idx) => (
+                        <div key={idx} className="relative aspect-square rounded-lg md:rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group/img">
+                          <img src={prev} className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => {
+                              setManualImagePreviews(prevs => prevs.filter((_, i) => i !== idx));
+                              setManualStopForm(form => ({ ...form, images: form.images.filter((_, i) => i !== idx) }));
+                            }}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                      {manualImagePreviews.length < 5 && (
                         <button
                           onClick={() => {
-                            setManualImagePreviews(prevs => prevs.filter((_, i) => i !== idx));
-                            setManualStopForm(form => ({ ...form, images: form.images.filter((_, i) => i !== idx) }));
+                            if (Capacitor.isNativePlatform()) {
+                               CapCamera.getPhoto({
+                                 quality: 80,
+                                 allowEditing: false,
+                                 resultType: CameraResultType.Uri,
+                                 source: CameraSource.Prompt,
+                                 saveToGallery: true,
+                                 width: 1200
+                               }).then(image => {
+                                 if (image.webPath) {
+                                   const preview = image.webPath;
+                                   fetch(preview).then(res => res.blob()).then(blob => uploadFile(blob, preview, true));
+                                 }
+                               });
+                            } else {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = (e: any) => {
+                                const files = e.target.files;
+                                if (files && files[0]) {
+                                  uploadFile(files[0], URL.createObjectURL(files[0]), true);
+                                }
+                              };
+                              input.click();
+                            }
                           }}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                          disabled={isUploading}
+                          className="aspect-square border-2 border-dashed border-gray-200 rounded-lg md:rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-500 transition-all font-black text-[10px]"
                         >
-                          <X size={10} />
+                          <Camera size={14} className="md:w-4 md:h-4" />
+                          <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+'}</span>
                         </button>
-                      </div>
-                    ))}
-                    {manualImagePreviews.length < 5 && (
-                      <button
-                        onClick={() => {
-                          if (Capacitor.isNativePlatform()) {
-                             CapCamera.getPhoto({
-                               quality: 80,
-                               allowEditing: false,
-                               resultType: CameraResultType.Uri,
-                               source: CameraSource.Prompt,
-                               saveToGallery: true,
-                               width: 1200
-                             }).then(image => {
-                               if (image.webPath) {
-                                 const preview = image.webPath;
-                                 fetch(preview).then(res => res.blob()).then(blob => uploadFile(blob, preview, true));
-                               }
-                             });
-                          } else {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'image/*';
-                            input.onchange = (e: any) => {
-                              const files = e.target.files;
-                              if (files && files[0]) {
-                                uploadFile(files[0], URL.createObjectURL(files[0]), true);
-                              }
-                            };
-                            input.click();
-                          }
-                        }}
-                        disabled={isUploading}
-                        className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-500 transition-all"
-                      >
-                        <Camera size={16} />
-                        <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+'}</span>
-                      </button>
-                    )}
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2 md:pt-4">
+                    <button 
+                      onClick={() => {
+                        if (!manualStopForm.typeId || !manualStopForm.startTime || !manualStopForm.endTime) {
+                          return alert(t('missing_fields'));
+                        }
+                        handleManualStop(manualStopForm);
+                      }}
+                      className="flex-1 bg-blue-600 text-white font-black uppercase py-3 md:py-4 rounded-xl md:rounded-2xl text-[10px] md:text-xs shadow-xl active:scale-95 transition-all tracking-widest hover:bg-blue-500 shadow-blue-100"
+                    >
+                      {editingLogId ? 'Enregistrer' : t('validate')}
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button 
-                    onClick={() => {
-                      if (!manualStopForm.typeId || !manualStopForm.startTime || !manualStopForm.endTime) {
-                        return alert(t('missing_fields'));
-                      }
-                      handleManualStop(manualStopForm);
-                    }}
-                    className="flex-1 bg-blue-600 text-white font-black uppercase py-4 rounded-2xl text-xs shadow-xl active:scale-95 transition-all tracking-widest hover:bg-blue-500 shadow-blue-100"
-                  >
-                    {editingLogId ? 'Enregistrer' : t('validate')}
-                  </button>
-                </div>
-              </div>
             </motion.div>
           </motion.div>
         )}
@@ -1526,51 +1526,51 @@ export default function OperatorScreen() {
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-white border border-gray-200 rounded-[2.5rem] w-full max-w-2xl shadow-3xl overflow-hidden"
+              className="bg-white border border-gray-200 rounded-[1.5rem] md:rounded-[2.5rem] w-full max-w-2xl shadow-3xl overflow-hidden"
             >
-              <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
+              <div className="p-4 md:p-8 space-y-4 md:space-y-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                      <Activity size={24} className="text-white" />
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                      <Activity size={20} className="text-white md:w-6 md:h-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-gray-900 italic tracking-tighter uppercase leading-none mb-1">Arrêts Groupés Intelligents</h3>
-                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Fonctionnalité AgroSync v2.4</p>
+                      <h3 className="text-lg md:text-xl font-black text-gray-900 italic tracking-tighter uppercase leading-none mb-1">Arrêts Groupés Intelligents</h3>
+                      <p className="text-[8px] md:text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Fonctionnalité AgroSync v2.4</p>
                     </div>
                   </div>
-                  <button onClick={() => setShowFeatureInfo(false)} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors">
-                    <X size={20} />
+                  <button onClick={() => setShowFeatureInfo(false)} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors">
+                    <X size={16} md:size={20} />
                   </button>
                 </div>
 
-                <div className="grid gap-6">
-                  <section className="space-y-3">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <div className="grid gap-4 md:gap-6">
+                  <section className="space-y-2 md:space-y-3">
+                    <h4 className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-blue-500" />
                       Détection de Proximité Temporelle
                     </h4>
-                    <p className="text-xs font-bold text-slate-600 leading-relaxed pl-3.5 border-l border-gray-100">
+                    <p className="text-[11px] md:text-xs font-bold text-slate-600 leading-relaxed pl-3 md:pl-3.5 border-l border-gray-100">
                       Le système analyse en continu les temps de début d'incident. Si deux arrêts ou plus du même type surviennent sur différentes lignes d'une même machine dans une fenêtre de 2 minutes, ils sont automatiquement identifiés comme un incident lié.
                     </p>
                   </section>
 
-                  <section className="space-y-3">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <section className="space-y-2 md:space-y-3">
+                    <h4 className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-blue-500" />
                       L'Action de Groupe : Propagation
                     </h4>
-                    <p className="text-xs font-bold text-slate-600 leading-relaxed pl-3.5 border-l border-gray-100">
+                    <p className="text-[11px] md:text-xs font-bold text-slate-600 leading-relaxed pl-3 md:pl-3.5 border-l border-gray-100">
                       Lorsqu'un opérateur déclare un arrêt, l'application vérifie si une autre ligne a déjà déclaré le même motif récemment. Si c'est le cas, elle se connecte à cet arrêt existant. Sinon, elle propage l'état d'arrêt à toutes les autres lignes concernées pour synchroniser la machine.
                     </p>
                   </section>
 
-                  <section className="space-y-3 p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                    <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                      <Activity size={12} />
+                  <section className="space-y-2 md:space-y-3 p-3 md:p-4 bg-blue-50 rounded-xl md:rounded-2xl border border-blue-100">
+                    <h4 className="text-[9px] md:text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                      <Activity size={10} md:size={12} />
                       Avantage Industriel
                     </h4>
-                    <p className="text-xs font-bold text-blue-800/80 leading-relaxed">
+                    <p className="text-[11px] md:text-xs font-bold text-blue-800/80 leading-relaxed">
                       Cette automatisation réduit la charge mentale des opérateurs qui n'ont plus à saisir manuellement chaque arrêt sur chaque ligne. Elle garantit une précision absolue dans le suivi des temps d'arrêt réels et facilite l'analyse des causes racines.
                     </p>
                   </section>
@@ -1578,7 +1578,7 @@ export default function OperatorScreen() {
 
                 <button 
                   onClick={() => setShowFeatureInfo(false)}
-                  className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-lg hover:bg-blue-500"
+                  className="w-full py-3 md:py-4 bg-blue-600 text-white rounded-lg md:rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest active:scale-95 transition-all shadow-lg hover:bg-blue-500"
                 >
                   Compris
                 </button>
