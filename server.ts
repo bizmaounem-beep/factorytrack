@@ -266,6 +266,27 @@ async function startServer() {
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
 
+  // 2.5 DIRECT UPLOAD ROUTE (FOR HIGHEST PRIORITY)
+  app.post(['/api/upload', '/api/upload/'], (req, res) => {
+    console.log(`[SERVER-UPLOAD] Incoming request at ${req.url}`);
+    upload.single('photo')(req, res, (err) => {
+      if (err) {
+        console.error('[SERVER-UPLOAD] Multer Error:', err);
+        return res.status(400).json({ error: err.message || 'Erreur multer' });
+      }
+      if (!req.file) {
+        console.error('[SERVER-UPLOAD] No file found in "photo" field');
+        return res.status(400).json({ error: 'Fichier absent du champ "photo"' });
+      }
+      console.log('[SERVER-UPLOAD] Saved:', req.file.filename);
+      res.status(200).json({ 
+        success: true,
+        url: `/uploads/${req.file.filename}`, 
+        path: req.file.filename 
+      });
+    });
+  });
+
   // 3. API ROUTES ROUTER
   const apiRouter = express.Router();
 
@@ -277,33 +298,17 @@ async function startServer() {
 
   // Health check
   apiRouter.get('/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
+    res.json({ status: 'ok', time: new Date().toISOString(), server: 'Express/Vite' });
   });
 
-  // UPLOAD ROUTE - MUST BE BEFORE BODY PARSERS for Multer
-  apiRouter.post(['/upload', '/upload/'], (req, res) => {
-    console.log('[API-UPLOAD] Processing request');
-    upload.single('photo')(req, res, (err) => {
-      if (err) {
-        console.error('[API-UPLOAD] Error:', err);
-        return res.status(400).json({ error: err.message || 'Erreur upload' });
-      }
-      if (!req.file) {
-        console.error('[API-UPLOAD] No file');
-        return res.status(400).json({ error: 'Fichier manquant' });
-      }
-      console.log('[API-UPLOAD] Success:', req.file.filename);
-      res.status(200).json({ 
-        success: true,
-        url: `/uploads/${req.file.filename}`, 
-        path: req.file.filename 
-      });
-    });
+  // Test route
+  apiRouter.get('/test-json', (req, res) => {
+    res.json({ success: true, message: 'JSON API reaches here' });
   });
 
   // Body parsers for other API routes
-  apiRouter.use(express.json({ limit: '10mb' }));
-  apiRouter.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  apiRouter.use(express.json({ limit: '50mb' }));
+  apiRouter.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // Sanitize helper (available in scope)
   const sanitizeValue = (val: any) => {
@@ -455,13 +460,13 @@ async function startServer() {
     } catch (e) { res.status(500).json({ error: 'Erreur interne' }); }
   });
 
-  // Catch-all for API Router
+  // Catch-all for API Router (JSON)
   apiRouter.all('*', (req, res) => {
-    console.warn(`[API-404] No match for ${req.method} ${req.url}`);
-    res.status(404).json({ error: `Route API inconnue: ${req.method} ${req.originalUrl}` });
+    console.warn(`[API-404] No match for ${req.method} ${req.originalUrl || req.url}`);
+    res.status(404).json({ error: `Route API inconnue: ${req.method} ${req.originalUrl || req.url}`, type: 'api_fallback' });
   });
 
-  // MOUNT API ROUTER on the app
+  // MOUNT API ROUTER on the app (priority)
   app.use('/api', apiRouter);
 
   // Serve uploads
@@ -500,7 +505,22 @@ async function startServer() {
 
   const PORT = 3000;
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log('\n' + '='.repeat(50));
+    console.log(`[SERVER] RUNNING ON PORT ${PORT}`);
+    console.log(`[SERVER] ENV: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[SERVER] HEALTH CHECK: http://localhost:${PORT}/api/health`);
+    console.log(`[SERVER] TEST JSON: http://localhost:${PORT}/api/test-json`);
+    console.log(`[SERVER] UPLOAD URL: http://localhost:${PORT}/api/upload`);
+    
+    // Log registered routes for debug
+    console.log('[SERVER] REGISTERED API ROUTES:');
+    apiRouter.stack.forEach((r: any) => {
+      if (r.route && r.route.path) {
+        const methods = Object.keys(r.route.methods).join(',').toUpperCase();
+        console.log(`  - [${methods}] /api${r.route.path}`);
+      }
+    });
+    console.log('='.repeat(50) + '\n');
   });
 }
 
