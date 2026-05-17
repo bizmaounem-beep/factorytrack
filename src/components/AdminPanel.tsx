@@ -86,6 +86,7 @@ export default function AdminPanel() {
   const [historyShiftFilter, setHistoryShiftFilter] = useState<string>(() => sessionStorage.getItem('admin_history_shift') || '');
   const [historyOperatorFilter, setHistoryOperatorFilter] = useState<string>(() => sessionStorage.getItem('admin_history_operator') || '');
   const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('admin_history_date') || '');
+  const [historyEndDateFilter, setHistoryEndDateFilter] = useState<string>(() => sessionStorage.getItem('admin_history_end_date') || '');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('admin_history_type') as any) || 'production');
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('admin_active_tab') || 'dashboard');
 
@@ -99,8 +100,9 @@ export default function AdminPanel() {
     sessionStorage.setItem('admin_history_shift', historyShiftFilter);
     sessionStorage.setItem('admin_history_operator', historyOperatorFilter);
     sessionStorage.setItem('admin_history_date', historyDateFilter);
+    sessionStorage.setItem('admin_history_end_date', historyEndDateFilter);
     sessionStorage.setItem('admin_history_type', historyLogType);
-  }, [historyMachineFilter, historyLineFilter, historyShiftFilter, historyOperatorFilter, historyDateFilter, historyLogType]);
+  }, [historyMachineFilter, historyLineFilter, historyShiftFilter, historyOperatorFilter, historyDateFilter, historyEndDateFilter, historyLogType]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -324,8 +326,17 @@ export default function AdminPanel() {
     const dashboardSheet = workbook.addWorksheet('Dashboard');
     
     let fileName = "";
+    const prefix = type === 'production' ? 'Rapport_Production' : 'Rapport_Arrets';
+    
+    if (historyDateFilter && historyEndDateFilter) {
+      fileName = `${prefix}_du_${historyDateFilter}_au_${historyEndDateFilter}.xlsx`;
+    } else if (historyDateFilter) {
+      fileName = `${prefix}_du_${historyDateFilter}.xlsx`;
+    } else {
+      fileName = type === 'production' ? 'Rapport_General_Production.xlsx' : 'Rapport_General_Arrets.xlsx';
+    }
+    
     const now = new Date();
-    const dateStr = format(now, "dd-MM-yyyy");
 
     // Styling constants
     const headerStyle = {
@@ -359,9 +370,29 @@ export default function AdminPanel() {
       }
     };
 
-    if (type === 'production') {
-      fileName = `Production_${dateStr}.xlsx`;
+    const filteredProdLogs = prodLogs.filter(log => {
+      const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
+      const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+      const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
+      const matchOperator = !historyOperatorFilter || log.operatorId === historyOperatorFilter;
+      const logDateOnly = log.timestamp.split('T')[0];
+      const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
+                        (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
+      return matchMachine && matchLine && matchShift && matchOperator && matchDate;
+    });
 
+    const filteredDownLogs = downLogs.filter(log => {
+      const matchMachine = !historyMachineFilter || log.machineId === historyMachineFilter;
+      const matchLine = !historyLineFilter || log.lineId === historyLineFilter;
+      const matchShift = !historyShiftFilter || log.shiftId === historyShiftFilter;
+      const matchOperator = !historyOperatorFilter || log.operatorId === historyOperatorFilter;
+      const logDateOnly = log.startTime.split('T')[0];
+      const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
+                        (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
+      return matchMachine && matchLine && matchShift && matchOperator && matchDate;
+    });
+
+    if (type === 'production') {
       dataSheet.columns = [
         { header: 'Date & Heure', key: 'timestamp', width: 20 },
         { header: 'Machine', key: 'machine', width: 25 },
@@ -372,7 +403,7 @@ export default function AdminPanel() {
         { header: 'Palettes', key: 'pallets', width: 15 },
       ];
 
-      prodLogs.forEach(log => {
+      filteredProdLogs.forEach(log => {
         dataSheet.addRow({
           timestamp: formatDateExcel(log.timestamp),
           machine: machines.find(m => m.id === log.machineId)?.name || '—',
@@ -413,7 +444,6 @@ export default function AdminPanel() {
       });
 
     } else {
-      fileName = `Logs_Arrets_${dateStr}.xlsx`;
       const photoSheet = workbook.addWorksheet('Photos');
 
       dataSheet.columns = [
@@ -438,7 +468,7 @@ export default function AdminPanel() {
 
       let photoRowIdx = 2;
 
-      for (const log of downLogs) {
+      for (const log of filteredDownLogs) {
         const durationSec = getLogDurationSec(log);
         const durationMin = log.endTime ? Number((durationSec / 60).toFixed(1)) : 'En cours';
         
@@ -562,7 +592,7 @@ export default function AdminPanel() {
       currentRow++;
 
       const causeStats = downtimeTypes.map(t => {
-        const filteredLogs = downLogs.filter(l => l.typeId === t.id);
+        const filteredLogs = filteredDownLogs.filter(l => l.typeId === t.id);
         const totalMin = filteredLogs.reduce((acc, l) => acc + getLogDurationSec(l), 0) / 60;
         return {
           name: t.name,
@@ -1324,11 +1354,21 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</p>
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_date') || 'Début'}</p>
                      <input 
                       type="date"
                       value={historyDateFilter}
                       onChange={e => setHistoryDateFilter(e.target.value)}
+                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                     />
+                   </div>
+
+                   <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_date') || 'Fin'}</p>
+                     <input 
+                      type="date"
+                      value={historyEndDateFilter}
+                      onChange={e => setHistoryEndDateFilter(e.target.value)}
                       className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
                      />
                    </div>
@@ -1797,28 +1837,78 @@ export default function AdminPanel() {
                       onChange={e => setModalData({...modalData, description: e.target.value})}
                     />
                   </div>
-                  {modalData.image_path && (
-                    <div className="md:col-span-2 space-y-1.5">
-                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Photo de l'arrêt</label>
-                      <div className="relative group overflow-hidden rounded-2xl border border-gray-100 aspect-video bg-black/5">
-                        <img 
-                          src={`/uploads/${modalData.image_path}`} 
-                          alt="Downtime" 
-                          className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
-                          onClick={() => setSelectedFullImage(modalData.image_path)}
-                        />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Eye className="text-white" size={32} />
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => setModalData({...modalData, image_path: null})}
-                        className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline"
-                      >
-                        Supprimer la photo
-                      </button>
+
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Photos Galerie</label>
+                    <div className="grid grid-cols-4 gap-2">
+                       {/* Legacy single photo handling */}
+                       {modalData.image_path && (
+                         <div className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 group">
+                           <img 
+                             src={`/uploads/${modalData.image_path}`} 
+                             className="w-full h-full object-cover cursor-pointer"
+                             onClick={() => setSelectedFullImage(modalData.image_path)}
+                           />
+                           <button 
+                             onClick={() => setModalData({...modalData, image_path: null})}
+                             className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"
+                           >
+                             <Trash2 size={10} />
+                           </button>
+                         </div>
+                       )}
+                       
+                       {/* Multi-photos handling */}
+                       {(Array.isArray(modalData.images) ? modalData.images : (modalData.images ? JSON.parse(modalData.images) : [])).map((img: string, idx: number) => (
+                         <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 group">
+                           <img 
+                             src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} 
+                             className="w-full h-full object-cover cursor-pointer"
+                             onClick={() => setSelectedFullImage(img)}
+                           />
+                           <button 
+                             onClick={() => {
+                               const imgs = Array.isArray(modalData.images) ? [...modalData.images] : JSON.parse(modalData.images || '[]');
+                               imgs.splice(idx, 1);
+                               setModalData({...modalData, images: imgs});
+                             }}
+                             className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"
+                           >
+                             <Trash2 size={10} />
+                           </button>
+                         </div>
+                       ))}
+                       
+                       <button
+                         onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = async (e: any) => {
+                              const file = e.target.files[0];
+                              if (!file) return;
+                              const formData = new FormData();
+                              formData.append('photo', file);
+                              const res = await fetch('/api/upload', {
+                                method: 'POST',
+                                body: formData
+                              });
+                              if (res.ok) {
+                                const data = await res.json();
+                                const filePath = data.path;
+                                const imgs = Array.isArray(modalData.images) ? [...modalData.images] : (modalData.images ? JSON.parse(modalData.images) : []);
+                                imgs.push(filePath);
+                                setModalData({...modalData, images: imgs});
+                              }
+                            };
+                            input.click();
+                         }}
+                         className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:text-blue-500 hover:border-blue-500 transition-all"
+                       >
+                         <Camera size={20} />
+                       </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
 

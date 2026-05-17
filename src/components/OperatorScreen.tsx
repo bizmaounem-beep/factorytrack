@@ -87,8 +87,10 @@ export default function OperatorScreen() {
     typeId: '',
     startTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-    description: ''
+    description: '',
+    images: [] as string[]
   });
+  const [manualImagePreviews, setManualImagePreviews] = useState<string[]>([]);
   const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
 
   // Session Persistence
@@ -339,7 +341,7 @@ export default function OperatorScreen() {
     }
   };
   
-  const uploadFile = async (file: Blob | File, preview: string) => {
+  const uploadFile = async (file: Blob | File, preview: string, isManual: boolean = false) => {
     setIsUploading(true);
     
     // Client-side size check (20MB)
@@ -376,8 +378,13 @@ export default function OperatorScreen() {
 
       if (res.ok && (data.path || data.success)) {
         const filePath = data.path || (data.url ? data.url.replace('/uploads/', '') : '');
-        setSelectedImagePaths(prev => [...prev, filePath]);
-        setImagePreviews(prev => [...prev, preview]);
+        if (isManual) {
+          setManualStopForm(prev => ({ ...prev, images: [...prev.images, filePath] }));
+          setManualImagePreviews(prev => [...prev, preview]);
+        } else {
+          setSelectedImagePaths(prev => [...prev, filePath]);
+          setImagePreviews(prev => [...prev, preview]);
+        }
       } else {
         throw new Error(data.error || `Erreur ${res.status}`);
       }
@@ -531,7 +538,7 @@ export default function OperatorScreen() {
     }
   };
 
-  const handleManualStop = async (data: { typeId: string, startTime: string, endTime: string, description: string }) => {
+  const handleManualStop = async (data: { typeId: string, startTime: string, endTime: string, description: string, images: string[] }) => {
     if (!selectedLineId || !user || !activeLine) return;
 
     try {
@@ -544,16 +551,12 @@ export default function OperatorScreen() {
         return;
       }
 
-      if (!isToday(new Date(data.startTime)) || !isToday(new Date(data.endTime))) {
-        alert("L'opérateur ne peut ajouter des arrêts que pour la journée en cours.");
-        return;
-      }
-
       const payload = {
         machineId: activeLine.machineId,
         lineId: activeLine.id,
         typeId: data.typeId,
         description: data.description,
+        images: data.images,
         operatorId: user.id,
         shiftId: currentShiftId,
         startTime: new Date(data.startTime).toISOString(),
@@ -569,11 +572,13 @@ export default function OperatorScreen() {
 
       setShowManualStopModal(false);
       setEditingLogId(null);
+      setManualImagePreviews([]);
       setManualStopForm({
         typeId: '',
         startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
         endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-        description: ''
+        description: '',
+        images: []
       });
     } catch (error) {
       console.error('Error adding/updating manual stop:', error);
@@ -592,12 +597,15 @@ export default function OperatorScreen() {
 
   const handleEditStopRequest = (log: any) => {
     setEditingLogId(log.id);
+    const parsedImages = log.images ? (typeof log.images === 'string' ? JSON.parse(log.images) : log.images) : [];
     setManualStopForm({
       typeId: log.typeId,
       startTime: format(parseISO(log.startTime), "yyyy-MM-dd'T'HH:mm"),
       endTime: log.endTime ? format(parseISO(log.endTime), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-      description: log.description || ''
+      description: log.description || '',
+      images: parsedImages
     });
+    setManualImagePreviews(parsedImages.map((img: string) => img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`));
     setShowManualStopModal(true);
   };
 
@@ -1419,6 +1427,63 @@ export default function OperatorScreen() {
                     <option value="">{t('select_reason')}...</option>
                     {downtimeTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Photos</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {manualImagePreviews.map((prev, idx) => (
+                      <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group/img">
+                        <img src={prev} className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => {
+                            setManualImagePreviews(prevs => prevs.filter((_, i) => i !== idx));
+                            setManualStopForm(form => ({ ...form, images: form.images.filter((_, i) => i !== idx) }));
+                          }}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                    {manualImagePreviews.length < 5 && (
+                      <button
+                        onClick={() => {
+                          if (Capacitor.isNativePlatform()) {
+                             CapCamera.getPhoto({
+                               quality: 80,
+                               allowEditing: false,
+                               resultType: CameraResultType.Uri,
+                               source: CameraSource.Prompt,
+                               saveToGallery: true,
+                               width: 1200
+                             }).then(image => {
+                               if (image.webPath) {
+                                 const preview = image.webPath;
+                                 fetch(preview).then(res => res.blob()).then(blob => uploadFile(blob, preview, true));
+                               }
+                             });
+                          } else {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = (e: any) => {
+                              const files = e.target.files;
+                              if (files && files[0]) {
+                                uploadFile(files[0], URL.createObjectURL(files[0]), true);
+                              }
+                            };
+                            input.click();
+                          }
+                        }}
+                        disabled={isUploading}
+                        className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-500 transition-all"
+                      >
+                        <Camera size={16} />
+                        <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">
