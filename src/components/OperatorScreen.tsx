@@ -353,6 +353,7 @@ export default function OperatorScreen() {
     formData.append('photo', file, 'photo.jpg');
   
     try {
+      console.log('[DEBUG] Starting upload to /api/upload');
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: {
@@ -361,14 +362,16 @@ export default function OperatorScreen() {
         body: formData
       });
       
+      console.log('[DEBUG] Upload response status:', res.status);
       let data;
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
         data = await res.json();
+        console.log('[DEBUG] Upload response JSON:', data);
       } else {
         const text = await res.text();
-        console.error('Server non-JSON response:', text);
-        throw new Error(`Le serveur a répondu avec un format invalide (${res.status})`);
+        console.error('[DEBUG] Server non-JSON response text:', text.substring(0, 500));
+        throw new Error(`Réponse non-JSON du serveur (${res.status}). Vérifiez les logs console.`);
       }
 
       if (res.ok && (data.path || data.success)) {

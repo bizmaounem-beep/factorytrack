@@ -266,9 +266,23 @@ async function startServer() {
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
 
-  // 3. UPLOAD ROUTE - BEFORE ANY BODY PARSERS that might interfere with multer
-  app.post(['/api/upload', '/api/upload/'], (req, res) => {
-    console.log('[UPLOAD-API] START matching route');
+  // 3. API ROUTES ROUTER
+  const apiRouter = express.Router();
+
+  // Debug middleware for API
+  apiRouter.use((req, res, next) => {
+    console.log(`[API-DEBUG] ${req.method} ${req.url}`);
+    next();
+  });
+
+  // Health check
+  apiRouter.get('/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // UPLOAD ROUTE - MUST BE BEFORE BODY PARSERS
+  apiRouter.post('/upload', (req, res) => {
+    console.log('[UPLOAD-API] Incoming request');
     upload.single('photo')(req, res, (err) => {
       if (err) {
         console.error('[UPLOAD-API] MULTER ERROR:', err);
@@ -289,17 +303,171 @@ async function startServer() {
     });
   });
 
-  // 4. GENERAL BODY PARSERS (for other API routes)
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // Now apply body parsers for the rest of the API routes
+  apiRouter.use(express.json({ limit: '10mb' }));
+  apiRouter.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Dynamic static files for uploads
-  app.use('/uploads', express.static(UPLOADS_DIR));
+  // Sanitize helper (available in scope)
+  const sanitizeValue = (val: any) => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'string') return val.replace(/[\x00-\x1F\x7F]/g, "").trim();
+    if (typeof val === 'number') return val;
+    if (typeof val === 'boolean') return val ? 1 : 0;
+    if (typeof val === 'object') {
+      try { return JSON.stringify(val); } catch { return null; }
+    }
+    return String(val);
+  };
 
-  // Health check
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
+  const getServerShiftId = () => {
+    try {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const shifts = db.prepare('SELECT * FROM shifts').all() as any[];
+      for (const shift of shifts) {
+        const [startH, startM] = shift.startTime.split(':').map(Number);
+        const [endH, endM] = shift.endTime.split(':').map(Number);
+        const startMin = startH * 60 + startM;
+        const endMin = endH * 60 + endM;
+        if (endMin < startMin) {
+          if (currentMinutes >= startMin || currentMinutes < endMin) return shift.id;
+        } else {
+          if (currentMinutes >= startMin && currentMinutes < endMin) return shift.id;
+        }
+      }
+    } catch (e) { console.error('Error shift ID:', e); }
+    return null;
+  };
+
+  // DB Collection Routes
+  apiRouter.get('/db/:collection', (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { collection } = req.params;
+      if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
+      const rows = db.prepare(`SELECT * FROM ${collection}`).all();
+      res.json(rows);
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
+
+  apiRouter.get('/db/:collection/:id', (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { collection, id } = req.params;
+      if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
+      const row = db.prepare(`SELECT * FROM ${collection} WHERE id = ?`).get(id);
+      res.json(row);
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  apiRouter.post('/db/:collection', async (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { collection } = req.params;
+      if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
+      const data = { ...req.body };
+      if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
+      if (collection === 'users' && data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+      const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
+      if (logCollections.includes(collection) && !data.shiftId) data.shiftId = getServerShiftId();
+      const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
+      const validColumns = pragma.map(p => p.name);
+      const values: any[] = [];
+      const keys: string[] = [];
+      for (const col of validColumns) {
+        if (data[col] !== undefined) {
+          keys.push(col);
+          values.push(sanitizeValue(data[col]));
+        }
+      }
+      if (keys.length === 0) return res.status(400).json({ error: 'Aucun champ valide fourni' });
+      const placeholders = keys.map(() => '?').join(',');
+      db.prepare(`INSERT INTO ${collection} (${keys.join(',')}) VALUES (${placeholders})`).run(...values);
+      io.emit('db_change', { collection });
+      res.json({ id: data.id });
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  apiRouter.put('/db/:collection/:id', async (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { collection, id } = req.params;
+      if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
+      const data = { ...req.body };
+      if (collection === 'users' && data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+      const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
+      const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
+      const values: any[] = [];
+      const keys: string[] = [];
+      for (const col of validColumns) {
+        if (data[col] !== undefined) {
+          keys.push(col);
+          values.push(sanitizeValue(data[col]));
+        }
+      }
+      if (keys.length === 0) return res.json({ success: true });
+      const sets = keys.map(k => `${k} = ?`).join(',');
+      db.prepare(`UPDATE ${collection} SET ${sets} WHERE id = ?`).run(...values, id);
+      io.emit('db_change', { collection });
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  apiRouter.delete('/db/:collection/:id', (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { collection, id } = req.params;
+      if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
+      db.prepare(`DELETE FROM ${collection} WHERE id = ?`).run(id);
+      io.emit('db_change', { collection });
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  // Login Rate Limiting
+  const loginLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, 
+    max: 10,
+    message: { error: 'Trop de tentatives.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
+  });
+
+  apiRouter.post('/login', loginLimiter, async (req, res) => {
+    try {
+      const { name, pin } = req.body;
+      if (!pin) return res.status(400).json({ error: 'PIN manquant' });
+      const pinStr = String(pin);
+      const nameStr = name ? sanitizeValue(name) : null;
+      let user;
+      if (nameStr) {
+        user = db.prepare('SELECT * FROM users WHERE name = ?').get(nameStr) as any;
+      } else {
+        const allUsers = db.prepare('SELECT * FROM users').all() as any[];
+        for (const u of allUsers) {
+          if (await bcrypt.compare(pinStr, u.pin)) { user = u; break; }
+        }
+      }
+      if (user) {
+        const isValid = await bcrypt.compare(pinStr, user.pin);
+        if (isValid) return res.json(user);
+      }
+      res.status(401).json({ error: 'Identifiants invalides' });
+    } catch (e) { res.status(500).json({ error: 'Erreur interne' }); }
+  });
+
+  // Catch-all for API Router
+  apiRouter.all('*', (req, res) => {
+    console.warn(`[API-404] No match for ${req.method} ${req.url}`);
+    res.status(404).json({ error: `Route API inconnue: ${req.method} ${req.originalUrl}` });
+  });
+
+  // Mount API Router
+  app.use('/api', apiRouter);
+
+  // Serve uploads
+  app.use('/uploads', express.static(UPLOADS_DIR));
 
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
@@ -309,290 +477,12 @@ async function startServer() {
     }
   });
 
-  // Login Rate Limiting
-  const loginLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
-    max: 5, // 5 attempts per minute
-    message: { error: 'Trop de tentatives de connexion. Réessayez dans une minute.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    validate: { xForwardedForHeader: false },
-  });
-
-  // Sanitization helper
-  const sanitizeValue = (val: any) => {
-    if (val === null || val === undefined) return null;
-    if (typeof val === 'string') {
-      // Basic protection against XSS and control characters
-      return val.replace(/[\x00-\x1F\x7F]/g, "").trim();
-    }
-    if (typeof val === 'number') return val;
-    if (typeof val === 'boolean') return val ? 1 : 0;
-    if (typeof val === 'object') {
-      try {
-        return JSON.stringify(val);
-      } catch {
-        return null;
-      }
-    }
-    return String(val);
-  };
-
-
   // Socket logic
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
     socket.on('disconnect', () => {
       console.log('User disconnected');
     });
-  });
-
-  // Broadcast helper
-  const notifyChange = (collection: string) => {
-    io.emit('db_change', { collection });
-  };
-
-  // API Endpoints
-  const getServerShiftId = () => {
-    try {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      const shifts = db.prepare('SELECT * FROM shifts').all() as any[];
-      
-      for (const shift of shifts) {
-        const [startH, startM] = shift.startTime.split(':').map(Number);
-        const [endH, endM] = shift.endTime.split(':').map(Number);
-        const startMin = startH * 60 + startM;
-        const endMin = endH * 60 + endM;
-
-        if (endMin < startMin) {
-          if (currentMinutes >= startMin || currentMinutes < endMin) return shift.id;
-        } else {
-          if (currentMinutes >= startMin && currentMinutes < endMin) return shift.id;
-        }
-      }
-    } catch (e) {
-      console.error('Error getting server shift ID:', e);
-    }
-    return null;
-  };
-
-  app.get('/api/db/:collection', (req, res) => {
-    try {
-      if (!db) throw new Error('Database not initialized');
-      const { collection } = req.params;
-      
-      if (!ALLOWED_COLLECTIONS.includes(collection)) {
-        return res.status(403).json({ error: 'Accès non autorisé' });
-      }
-
-      // Prepared statement for safety
-      const rows = db.prepare(`SELECT * FROM ${collection}`).all();
-      res.json(rows);
-    } catch (e) {
-      res.status(500).json({ error: (e as Error).message });
-    }
-  });
-
-  app.get('/api/db/:collection/:id', (req, res) => {
-    try {
-      if (!db) throw new Error('Database not initialized');
-      const { collection, id } = req.params;
-
-      if (!ALLOWED_COLLECTIONS.includes(collection)) {
-        return res.status(403).json({ error: 'Accès non autorisé' });
-      }
-
-      // Prepared statement with parameter binding
-      const row = db.prepare(`SELECT * FROM ${collection} WHERE id = ?`).get(id);
-      res.json(row);
-    } catch (e) {
-      res.status(500).json({ error: (e as Error).message });
-    }
-  });
-
-  app.post('/api/db/:collection', async (req, res) => {
-    try {
-      if (!db) throw new Error('Database not initialized');
-      const { collection } = req.params;
-      
-      if (!ALLOWED_COLLECTIONS.includes(collection)) {
-        return res.status(403).json({ error: 'Accès non autorisé' });
-      }
-
-      const data = { ...req.body };
-      if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
-      
-      // Hash PIN if creating a user
-      if (collection === 'users' && data.pin) {
-        data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
-      }
-
-      // Auto-populate shiftId for logs if missing
-      const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
-      if (logCollections.includes(collection) && !data.shiftId) {
-        data.shiftId = getServerShiftId();
-      }
-      
-      // Get valid columns for safety
-      const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
-      const validColumns = pragma.map(p => p.name);
-      
-      const values: any[] = [];
-      const keys: string[] = [];
-
-      for (const col of validColumns) {
-        if (data[col] !== undefined) {
-          keys.push(col);
-          values.push(sanitizeValue(data[col]));
-        }
-      }
-
-      if (keys.length === 0) {
-        return res.status(400).json({ error: 'Aucun champ valide fourni' });
-      }
-
-      const placeholders = keys.map(() => '?').join(',');
-      const stmt = db.prepare(`INSERT INTO ${collection} (${keys.join(',')}) VALUES (${placeholders})`);
-      stmt.run(...values);
-      
-      notifyChange(collection);
-      res.json({ id: data.id });
-    } catch (e) {
-      console.error('POST Error:', e);
-      res.status(500).json({ error: (e as Error).message });
-    }
-  });
-
-  app.put('/api/db/:collection/:id', async (req, res) => {
-    try {
-      if (!db) throw new Error('Database not initialized');
-      const { collection, id } = req.params;
-
-      if (!ALLOWED_COLLECTIONS.includes(collection)) {
-        return res.status(403).json({ error: 'Accès non autorisé' });
-      }
-
-      const data = { ...req.body };
-
-      // Hash PIN if updating a user
-      if (collection === 'users' && data.pin) {
-        data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
-      }
-
-      // Auto-populate shiftId for logs if missing/null during update
-      const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
-      if (logCollections.includes(collection) && !data.shiftId) {
-        const current = db.prepare(`SELECT shiftId FROM ${collection} WHERE id = ?`).get(id) as any;
-        if (!current || !current.shiftId) {
-          data.shiftId = getServerShiftId();
-        }
-      }
-      
-      const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
-      const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
-      
-      const values: any[] = [];
-      const keys: string[] = [];
-
-      for (const col of validColumns) {
-        if (data[col] !== undefined) {
-          keys.push(col);
-          values.push(sanitizeValue(data[col]));
-        }
-      }
-
-      if (keys.length === 0) {
-        return res.json({ success: true, message: 'Aucun champ à mettre à jour' });
-      }
-
-      const sets = keys.map(k => `${k} = ?`).join(',');
-      const stmt = db.prepare(`UPDATE ${collection} SET ${sets} WHERE id = ?`);
-      stmt.run(...values, id);
-      
-      notifyChange(collection);
-      res.json({ success: true });
-    } catch (e) {
-      console.error('PUT Error:', e);
-      res.status(500).json({ error: (e as Error).message });
-    }
-  });
-
-  app.delete('/api/db/:collection/:id', (req, res) => {
-    try {
-      if (!db) throw new Error('Database not initialized');
-      const { collection, id } = req.params;
-
-      if (!ALLOWED_COLLECTIONS.includes(collection)) {
-        return res.status(403).json({ error: 'Accès non autorisé' });
-      }
-
-      db.prepare(`DELETE FROM ${collection} WHERE id = ?`).run(id);
-      notifyChange(collection);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: (e as Error).message });
-    }
-  });
-
-  // Specialized Login Route with Hashed PIN check and Rate Limiting
-  app.post('/api/login', loginLimiter, async (req, res) => {
-    try {
-      if (!db) throw new Error('Base de données non initialisée');
-      const { name, pin } = req.body;
-      
-      if (!pin) {
-        return res.status(400).json({ error: 'PIN manquant' });
-      }
-
-      const pinStr = String(pin);
-      const nameStr = name ? sanitizeValue(name) : null;
-      
-      let user;
-      if (nameStr) {
-        // First find user by name exactly using prepared statement
-        user = db.prepare('SELECT * FROM users WHERE name = ?').get(nameStr) as any;
-      } else {
-        // Optimization: Find candidate users (since we can't search by hash directly)
-        // In a real system we'd always require a name/username
-        const allUsers = db.prepare('SELECT * FROM users').all() as any[];
-        for (const u of allUsers) {
-          if (await bcrypt.compare(pinStr, u.pin)) {
-            user = u;
-            break;
-          }
-        }
-      }
-      
-      if (user && nameStr) {
-        // Verify PIN hash
-        const isValid = await bcrypt.compare(pinStr, user.pin);
-        if (isValid) {
-          res.json(user);
-        } else {
-          res.status(401).json({ error: 'Identifiants invalides' });
-        }
-      } else if (user) {
-        res.json(user);
-      } else {
-        res.status(401).json({ error: 'Identifiants invalides' });
-      }
-    } catch (e) {
-      console.error('Login error:', e);
-      res.status(500).json({ error: 'Erreur interne du serveur' });
-    }
-  });
-
-  // 5. API Catch-all for debugging 404s (Placed AFTER all defined routes)
-  app.all('/api/*', (req, res, next) => {
-    console.warn(`[API 404] No route matched: ${req.method} ${req.url}`);
-    if (req.accepts('json') || req.path.startsWith('/api/')) {
-      return res.status(404).json({ 
-        error: `Route API inconnue: ${req.method} ${req.url}`,
-        tip: 'Vérifiez l\'URL de l\'API ou si la route est définie sur le serveur.' 
-      });
-    }
-    next();
   });
 
   // Vite setup
