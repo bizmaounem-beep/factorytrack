@@ -450,16 +450,22 @@ async function startServer() {
       const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
       const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
       const values: any[] = [];
-      const keys: string[] = [];
+      const sets: string[] = [];
       for (const col of validColumns) {
         if (data[col] !== undefined) {
-          keys.push(col);
-          values.push(sanitizeValue(data[col]));
+          const val = data[col];
+          // Support atomic increments: { field: { _inc: Number } }
+          if (val && typeof val === 'object' && val._inc !== undefined) {
+            sets.push(`${col} = ${col} + ?`);
+            values.push(Number(val._inc));
+          } else {
+            sets.push(`${col} = ?`);
+            values.push(sanitizeValue(val));
+          }
         }
       }
-      if (keys.length === 0) return res.json({ success: true });
-      const sets = keys.map(k => `${k} = ?`).join(',');
-      db.prepare(`UPDATE ${collection} SET ${sets} WHERE id = ?`).run(...values, id);
+      if (sets.length === 0) return res.json({ success: true });
+      db.prepare(`UPDATE ${collection} SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
       io.emit('db_change', { collection });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }

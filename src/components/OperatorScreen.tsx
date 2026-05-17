@@ -209,7 +209,7 @@ export default function OperatorScreen() {
 
         // Update programme total
         await localApi.updateDoc('programmes', activeProgramme.id, {
-          producedPallets: (activeProgramme.producedPallets || 0) + count,
+          producedPallets: { _inc: count }
         });
       }
 
@@ -243,7 +243,7 @@ export default function OperatorScreen() {
 
       // Update programme total (don't finish)
       await localApi.updateDoc('programmes', activeProgramme.id, {
-        producedPallets: (activeProgramme.producedPallets || 0) + 1
+        producedPallets: { _inc: 1 }
       });
       
       // Visual feedback
@@ -272,7 +272,7 @@ export default function OperatorScreen() {
 
       // Update programme total and mark as finished
       await localApi.updateDoc('programmes', activeProgramme.id, {
-        producedPallets: (activeProgramme.producedPallets || 0) + count,
+        producedPallets: { _inc: count },
         status: 'FINISHED'
       });
 
@@ -1186,7 +1186,7 @@ export default function OperatorScreen() {
                                       timestamp: new Date().toISOString()
                                     });
                                     await localApi.updateDoc('programmes', activeProgramme.id, {
-                                      producedPallets: (activeProgramme.producedPallets || 0) + count
+                                      producedPallets: { _inc: count }
                                     });
                                     setPalletInput('1');
                                     setFlashFeedback(true);
