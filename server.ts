@@ -283,14 +283,23 @@ async function startServer() {
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, curl, Capacitor)
       if (!origin) return callback(null, true);
+      
       // Allow localhost
       if (origin.includes('localhost')) return callback(null, true);
+      
       // Allow local network IPs: 192.168.x.x, 10.x.x.x, 172.16-31.x.x
       const isLAN = /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(origin);
       if (isLAN) return callback(null, true);
-      // Allow explicit override from env
+
+      // Allow AI Studio / Cloud Run domains
+      if (origin.endsWith('.run.app')) return callback(null, true);
+      
+      // Allow explicit overrides from env
       if (process.env.ALLOWED_ORIGIN && origin === process.env.ALLOWED_ORIGIN) 
         return callback(null, true);
+      if (process.env.APP_URL && origin === process.env.APP_URL)
+        return callback(null, true);
+
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
