@@ -269,9 +269,9 @@ async function startServer() {
   // 3. API ROUTES ROUTER
   const apiRouter = express.Router();
 
-  // Debug middleware for API
+  // Log all API requests
   apiRouter.use((req, res, next) => {
-    console.log(`[API-DEBUG] ${req.method} ${req.url}`);
+    console.log(`[API] ${req.method} ${req.url}`);
     next();
   });
 
@@ -280,21 +280,19 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
-  // UPLOAD ROUTE - MUST BE BEFORE BODY PARSERS
-  apiRouter.post('/upload', (req, res) => {
-    console.log('[UPLOAD-API] Incoming request');
+  // UPLOAD ROUTE - MUST BE BEFORE BODY PARSERS for Multer
+  apiRouter.post(['/upload', '/upload/'], (req, res) => {
+    console.log('[API-UPLOAD] Processing request');
     upload.single('photo')(req, res, (err) => {
       if (err) {
-        console.error('[UPLOAD-API] MULTER ERROR:', err);
-        return res.status(400).json({ error: err.message || 'Erreur Multer' });
+        console.error('[API-UPLOAD] Error:', err);
+        return res.status(400).json({ error: err.message || 'Erreur upload' });
       }
-      
       if (!req.file) {
-        console.error('[UPLOAD-API] NO FILE. Content-Type:', req.headers['content-type']);
-        return res.status(400).json({ error: 'Fichier manquant. Assurez-vous d\'envoyer un champ "photo" de type fichier.' });
+        console.error('[API-UPLOAD] No file');
+        return res.status(400).json({ error: 'Fichier manquant' });
       }
-
-      console.log('[UPLOAD-API] SUCCESS:', req.file.filename);
+      console.log('[API-UPLOAD] Success:', req.file.filename);
       res.status(200).json({ 
         success: true,
         url: `/uploads/${req.file.filename}`, 
@@ -303,7 +301,7 @@ async function startServer() {
     });
   });
 
-  // Now apply body parsers for the rest of the API routes
+  // Body parsers for other API routes
   apiRouter.use(express.json({ limit: '10mb' }));
   apiRouter.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -463,7 +461,7 @@ async function startServer() {
     res.status(404).json({ error: `Route API inconnue: ${req.method} ${req.originalUrl}` });
   });
 
-  // Mount API Router
+  // MOUNT API ROUTER on the app
   app.use('/api', apiRouter);
 
   // Serve uploads
