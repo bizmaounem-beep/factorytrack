@@ -1609,7 +1609,6 @@ export default function OperatorScreen() {
                   <button 
                     onClick={() => {
                       setIsInitialSelection(false);
-                      setCategorizingLogId(null);
                       setSelectedStopType(null);
                     }}
                     className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
