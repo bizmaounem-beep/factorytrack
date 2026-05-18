@@ -76,16 +76,14 @@ export default function OperatorScreen() {
 
   const currentShiftId = getCurrentShiftId(shifts);
 
-  const [dismissedCategorizationId, setDismissedCategorizationId] = useState<string | null>(null);
-
   // Derive categorizing log
   const categorizingLog = !activeDowntime && activeLine 
-    ? downtimeLogs.find(d => d.lineId === activeLine.id && d.operatorId === user?.id && d.typeId === 'PENDING' && d.endTime && d.id !== dismissedCategorizationId) || null 
+    ? downtimeLogs.find(d => d.lineId === activeLine.id && d.operatorId === user?.id && d.typeId === 'PENDING' && d.endTime) || null 
     : null;
   const categorizingLogId = categorizingLog?.id || null;
 
   const [flashFeedback, setFlashFeedback] = useState(false);
-  
+
   // Manual Stop Form State
   const [manualStopForm, setManualStopForm] = useState({
     typeId: '',
@@ -1611,9 +1609,7 @@ export default function OperatorScreen() {
                   <button 
                     onClick={() => {
                       setIsInitialSelection(false);
-                      if (categorizingLogId) {
-                        setDismissedCategorizationId(categorizingLogId);
-                      }
+                      setCategorizingLogId(null);
                       setSelectedStopType(null);
                     }}
                     className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"

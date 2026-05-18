@@ -95,7 +95,7 @@ async function startServer() {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT,
-        password TEXT,
+        pin TEXT,
         role TEXT
       );
 
@@ -207,24 +207,27 @@ async function startServer() {
     }
     console.log('Database migrations completed.');
 
-    // Seed default data if empty (only if users table is empty)
+    // Seed default data if empty
     const countRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
     if (countRow.count === 0) {
       console.log('Seeding initial database data...');
       
-      // Default Admin (Hashed Password)
-      const hashedAdminPass = await bcrypt.hash('admin123', SALT_ROUNDS);
-      db.prepare('INSERT INTO users (id, name, password, role) VALUES (?, ?, ?, ?)').run(
-        'admin-1', 'Bizmaoune Mohamed', hashedAdminPass, 'ADMIN'
+      // Default Admin (Hashed PIN)
+      const hashedAdminPin = await bcrypt.hash('1234', SALT_ROUNDS);
+      db.prepare('INSERT INTO users (id, name, pin, role) VALUES (?, ?, ?, ?)').run(
+        'admin-1', 'Admin', hashedAdminPin, 'ADMIN'
       );
 
-      // Default Operators
-      const hashedOpPass = await bcrypt.hash('operator123', SALT_ROUNDS);
-      db.prepare('INSERT INTO users (id, name, password, role) VALUES (?, ?, ?, ?)').run(
-        'op-1', 'Nabil', hashedOpPass, 'OPERATOR'
+      // Default Pilot
+      const hashedPilotPin = await bcrypt.hash('2222', SALT_ROUNDS);
+      db.prepare('INSERT INTO users (id, name, pin, role) VALUES (?, ?, ?, ?)').run(
+        'pilot-1', 'Pilote Test', hashedPilotPin, 'PILOT'
       );
-      db.prepare('INSERT INTO users (id, name, password, role) VALUES (?, ?, ?, ?)').run(
-        'op-2', 'Abdelhakim', hashedOpPass, 'OPERATOR'
+
+      // Default Operator
+      const hashedOpPin = await bcrypt.hash('3333', SALT_ROUNDS);
+      db.prepare('INSERT INTO users (id, name, pin, role) VALUES (?, ?, ?, ?)').run(
+        'op-1', 'Opérateur Test', hashedOpPin, 'OPERATOR'
       );
 
       // Default Downtime Types
@@ -242,11 +245,14 @@ async function startServer() {
         insertDT.run(dt.id, dt.name, dt.icon);
       }
 
-      // Default production lines and machines matching existing data
-      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m1', 'Mafroda');
+      // Default production lines and machines
+      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m-a1', 'Machine A1');
+      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m-b2', 'Machine B2');
+      db.prepare('INSERT INTO machines (id, name) VALUES (?, ?)').run('m-c3', 'Machine C3');
       
-      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l1', 'm1', 'Ligne 1', 'IDLE', 1);
-      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l2lxzytwv', 'm1', 'Elifab', 'IDLE', 1);
+      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l-1', 'm-a1', 'Ligne 1', 'IDLE', 1);
+      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l-2', 'm-b2', 'Ligne 2', 'IDLE', 0);
+      db.prepare('INSERT INTO lines (id, machineId, name, status, tracksProduction) VALUES (?, ?, ?, ?, ?)').run('l-3', 'm-c3', 'Ligne 3', 'IDLE', 1);
 
       // Default Shifts
       const defaultShifts = [
@@ -379,29 +385,19 @@ async function startServer() {
   // Login Public Route
   apiRouter.post('/login', loginLimiter, async (req, res) => {
     try {
-      const { name, pin, password } = req.body;
-      const passToTry = String(password || pin);
-      
-      if (!name || !passToTry) return res.status(400).json({ error: 'Utilisateur et mot de passe requis' });
-      
+      const { name, pin } = req.body;
+      if (!name || !pin) return res.status(400).json({ error: 'Utilisateur et PIN requis' });
       const user = db.prepare('SELECT * FROM users WHERE name = ?').get(sanitizeValue(name)) as any;
       if (user) {
-        // Support both hashed password stored in 'password' or 'pin' columns for backward compatibility if migration isn't full
-        const storedHash = user.password || user.pin;
-        if (!storedHash) return res.status(401).json({ error: 'Compte invalide' });
-        
-        const isValid = await bcrypt.compare(passToTry, storedHash);
+        const isValid = await bcrypt.compare(String(pin), user.pin);
         if (isValid) {
-          const { password: _p, pin: _h, ...safeUser } = user;
+          const { pin: _hash, ...safeUser } = user;
           const token = jwt.sign({ id: safeUser.id, role: safeUser.role }, JWT_SECRET, { expiresIn: '12h' });
           return res.json({ ...safeUser, token });
         }
       }
       res.status(401).json({ error: 'Identifiants invalides' });
-    } catch (e) { 
-      console.error('Login error:', e);
-      res.status(500).json({ error: 'Erreur interne au serveur' }); 
-    }
+    } catch (e) { res.status(500).json({ error: 'Erreur interne' }); }
   });
 
   // Apply Auth Middleware to all subsequent routes
@@ -513,7 +509,7 @@ async function startServer() {
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const rows = db.prepare(`SELECT * FROM ${collection}`).all();
       if (collection === 'users') {
-        return res.json(rows.map(({ password, pin, ...u }: any) => u));
+        return res.json(rows.map(({ pin, ...u }: any) => u));
       }
       res.json(rows);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
@@ -526,7 +522,7 @@ async function startServer() {
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const row = db.prepare(`SELECT * FROM ${collection} WHERE id = ?`).get(id);
       if (collection === 'users' && row) {
-        const { password, pin, ...safeRow } = row as any;
+        const { pin, ...safeRow } = row as any;
         return res.json(safeRow);
       }
       res.json(row);
@@ -540,14 +536,7 @@ async function startServer() {
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const data = { ...req.body };
       if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
-      
-      if (collection === 'users') {
-        const newPassword = data.password || data.pin;
-        if (newPassword) {
-          data.password = await bcrypt.hash(String(newPassword), SALT_ROUNDS);
-          delete data.pin;
-        }
-      }
+      if (collection === 'users' && data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
       const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
       if (logCollections.includes(collection) && !data.shiftId) data.shiftId = getServerShiftId();
       const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
@@ -574,14 +563,7 @@ async function startServer() {
       const { collection, id } = req.params;
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const data = { ...req.body };
-      
-      if (collection === 'users') {
-        const newPassword = data.password || data.pin;
-        if (newPassword) {
-          data.password = await bcrypt.hash(String(newPassword), SALT_ROUNDS);
-          delete data.pin;
-        }
-      }
+      if (collection === 'users' && data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
       const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
       const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
       const values: any[] = [];

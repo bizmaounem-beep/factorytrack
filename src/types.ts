@@ -1,10 +1,10 @@
-export type UserRole = 'OPERATOR' | 'ADMIN';
+export type UserRole = 'OPERATOR' | 'PILOT' | 'ADMIN';
 export type LineStatus = 'IDLE' | 'RUNNING' | 'STOPPED';
 
 export interface User {
   id: string;
   name: string;
-  password?: string;
+  pin: string;
   role: UserRole;
 }
 

@@ -127,11 +127,7 @@ export const translations: Translation = {
   stat_short: { fr: 'Stat.' },
   pal_short: { fr: 'Pal.' },
   op_short: { fr: 'Op.' },
-  pin: { fr: 'Mot de passe' },
-  password: { fr: 'Mot de passe' },
-  confirm_password: { fr: 'Confirmer le mot de passe' },
-  passwords_not_match: { fr: 'Les mots de passe ne correspondent pas' },
-  new_password_placeholder: { fr: 'Nouveau mot de passe (optionnel)' },
+  pin: { fr: 'PIN' },
   status: { fr: 'Status' },
   confirm: { fr: 'Confirmer' },
   delete_question: { fr: 'Supprimer ?' },
@@ -188,6 +184,7 @@ export const translations: Translation = {
   all_lines: { fr: 'Toutes les lignes' },
   all_shifts: { fr: 'Toutes les équipes' },
   all_operators: { fr: 'Tous les opérateurs' },
+  new_pin_placeholder: { fr: 'Nouveau PIN (Laissez vide pour conserver)' },
   
   // SCADA specific
   efficiency: { fr: 'Efficience' },

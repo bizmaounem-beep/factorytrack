@@ -173,8 +173,8 @@ export default function AdminPanel() {
   const openModal = (type: typeof modalType, data: any = {}) => {
     setModalType(type);
     setConfirmPin('');
-    // When editing a user, we don't want to show the hashed password
-    const cleanData = type === 'user' && data.id ? { ...data, password: '' } : { ...data };
+    // When editing a user, we don't want to show the hashed PIN
+    const cleanData = type === 'user' && data.id ? { ...data, pin: '' } : { ...data };
     setModalData(cleanData);
     setEditingId(data.id || null);
     if (type === 'line' && data.machineId) {
@@ -193,11 +193,11 @@ export default function AdminPanel() {
         }
       }
       if (modalType === 'user') {
-        if (!modalData.name || (!editingId && !modalData.password) || !modalData.role) {
+        if (!modalData.name || (!editingId && !modalData.pin) || !modalData.role) {
           alert(t('fill_all_fields'));
           return;
         }
-        if (modalData.password && modalData.password !== confirmPin) {
+        if (modalData.pin && modalData.pin !== confirmPin) {
           alert(t('passwords_not_match') || 'Les mots de passe ne correspondent pas');
           return;
         }
@@ -232,9 +232,9 @@ export default function AdminPanel() {
 
       let finalData = { ...modalData };
       
-      // If editing a user and password is empty, remove it from the update payload so it's not changed
-      if (modalType === 'user' && editingId && !finalData.password) {
-        delete finalData.password;
+      // If editing a user and PIN is empty, remove it from the update payload so it's not changed
+      if (modalType === 'user' && editingId && !finalData.pin) {
+        delete finalData.pin;
       }
 
       if (modalType === 'production_log' && finalData.count) {
@@ -1084,7 +1084,7 @@ export default function AdminPanel() {
                       <div className={cn(
                         "w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-sm",
                         u.role === 'ADMIN' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
-                        "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                        u.role === 'PILOT' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
                       )}>
                         {u.name?.substring(0, 1) || '?'}
                       </div>
@@ -2079,8 +2079,8 @@ export default function AdminPanel() {
                       placeholder={editingId ? t('new_password_placeholder') || 'Nouveau mot de passe (optionnel)' : t('password') || 'Mot de passe'}
                       type="password"
                       className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
-                      value={modalData.password || ''}
-                      onChange={e => setModalData({...modalData, password: e.target.value})}
+                      value={modalData.pin || ''}
+                      onChange={e => setModalData({...modalData, pin: e.target.value})}
                     />
                     <input 
                       placeholder={t('confirm_password') || 'Confirmer le mot de passe'}
@@ -2095,9 +2095,10 @@ export default function AdminPanel() {
                     value={modalData.role || ''}
                     onChange={e => setModalData({...modalData, role: e.target.value})}
                   >
-                    <option value="">{t('choose_role') || 'Choisir un rôle'}</option>
-                    <option value="OPERATOR">{t('operator') || 'Opérateur'}</option>
-                    <option value="ADMIN">{t('admin') || 'Administrateur'}</option>
+                    <option value="">{t('choose_role')}</option>
+                    <option value="OPERATOR">{t('operator')}</option>
+                    <option value="PILOT">{t('pilot')}</option>
+                    <option value="ADMIN">{t('admin')}</option>
                   </select>
                 </>
               )}

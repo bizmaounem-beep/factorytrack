@@ -55,6 +55,8 @@ export default function App() {
     switch (user.role) {
       case 'ADMIN':
         return <AdminPanel />;
+      case 'PILOT':
+        return <PilotScreen />;
       case 'OPERATOR':
         return <OperatorScreen />;
       default:
