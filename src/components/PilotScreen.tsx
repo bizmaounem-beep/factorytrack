@@ -557,7 +557,16 @@ export default function PilotScreen() {
     }
 
     const formData = new FormData();
-    const extension = isVid ? '.mp4' : '.jpg';
+    // Use a more accurate extension detection
+    const getExt = (m: string) => {
+      if (m.includes('video/mp4')) return '.mp4';
+      if (m.includes('video/quicktime')) return '.mov';
+      if (m.includes('video/webm')) return '.webm';
+      if (m.includes('image/png')) return '.png';
+      if (m.includes('image/webp')) return '.webp';
+      return '.jpg';
+    };
+    const extension = getExt(mimeType || file.type);
     formData.append('photo', file, `media-${Date.now()}${extension}`);
   
     try {
@@ -2308,7 +2317,7 @@ export default function PilotScreen() {
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
                   className="hidden" 
-                  accept="image/*" 
+                  accept="image/*,video/*" 
                  />
                </div>
             </div>
