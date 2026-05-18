@@ -10,7 +10,7 @@ import {
   Play, Square, Settings, Timer, Package, AlertCircle, 
   CheckCircle, Factory, Monitor, Activity, Plus, Minus, 
   ArrowLeft, X, Clock, Check, Edit, Trash2, History,
-  ChevronRight, ChevronLeft, Info, Camera, Trash, Sun, Moon
+  ChevronRight, ChevronLeft, Info, Camera, Video, Trash, Sun, Moon
 } from 'lucide-react';
 import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -68,7 +68,7 @@ export default function OperatorScreen() {
   const [selectedImagePaths, setSelectedImagePaths] = useState<string[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
 
   const activeLine = lines.find(l => l.id === selectedLineId) || null;
   const activeProgramme = activeLine ? availableProgrammes.find(p => p.id === activeLine.currentProgrammeId) || null : null;
@@ -307,57 +307,68 @@ export default function OperatorScreen() {
     }
   };
 
-  const handleTakeStorePhoto = async () => {
+  const handleTakeStoreMedia = async (type: 'photo' | 'video') => {
     if (Capacitor.isNativePlatform()) {
-      try {
-        const image = await CapCamera.getPhoto({
-          quality: 80,
-          allowEditing: false,
-          resultType: CameraResultType.Uri,
-          source: CameraSource.Prompt,
-          saveToGallery: true,
-          width: 1200 // Resizing for efficiency
-        });
-  
-        if (image.webPath) {
-          const preview = image.webPath;
-          const response = await fetch(preview);
-          const blob = await response.blob();
-          uploadFile(blob, preview);
+      if (type === 'photo') {
+        try {
+          const image = await CapCamera.getPhoto({
+            quality: 80,
+            allowEditing: false,
+            resultType: CameraResultType.Uri,
+            source: CameraSource.Prompt,
+            saveToGallery: true,
+            width: 1200
+          });
+          if (image.webPath) {
+            const response = await fetch(image.webPath);
+            const blob = await response.blob();
+            uploadFile(blob, image.webPath, false, 'image/jpeg');
+          }
+        } catch (e) {
+          console.error('Erreur caméra:', e);
         }
-      } catch (e) {
-        console.error('Erreur caméra:', e);
+      } else {
+        // Capacitor doesn't have a built-in video capture plugin as standard as Camera
+        // We'll fallback to the HTML5 file input which works well on mobile browsers
+        mediaInputRef.current?.setAttribute('accept', 'video/*');
+        mediaInputRef.current?.setAttribute('capture', 'environment');
+        mediaInputRef.current?.click();
       }
     } else {
-      fileInputRef.current?.click();
+      mediaInputRef.current?.setAttribute('accept', type === 'photo' ? 'image/*' : 'video/*');
+      mediaInputRef.current?.setAttribute('capture', 'environment');
+      mediaInputRef.current?.click();
     }
   };
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       Array.from(files).forEach((file: File) => {
         const preview = URL.createObjectURL(file);
-        uploadFile(file, preview);
+        uploadFile(file, preview, false, file.type);
       });
     }
   };
-  
-  const uploadFile = async (file: Blob | File, preview: string, isManual: boolean = false) => {
+
+  const uploadFile = async (file: Blob | File, preview: string, isManual: boolean = false, mimeType?: string) => {
     setIsUploading(true);
     
-    // Client-side size check (20MB)
-    if (file.size > 20 * 1024 * 1024) {
-      alert('Le fichier est trop volumineux (max 20Mo).');
+    // Limits: photo ~ 10MB, video ~ 25MB (server limits)
+    const isVideo = mimeType?.startsWith('video/');
+    const limit = isVideo ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
+
+    if (file.size > limit) {
+      alert(`Le fichier est trop volumineux (max ${isVideo ? '25Mo' : '10Mo'}).`);
       setIsUploading(false);
       return;
     }
 
     const formData = new FormData();
-    formData.append('photo', file, 'photo.jpg');
+    const extension = isVideo ? '.mp4' : '.jpg';
+    formData.append('photo', file, `media-${Date.now()}${extension}`);
   
     try {
-      console.log('[DEBUG] Starting upload to /api/upload');
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: {
@@ -366,16 +377,12 @@ export default function OperatorScreen() {
         body: formData
       });
       
-      console.log('[DEBUG] Upload response status:', res.status);
       let data;
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
         data = await res.json();
-        console.log('[DEBUG] Upload response JSON:', data);
       } else {
-        const text = await res.text();
-        console.error('[DEBUG] Server non-JSON response text:', text.substring(0, 500));
-        throw new Error(`Réponse non-JSON du serveur (${res.status}). Vérifiez les logs console.`);
+        throw new Error(`Réponse non-JSON du serveur (${res.status})`);
       }
 
       if (res.ok && (data.path || data.success)) {
@@ -1203,19 +1210,26 @@ export default function OperatorScreen() {
                                  </div>
                                  {log.images && (
                                    <div className="flex gap-1 mt-2">
-                                     {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => (
-                                       <div 
-                                         key={i} 
-                                         className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:scale-110 transition-all"
-                                         onClick={() => setSelectedFullImage(img)}
-                                       >
-                                         <img 
-                                           src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} 
-                                           className="w-full h-full object-cover" 
-                                           referrerPolicy="no-referrer"
-                                         />
-                                       </div>
-                                     ))}
+                                     {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => {
+                                       const isVid = img.toLowerCase().endsWith('.mp4') || img.toLowerCase().endsWith('.webm') || img.toLowerCase().endsWith('.mov');
+                                       return (
+                                         <div 
+                                           key={i} 
+                                           className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:scale-110 transition-all bg-gray-100 dark:bg-gray-800"
+                                           onClick={() => setSelectedFullImage(img)}
+                                         >
+                                           {isVid ? (
+                                             <video src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" />
+                                           ) : (
+                                             <img 
+                                               src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} 
+                                               className="w-full h-full object-cover" 
+                                               referrerPolicy="no-referrer"
+                                             />
+                                           )}
+                                         </div>
+                                       );
+                                     })}
                                    </div>
                                  )}
                               </div>
@@ -1354,56 +1368,46 @@ export default function OperatorScreen() {
                   <div className="space-y-1 md:space-y-2">
                     <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest">Photos</label>
                     <div className="grid grid-cols-4 gap-2">
-                      {manualImagePreviews.map((prev, idx) => (
-                        <div key={idx} className="relative aspect-square rounded-lg md:rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 group/img">
-                          <img src={prev} className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => {
-                              setManualImagePreviews(prevs => prevs.filter((_, i) => i !== idx));
-                              setManualStopForm(form => ({ ...form, images: form.images.filter((_, i) => i !== idx) }));
-                            }}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      ))}
+                      {manualImagePreviews.map((prev, idx) => {
+                        const isVid = manualStopForm.images[idx] ? (manualStopForm.images[idx].endsWith('.mp4') || manualStopForm.images[idx].endsWith('.webm') || manualStopForm.images[idx].endsWith('.mov')) : false;
+                        return (
+                          <div key={idx} className="relative aspect-square rounded-lg md:rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 group/img">
+                            {isVid ? (
+                              <video src={prev} className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={prev} className="w-full h-full object-cover" />
+                            )}
+                            <button
+                              onClick={() => {
+                                setManualImagePreviews(prevs => prevs.filter((_, i) => i !== idx));
+                                setManualStopForm(form => ({ ...form, images: form.images.filter((_, i) => i !== idx) }));
+                              }}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        );
+                      })}
                       {manualImagePreviews.length < 5 && (
-                        <button
-                          onClick={() => {
-                            if (Capacitor.isNativePlatform()) {
-                               CapCamera.getPhoto({
-                                 quality: 80,
-                                 allowEditing: false,
-                                 resultType: CameraResultType.Uri,
-                                 source: CameraSource.Prompt,
-                                 saveToGallery: true,
-                                 width: 1200
-                               }).then(image => {
-                                 if (image.webPath) {
-                                   const preview = image.webPath;
-                                   fetch(preview).then(res => res.blob()).then(blob => uploadFile(blob, preview, true));
-                                 }
-                               });
-                            } else {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = 'image/*';
-                              input.onchange = (e: any) => {
-                                const files = e.target.files;
-                                if (files && files[0]) {
-                                  uploadFile(files[0], URL.createObjectURL(files[0]), true);
-                                }
-                              };
-                              input.click();
-                            }
-                          }}
-                          disabled={isUploading}
-                          className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500 transition-all font-black text-[10px]"
-                        >
-                          <Camera size={14} className="md:w-4 md:h-4" />
-                          <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+'}</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleTakeStoreMedia('photo')}
+                            disabled={isUploading}
+                            className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500 transition-all font-black"
+                          >
+                            <Camera size={14} className="md:w-4 md:h-4" />
+                            <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : 'Photo'}</span>
+                          </button>
+                          <button
+                            onClick={() => handleTakeStoreMedia('video')}
+                            disabled={isUploading}
+                            className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500 transition-all font-black"
+                          >
+                            <Video size={14} className="md:w-4 md:h-4" />
+                            <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : 'Vidéo'}</span>
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -1567,12 +1571,22 @@ export default function OperatorScreen() {
               className="relative max-w-4xl w-full"
               onClick={e => e.stopPropagation()}
             >
-              <img 
-                src={selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`}
-                alt="Downtime Evidence" 
-                className="w-full h-auto max-h-[90vh] object-contain rounded-2xl shadow-2xl dark:shadow-none"
-                referrerPolicy="no-referrer"
-              />
+              <div className="relative w-full overflow-hidden rounded-2xl shadow-3xl dark:shadow-none border dark:border-gray-800 bg-black/40">
+                {(() => {
+                  const src = selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`;
+                  const isVid = selectedFullImage.toLowerCase().endsWith('.mp4') || selectedFullImage.toLowerCase().endsWith('.webm') || selectedFullImage.toLowerCase().endsWith('.mov');
+                  return isVid ? (
+                    <video src={src} controls autoPlay className="w-full h-auto max-h-[90vh] object-contain" />
+                  ) : (
+                    <img 
+                      src={src}
+                      alt="Downtime Evidence" 
+                      className="w-full h-auto max-h-[85vh] object-contain mx-auto rounded-2xl"
+                      referrerPolicy="no-referrer"
+                    />
+                  );
+                })()}
+              </div>
               <button 
                 onClick={() => setSelectedFullImage(null)}
                 className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors bg-white/10 p-2 rounded-full backdrop-blur-md"
@@ -1655,21 +1669,41 @@ export default function OperatorScreen() {
                       />
                       
                       <div className="grid grid-cols-5 gap-2">
-                         {imagePreviews.map((p, idx) => (
-                           <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                             <img src={p} className="w-full h-full object-cover" />
-                             <button onClick={() => {
-                               setImagePreviews(prev => prev.filter((_, i) => i !== idx));
-                               setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
-                             }} className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5">
-                                <X size={8} />
-                             </button>
-                           </div>
-                         ))}
+                         {imagePreviews.map((p, idx) => {
+                           const isVid = selectedImagePaths[idx] ? (selectedImagePaths[idx].endsWith('.mp4') || selectedImagePaths[idx].endsWith('.webm') || selectedImagePaths[idx].endsWith('.mov')) : false;
+                           return (
+                             <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+                               {isVid ? (
+                                 <video src={p} className="w-full h-full object-cover" />
+                               ) : (
+                                 <img src={p} className="w-full h-full object-cover" />
+                               )}
+                               <button onClick={() => {
+                                 setImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                                 setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
+                               }} className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 shadow-lg active:scale-95">
+                                  <X size={8} />
+                               </button>
+                             </div>
+                           );
+                         })}
                          {imagePreviews.length < 5 && (
-                           <button onClick={handleTakeStorePhoto} className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center text-slate-400">
-                              <Camera size={16} />
-                           </button>
+                           <>
+                             <button 
+                               onClick={() => handleTakeStoreMedia('photo')} 
+                               className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-500 transition-all bg-white dark:bg-gray-900"
+                             >
+                                <Camera size={16} />
+                                <span className="text-[7px] font-black mt-1">PHOTO</span>
+                             </button>
+                             <button 
+                               onClick={() => handleTakeStoreMedia('video')} 
+                               className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-500 transition-all bg-white dark:bg-gray-900"
+                             >
+                                <Video size={16} />
+                                <span className="text-[7px] font-black mt-1">VIDÉO</span>
+                             </button>
+                           </>
                          )}
                       </div>
 
@@ -1694,6 +1728,12 @@ export default function OperatorScreen() {
           </div>
         )}
       </AnimatePresence>
+      <input 
+        type="file" 
+        ref={mediaInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
     </div>
   );
 }

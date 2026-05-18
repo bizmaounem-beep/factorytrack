@@ -12,7 +12,7 @@ import {
   ExternalLink, Plus, History, Timer, Pencil, 
   Trash2, Menu, X, ArrowLeft, Clock, Square, 
   Play, TrendingUp, AlertTriangle, CheckCircle2,
-  Box, LayoutDashboard, Info, Camera, Sun, Moon
+  Box, LayoutDashboard, Info, Camera, Video, Sun, Moon
 } from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -240,6 +240,7 @@ export default function PilotScreen() {
   const [selectedImagePaths, setSelectedImagePaths] = useState<string[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
 
@@ -543,21 +544,23 @@ export default function PilotScreen() {
     }
   };
 
-  const uploadFile = async (file: Blob | File, preview: string) => {
+  const uploadFile = async (file: Blob | File, preview: string, mimeType?: string) => {
     setIsUploading(true);
     
-    // Client-side size check (20MB)
-    if (file.size > 20 * 1024 * 1024) {
-      alert('Le fichier est trop volumineux (max 20Mo).');
+    const isVid = mimeType?.startsWith('video/') || file.type.startsWith('video/') || ('name' in file && (file as File).name?.toLowerCase().endsWith('.mp4')) || ('name' in file && (file as File).name?.toLowerCase().endsWith('.webm'));
+    const limit = isVid ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
+
+    if (file.size > limit) {
+      alert(`Le fichier est trop volumineux (max ${isVid ? '25Mo' : '10Mo'}).`);
       setIsUploading(false);
       return;
     }
 
     const formData = new FormData();
-    formData.append('photo', file, 'photo.jpg');
+    const extension = isVid ? '.mp4' : '.jpg';
+    formData.append('photo', file, `media-${Date.now()}${extension}`);
   
     try {
-      console.log('[DEBUG] Starting upload to /api/upload');
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: {
@@ -566,16 +569,12 @@ export default function PilotScreen() {
         body: formData
       });
       
-      console.log('[DEBUG] Upload response status:', res.status);
       let data;
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
         data = await res.json();
-        console.log('[DEBUG] Upload response JSON:', data);
       } else {
-        const text = await res.text();
-        console.error('[DEBUG] Server non-JSON response text:', text.substring(0, 500));
-        throw new Error(`Réponse non-JSON du serveur (${res.status}). Vérifiez les logs console.`);
+        throw new Error(`Réponse non-JSON du serveur (${res.status})`);
       }
 
       if (res.ok && (data.path || data.success)) {
@@ -600,8 +599,14 @@ export default function PilotScreen() {
     }
   };
 
+  const handleTakeStoreMedia = async (type: 'photo' | 'video') => {
+    mediaInputRef.current?.setAttribute('accept', type === 'photo' ? 'image/*' : 'video/*');
+    mediaInputRef.current?.setAttribute('capture', 'environment');
+    mediaInputRef.current?.click();
+  };
+
   const handleTakeStorePhoto = async () => {
-    fileInputRef.current?.click();
+    handleTakeStoreMedia('photo');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -609,7 +614,7 @@ export default function PilotScreen() {
     if (files && files.length > 0) {
       Array.from(files).forEach((file: File) => {
         const preview = URL.createObjectURL(file);
-        uploadFile(file, preview);
+        uploadFile(file, preview, file.type);
       });
     }
   };
@@ -1532,15 +1537,22 @@ export default function PilotScreen() {
 
                                   {down.images && (
                                     <div className="flex flex-wrap gap-1.5">
-                                      {(typeof down.images === 'string' ? JSON.parse(down.images) : down.images).map((img: string, i: number) => (
-                                        <button 
-                                          key={i} 
-                                          onClick={() => setSelectedFullImage(img)}
-                                          className="w-10 h-10 rounded-lg overflow-hidden border border-white dark:border-gray-700 shadow-sm dark:shadow-none hover:scale-110 transition-all focus:outline-none"
-                                        >
-                                          <img src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" />
-                                        </button>
-                                      ))}
+                                      {(typeof down.images === 'string' ? JSON.parse(down.images) : down.images).map((img: string, i: number) => {
+                                        const isVid = img.toLowerCase().endsWith('.mp4') || img.toLowerCase().endsWith('.webm') || img.toLowerCase().endsWith('.mov');
+                                        return (
+                                          <button 
+                                            key={i} 
+                                            onClick={() => setSelectedFullImage(img)}
+                                            className="w-10 h-10 rounded-lg overflow-hidden border border-white dark:border-gray-700 shadow-sm dark:shadow-none hover:scale-110 transition-all focus:outline-none bg-slate-100 dark:bg-gray-800"
+                                          >
+                                            {isVid ? (
+                                              <video src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" />
+                                            ) : (
+                                              <img src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" />
+                                            )}
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                   
@@ -2124,31 +2136,48 @@ export default function PilotScreen() {
 
                   {/* PHOTO SECTION */}
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">Photos (Optionnel)</label>
+                    <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">Médias (Optionnel)</label>
                     <div className="grid grid-cols-4 gap-2">
-                      {imagePreviews.map((p, idx) => (
-                        <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
-                          <img src={p} className="w-full h-full object-cover" alt="Preview" />
-                          <button 
-                            onClick={() => {
-                              setImagePreviews(prev => prev.filter((_, i) => i !== idx));
-                              setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
-                            }} 
-                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 shadow-lg active:scale-95"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      ))}
+                      {imagePreviews.map((p, idx) => {
+                        const isVid = selectedImagePaths[idx] ? (selectedImagePaths[idx].endsWith('.mp4') || selectedImagePaths[idx].endsWith('.webm') || selectedImagePaths[idx].endsWith('.mov')) : false;
+                        return (
+                          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+                            {isVid ? (
+                              <video src={p} className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={p} className="w-full h-full object-cover" alt="Preview" />
+                            )}
+                            <button 
+                              onClick={() => {
+                                setImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                                setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
+                              }} 
+                              className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 shadow-lg active:scale-95"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        );
+                      })}
                       {imagePreviews.length < 5 && (
-                        <button 
-                          onClick={handleTakeStorePhoto}
-                          disabled={isUploading}
-                          className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-all bg-gray-50 dark:bg-gray-800/50"
-                        >
-                          <Camera size={20} />
-                          <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+ Photo'}</span>
-                        </button>
+                        <>
+                          <button 
+                            onClick={() => handleTakeStoreMedia('photo')}
+                            disabled={isUploading}
+                            className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-all bg-gray-50 dark:bg-gray-800/50"
+                          >
+                            <Camera size={20} />
+                            <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+ Photo'}</span>
+                          </button>
+                          <button 
+                            onClick={() => handleTakeStoreMedia('video')}
+                            disabled={isUploading}
+                            className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-all bg-gray-50 dark:bg-gray-800/50"
+                          >
+                            <Video size={20} />
+                            <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+ Vidéo'}</span>
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -2401,15 +2430,25 @@ export default function PilotScreen() {
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="relative max-w-4xl w-full"
+              className="relative max-w-4xl w-full flex items-center justify-center p-2"
               onClick={e => e.stopPropagation()}
             >
-              <img 
-                src={selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`}
-                alt="Downtime Evidence" 
-                className="w-full h-auto max-h-[90vh] object-contain rounded-2xl shadow-2xl dark:shadow-none border dark:border-gray-800"
-                referrerPolicy="no-referrer"
-              />
+              <div className="relative w-full overflow-hidden rounded-2xl shadow-3xl dark:shadow-none border dark:border-gray-800 bg-black/40">
+                {(() => {
+                  const src = selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`;
+                  const isVid = selectedFullImage.toLowerCase().endsWith('.mp4') || selectedFullImage.toLowerCase().endsWith('.webm') || selectedFullImage.toLowerCase().endsWith('.mov');
+                  return isVid ? (
+                    <video src={src} controls autoPlay className="w-full h-auto max-h-[90vh] object-contain" />
+                  ) : (
+                    <img 
+                      src={src}
+                      alt="Downtime Evidence" 
+                      className="w-full h-auto max-h-[85vh] object-contain mx-auto"
+                      referrerPolicy="no-referrer"
+                    />
+                  );
+                })()}
+              </div>
               <button 
                 onClick={() => setSelectedFullImage(null)}
                 className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors bg-white/10 p-2 rounded-full backdrop-blur-md focus:outline-none"
@@ -2435,6 +2474,12 @@ export default function PilotScreen() {
           </button>
         ))}
       </nav>
+      <input 
+        type="file" 
+        ref={mediaInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
     </div>
   );
 }

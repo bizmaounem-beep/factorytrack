@@ -43,13 +43,17 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // Increase to 20MB
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit to accommodate short videos
   fileFilter: (req, file, cb) => {
     console.log(`Receiving file: ${file.originalname} (${file.mimetype})`);
-    if (file.mimetype.startsWith('image/')) {
+    const allowedMimeTypes = [
+      'image/jpeg', 'image/png', 'image/webp',
+      'video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'
+    ];
+    if (allowedMimeTypes.includes(file.mimetype) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       cb(null, true);
     } else {
-      cb(new Error('Uniquement des images sont autorisées.'));
+      cb(new Error('Format de fichier non supporté. Uniquement images et vidéos.'));
     }
   }
 });
