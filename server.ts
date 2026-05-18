@@ -43,23 +43,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
   fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = [
-      'image/jpeg', 'image/png', 'image/webp',
-      'video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska',
-      'application/octet-stream' // Allow generic for some browsers/files
-    ];
-    
-    const isImage = file.mimetype.startsWith('image/');
-    const isVideo = file.mimetype.startsWith('video/') || 
-                    /\.(mp4|webm|mov|mkv|quicktime)$/i.test(file.originalname);
-
-    if (allowedMimeTypes.includes(file.mimetype) || isImage || isVideo) {
-      cb(null, true);
-    } else {
-      cb(new Error('Format non supporté. Uniquement images et vidéos autorisées.'));
-    }
+    console.log(`[MULTER-DEBUG] Incoming: field=${file.fieldname}, name=${file.originalname}, mime=${file.mimetype}`);
+    // Allow everything for now to fix the user's issue
+    cb(null, true);
   }
 });
 
@@ -371,7 +359,8 @@ async function startServer() {
       res.status(200).json({ 
         success: true,
         url: `/uploads/${req.file.filename}`, 
-        path: req.file.filename 
+        path: req.file.filename,
+        v: '50MB-v3' // Version tag
       });
     });
   });

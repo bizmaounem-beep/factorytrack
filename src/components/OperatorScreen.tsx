@@ -362,26 +362,35 @@ export default function OperatorScreen() {
   const uploadFile = async (file: Blob | File, preview: string, isManual: boolean = false, mimeType?: string) => {
     setIsUploading(true);
     
-    // Limits: 20MB (server limit)
-    const isVideo = mimeType?.startsWith('video/') || file.type.startsWith('video/');
-    const limit = 20 * 1024 * 1024;
+    const isVideo = mimeType?.startsWith('video/') || file.type.startsWith('video/') || ('name' in file && (file as File).name?.toLowerCase().endsWith('.mp4'));
+    const limit = 50 * 1024 * 1024; // Increased to 50MB
 
     if (file.size > limit) {
-      alert(`Le fichier est trop volumineux (max 20Mo).`);
+      alert(`Le fichier est trop volumineux (max 50Mo).`);
       setIsUploading(false);
       return;
     }
 
     const formData = new FormData();
-    const getExt = (m: string) => {
+    const getExt = (m: string, f?: Blob | File) => {
+      // 1. Try to get extension from original filename if it's a File
+      if (f && 'name' in f) {
+        const name = (f as File).name;
+        if (name && name.includes('.')) {
+          return name.substring(name.lastIndexOf('.')).toLowerCase();
+        }
+      }
+      // 2. Fallback to mime type detection
       if (m.includes('video/mp4')) return '.mp4';
       if (m.includes('video/quicktime')) return '.mov';
       if (m.includes('video/webm')) return '.webm';
+      if (m.includes('video/x-matroska')) return '.mkv';
       if (m.includes('image/png')) return '.png';
       if (m.includes('image/webp')) return '.webp';
+      if (m.includes('video/')) return '.mp4'; // Default video ext
       return '.jpg';
     };
-    const extension = getExt(mimeType || file.type);
+    const extension = getExt(mimeType || file.type, file);
     formData.append('photo', file, `media-${Date.now()}${extension}`);
   
     try {

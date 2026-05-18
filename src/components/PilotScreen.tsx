@@ -548,25 +548,32 @@ export default function PilotScreen() {
     setIsUploading(true);
     
     const isVid = mimeType?.startsWith('video/') || file.type.startsWith('video/') || ('name' in file && (file as File).name?.toLowerCase().endsWith('.mp4')) || ('name' in file && (file as File).name?.toLowerCase().endsWith('.webm'));
-    const limit = 20 * 1024 * 1024;
+    const limit = 50 * 1024 * 1024; // 50MB
 
     if (file.size > limit) {
-      alert(`Le fichier est trop volumineux (max 20Mo).`);
+      alert(`Le fichier est trop volumineux (max 50Mo).`);
       setIsUploading(false);
       return;
     }
 
     const formData = new FormData();
-    // Use a more accurate extension detection
-    const getExt = (m: string) => {
+    const getExt = (m: string, f?: Blob | File) => {
+      if (f && 'name' in f) {
+        const name = (f as File).name;
+        if (name && name.includes('.')) {
+          return name.substring(name.lastIndexOf('.')).toLowerCase();
+        }
+      }
       if (m.includes('video/mp4')) return '.mp4';
       if (m.includes('video/quicktime')) return '.mov';
       if (m.includes('video/webm')) return '.webm';
+      if (m.includes('video/x-matroska')) return '.mkv';
       if (m.includes('image/png')) return '.png';
       if (m.includes('image/webp')) return '.webp';
+      if (m.includes('video/')) return '.mp4';
       return '.jpg';
     };
-    const extension = getExt(mimeType || file.type);
+    const extension = getExt(mimeType || file.type, file);
     formData.append('photo', file, `media-${Date.now()}${extension}`);
   
     try {
