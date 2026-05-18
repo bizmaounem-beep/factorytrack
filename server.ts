@@ -16,6 +16,14 @@ import { networkInterfaces } from 'os';
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+const DB_DIR = process.env.DB_DIR || path.join(process.cwd(), 'data');
+const DB_PATH = path.join(DB_DIR, 'factory.db');
+const DB_BACKUP_PATH = path.join(DB_DIR, 'factory_backup.db');
+
+// Ensure database directory exists
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+}
 
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -55,17 +63,19 @@ let db: Database.Database;
 let io: Server;
 
 async function startServer() {
+  console.log(`[DB] Database location: ${DB_PATH}`);
+  
   // Ensure the database file is writable before opening
   try {
-    if (fs.existsSync('data.db')) {
+    if (fs.existsSync(DB_PATH)) {
       try {
-        fs.chmodSync('data.db', 0o666);
+        fs.chmodSync(DB_PATH, 0o666);
       } catch (e) {
-        console.warn('Could not chmod data.db:', e);
+        console.warn('Could not chmod DB_PATH:', e);
       }
     }
     
-    db = new Database('data.db', { 
+    db = new Database(DB_PATH, { 
       verbose: (message) => {
         // Obfuscate sensitive values in logs
         console.log(message);
@@ -75,9 +85,10 @@ async function startServer() {
     // Automatic Daily Backup Function
     const performBackup = () => {
       try {
-        const backupPath = 'data_backup.db';
-        fs.copyFileSync('data.db', backupPath);
-        console.log(`[AgroSync] Sauvegarde automatique effectuée : ${backupPath} (${new Date().toLocaleString()})`);
+        if (fs.existsSync(DB_PATH)) {
+          fs.copyFileSync(DB_PATH, DB_BACKUP_PATH);
+          console.log(`[AgroSync] Sauvegarde automatique effectuée : ${DB_BACKUP_PATH} (${new Date().toLocaleString()})`);
+        }
       } catch (err) {
         console.error('[AgroSync] Échec de la sauvegarde:', err);
       }
@@ -87,6 +98,29 @@ async function startServer() {
     setInterval(performBackup, 24 * 60 * 60 * 1000);
     // Also run once at startup
     performBackup();
+
+    function exportBackupJSON() {
+      try {
+        const backup: Record<string, any[]> = {};
+        const tables = ['users','machines','lines','programmes','shifts',
+                        'downtime_types','production_logs','downtime_logs'];
+        for (const table of tables) {
+          backup[table] = db.prepare(`SELECT * FROM ${table}`).all();
+        }
+        // Remove pin hashes from the backup for security
+        if (backup.users) backup.users = backup.users.map(({ pin, ...u }) => u);
+        
+        const backupFile = path.join(DB_DIR, 'factory_data_export.json');
+        fs.writeFileSync(backupFile, JSON.stringify(backup, null, 2));
+        console.log(`[DB] JSON backup saved to ${backupFile}`);
+      } catch (e) {
+        console.error('[DB] Backup failed:', e);
+      }
+    }
+
+    // Export immediately on start, then every 30 minutes
+    exportBackupJSON();
+    setInterval(exportBackupJSON, 30 * 60 * 1000);
 
     db.pragma('journal_mode = WAL'); // Use WAL mode for better concurrency and write stability
     
@@ -347,6 +381,27 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString(), server: 'Express/Vite' });
   });
 
+  // Manual Backup Download (Authenticated)
+  apiRouter.get('/backup/download', (req, res) => {
+    try {
+      const tables = ['users','machines','lines','programmes','shifts',
+                      'downtime_types','production_logs','downtime_logs'];
+      const backup: Record<string, any[]> = {};
+      for (const table of tables) {
+        backup[table] = db.prepare(`SELECT * FROM ${table}`).all();
+      }
+      if (backup.users) backup.users = backup.users.map(({ pin, ...u }) => u);
+      
+      const filename = `factorycloud_backup_${new Date().toISOString().slice(0,10)}.json`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/json');
+      res.json(backup);
+    } catch (e) {
+      console.error('[DB] Manual backup failed:', e);
+      res.status(500).json({ error: 'Manual backup failed' });
+    }
+  });
+
   // Test route (Public)
   apiRouter.get('/test-json', (req, res) => {
     res.json({ success: true, message: 'JSON API reaches here' });
@@ -358,7 +413,11 @@ async function startServer() {
 
   // JWT Auth Middleware
   function requireAuth(req: any, res: any, next: any) {
-    const authHeader = req.headers.authorization;
+    let authHeader = req.headers.authorization;
+    if (!authHeader && req.query.token) {
+      authHeader = `Bearer ${req.query.token}`;
+    }
+    
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Non autorisé' });
     }

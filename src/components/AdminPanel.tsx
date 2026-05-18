@@ -1698,7 +1698,7 @@ export default function AdminPanel() {
                     </button>
                  </div>
 
-                 <div className="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-4 relative overflow-hidden group">
+                  <div className="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-4 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 text-orange-50/50 dark:text-orange-900/10 group-hover:text-orange-100/50 dark:group-hover:text-orange-900/20 transition-colors rotate-12">
                        <Timer size={80} />
                     </div>
@@ -1716,7 +1716,28 @@ export default function AdminPanel() {
                       <Download size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" />
                       {t('export')}
                     </button>
-                 </div>
+                  </div>
+
+                  {/* BACKUP SECTION */}
+                  <div className="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800 flex flex-col gap-4 relative overflow-hidden group">
+                    <div className="w-10 h-10 bg-green-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-green-100 dark:shadow-none relative z-10">
+                       <Download size={20} strokeWidth={2.5} />
+                    </div>
+                    <div className="relative z-10">
+                      <h3 className="text-base font-black text-gray-900 dark:text-white tracking-tight mb-1">Sauvegarde Système</h3>
+                      <p className="text-gray-500 dark:text-gray-400 text-[10px] md:text-xs font-medium leading-tight italic">Export JSON complet de toutes les tables de données.</p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const token = localStorage.getItem('token');
+                        window.open(`/api/backup/download?token=${token}`, '_blank');
+                      }}
+                      className="w-full py-1.5 md:py-2.5 bg-green-600 text-white rounded-lg font-black shadow-lg shadow-green-50 dark:shadow-none active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"
+                    >
+                      <Download size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" />
+                      Télécharger JSON
+                    </button>
+                  </div>
               </div>
             </div>
           )}
