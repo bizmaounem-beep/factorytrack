@@ -354,12 +354,12 @@ export default function OperatorScreen() {
   const uploadFile = async (file: Blob | File, preview: string, isManual: boolean = false, mimeType?: string) => {
     setIsUploading(true);
     
-    // Limits: photo ~ 10MB, video ~ 25MB (server limits)
-    const isVideo = mimeType?.startsWith('video/');
-    const limit = isVideo ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
+    // Limits: 20MB (server limit)
+    const isVideo = mimeType?.startsWith('video/') || file.type.startsWith('video/');
+    const limit = 20 * 1024 * 1024;
 
     if (file.size > limit) {
-      alert(`Le fichier est trop volumineux (max ${isVideo ? '25Mo' : '10Mo'}).`);
+      alert(`Le fichier est trop volumineux (max 20Mo).`);
       setIsUploading(false);
       return;
     }

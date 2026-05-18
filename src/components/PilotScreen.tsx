@@ -548,10 +548,10 @@ export default function PilotScreen() {
     setIsUploading(true);
     
     const isVid = mimeType?.startsWith('video/') || file.type.startsWith('video/') || ('name' in file && (file as File).name?.toLowerCase().endsWith('.mp4')) || ('name' in file && (file as File).name?.toLowerCase().endsWith('.webm'));
-    const limit = isVid ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
+    const limit = 20 * 1024 * 1024;
 
     if (file.size > limit) {
-      alert(`Le fichier est trop volumineux (max ${isVid ? '25Mo' : '10Mo'}).`);
+      alert(`Le fichier est trop volumineux (max 20Mo).`);
       setIsUploading(false);
       return;
     }
