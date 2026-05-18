@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('factory_user');
+    localStorage.removeItem('factory_token');
   };
 
   return (

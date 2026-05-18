@@ -8,11 +8,13 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import helmet from 'helmet';
+import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import { networkInterfaces } from 'os';
 
 const SALT_ROUNDS = 10;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
 // Ensure uploads directory exists
@@ -340,15 +342,62 @@ async function startServer() {
     next();
   });
 
-  // Health check
+  // Health check (Public)
   apiRouter.get('/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString(), server: 'Express/Vite' });
   });
 
-  // Test route
+  // Test route (Public)
   apiRouter.get('/test-json', (req, res) => {
     res.json({ success: true, message: 'JSON API reaches here' });
   });
+
+  // JWT Auth Middleware
+  function requireAuth(req: any, res: any, next: any) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Non autorisé' });
+    }
+    try {
+      const payload = jwt.verify(authHeader.slice(7), JWT_SECRET);
+      req.user = payload;
+      next();
+    } catch (e) {
+      res.status(401).json({ error: 'Token invalide ou expiré' });
+    }
+  }
+
+  // Login Rate Limiting
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 5,
+    message: { error: 'Trop de tentatives. Veuillez attendre 15 minutes avant de réessayer.' },
+    skipSuccessfulRequests: true,
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { xForwardedForHeader: false } as any,
+  });
+
+  // Login Public Route
+  apiRouter.post('/login', loginLimiter, async (req, res) => {
+    try {
+      const { name, pin } = req.body;
+      if (!name || !pin) return res.status(400).json({ error: 'Utilisateur et PIN requis' });
+      const user = db.prepare('SELECT * FROM users WHERE name = ?').get(sanitizeValue(name)) as any;
+      if (user) {
+        const isValid = await bcrypt.compare(String(pin), user.pin);
+        if (isValid) {
+          const { pin: _hash, ...safeUser } = user;
+          const token = jwt.sign({ id: safeUser.id, role: safeUser.role }, JWT_SECRET, { expiresIn: '12h' });
+          return res.json({ ...safeUser, token });
+        }
+      }
+      res.status(401).json({ error: 'Identifiants invalides' });
+    } catch (e) { res.status(500).json({ error: 'Erreur interne' }); }
+  });
+
+  // Apply Auth Middleware to all subsequent routes
+  apiRouter.use(requireAuth);
 
   // --- SCADA GLOBAL ENDPOINTS ---
   apiRouter.post('/machine/:id/global-stop', async (req, res) => {
@@ -548,33 +597,6 @@ async function startServer() {
       io.emit('db_change', { collection });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
-  });
-
-  // Login Rate Limiting
-  const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 5,
-    message: { error: 'Trop de tentatives. Veuillez attendre 15 minutes avant de réessayer.' },
-    skipSuccessfulRequests: true,
-    standardHeaders: true,
-    legacyHeaders: false,
-    validate: { xForwardedForHeader: false },
-  });
-
-  apiRouter.post('/login', loginLimiter, async (req, res) => {
-    try {
-      const { name, pin } = req.body;
-      if (!name || !pin) return res.status(400).json({ error: 'Utilisateur et PIN requis' });
-      const user = db.prepare('SELECT * FROM users WHERE name = ?').get(sanitizeValue(name)) as any;
-      if (user) {
-        const isValid = await bcrypt.compare(String(pin), user.pin);
-        if (isValid) {
-          const { pin: _hash, ...safeUser } = user;
-          return res.json(safeUser);
-        }
-      }
-      res.status(401).json({ error: 'Identifiants invalides' });
-    } catch (e) { res.status(500).json({ error: 'Erreur interne' }); }
   });
 
   // Catch-all for API Router (JSON)

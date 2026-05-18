@@ -715,21 +715,21 @@ export default function PilotScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-20">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-950 pb-20">
       {/* MOBILE HEADER */}
-      <header className="sm:hidden bg-white border-b border-gray-100 px-2 py-0.5 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+      <header className="sm:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-2 py-0.5 flex justify-between items-center sticky top-0 z-40 shadow-sm dark:shadow-none">
         <div className="flex items-center gap-1">
           {selectedMachineId ? (
             <button 
               onClick={() => handleMachineSelect('')}
-              className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors mr-0.5"
+              className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors mr-0.5"
             >
               <ArrowLeft size={14} />
             </button>
           ) : (
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               {isMobileMenuOpen ? <X size={14} /> : <Menu size={14} />}
             </button>
@@ -737,7 +737,7 @@ export default function PilotScreen() {
               <div className="flex items-center gap-1">
                 <button 
                   onClick={() => setShowFeatureInfo(true)}
-                  className="p-1.5 text-gray-400 hover:bg-blue-600 hover:text-white rounded-lg transition-colors mr-1"
+                  className="p-1.5 text-gray-400 dark:text-gray-500 hover:bg-blue-600 hover:text-white rounded-lg transition-colors mr-1"
                   title="Description des fonctionnalités intelligentes"
                 >
                   <Info size={14} />
@@ -745,20 +745,36 @@ export default function PilotScreen() {
                 <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
                   A
                 </div>
-            <h1 className="font-black text-xs tracking-tighter text-gray-900 leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
+            <h1 className="font-black text-xs tracking-tighter text-gray-900 dark:text-white leading-none">PILOT<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={toggleTheme}
-            className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            className={cn(
+              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
+              theme === 'dark'
+                ? "bg-slate-800 border-slate-700 text-yellow-400"
+                : "bg-gray-100 border-gray-200 text-gray-500"
+            )}
             title="Changer le thème"
+            aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
           >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            <Sun size={13} className={theme === 'dark' ? "opacity-100" : "opacity-30"} />
+            <div className={cn(
+              "w-7 h-4 rounded-full transition-colors duration-300 relative flex-shrink-0",
+              theme === 'dark' ? "bg-blue-600" : "bg-gray-300"
+            )}>
+              <div className={cn(
+                "absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all duration-300",
+                theme === 'dark' ? "left-3.5" : "left-0.5"
+              )} />
+            </div>
+            <Moon size={13} className={theme === 'dark' ? "opacity-30" : "opacity-100"} />
           </button>
           <button 
             onClick={handleLogout}
-            className="p-1 px-1.5 border border-red-50 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[7px] uppercase"
+            className="p-1 px-1.5 border border-red-50 dark:border-red-900/20 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-lg transition-colors font-black text-[7px] uppercase"
           >
             {t('logout')}
           </button>
@@ -784,13 +800,13 @@ export default function PilotScreen() {
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="fixed inset-y-0 left-0 w-[260px] bg-white z-[70] p-4 flex flex-col gap-6 shadow-2xl sm:hidden"
+              className="fixed inset-y-0 left-0 w-[260px] bg-white dark:bg-gray-900 z-[70] p-4 flex flex-col gap-6 shadow-2xl dark:shadow-none sm:hidden"
             >
               <div className="flex items-center gap-2 px-1">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-200">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-200 dark:shadow-none">
                   A
                 </div>
-                <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none capitalize italic">PILOT<span className="text-blue-600">CLOUD</span></h1>
+                <h1 className="font-black text-lg tracking-tighter text-gray-900 dark:text-white leading-none capitalize italic">PILOT<span className="text-blue-600">CLOUD</span></h1>
               </div>
               
               <nav className="flex flex-col gap-1.5 flex-1">
@@ -798,7 +814,7 @@ export default function PilotScreen() {
                   onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
                   className={cn(
                     "flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                    activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"
+                    activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-md dark:shadow-none" : "text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
                   )}
                 >
                   <LayoutDashboard size={16} />
@@ -808,7 +824,7 @@ export default function PilotScreen() {
                   onClick={() => { setActiveTab('monitor'); setIsMobileMenuOpen(false); }}
                   className={cn(
                     "flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                    activeTab === 'monitor' ? "bg-blue-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"
+                    activeTab === 'monitor' ? "bg-blue-600 text-white shadow-md dark:shadow-none" : "text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
                   )}
                 >
                   <Monitor size={16} />
@@ -818,17 +834,17 @@ export default function PilotScreen() {
                   onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
                   className={cn(
                     "flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                    activeTab === 'history' ? "bg-blue-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"
+                    activeTab === 'history' ? "bg-blue-600 text-white shadow-md dark:shadow-none" : "text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
                   )}
                 >
                   <History size={16} />
                   Historique
                 </button>
 
-                <div className="mt-auto pt-4 border-t border-gray-100">
+                <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-800">
                   <button 
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 w-full transition-colors"
                   >
                     <Trash2 size={16} />
                     QUITTER
@@ -840,24 +856,41 @@ export default function PilotScreen() {
         )}
       </AnimatePresence>
 
-      <div className="bg-white p-4 shadow-sm flex flex-col gap-4 sticky top-0 sm:top-0 z-20 border-b border-gray-200 hidden sm:block">
+      <div className="bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-none flex flex-col gap-4 sticky top-0 sm:top-0 z-20 border-b border-gray-200 dark:border-gray-800 hidden sm:block">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
-            <Monitor className="text-blue-600" size={24} />
-            <h1 className="font-black text-xl tracking-tighter uppercase italic">Pilot Monitor</h1>
+            <Monitor className="text-blue-600 dark:text-blue-400" size={24} />
+            <h1 className="font-black text-xl tracking-tighter uppercase italic text-gray-900 dark:text-white">Pilot Monitor</h1>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button 
+            <button
               onClick={toggleTheme}
-              className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors hidden sm:block"
+              className={cn(
+                "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest hidden sm:flex",
+                theme === 'dark'
+                  ? "bg-slate-800 border-slate-700 text-yellow-400"
+                  : "bg-gray-100 border-gray-200 text-gray-500"
+              )}
+              title="Changer le thème"
+              aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
             >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              <Sun size={13} className={theme === 'dark' ? "opacity-100" : "opacity-30"} />
+              <div className={cn(
+                "w-7 h-4 rounded-full transition-colors duration-300 relative flex-shrink-0",
+                theme === 'dark' ? "bg-blue-600" : "bg-gray-300"
+              )}>
+                <div className={cn(
+                  "absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all duration-300",
+                  theme === 'dark' ? "left-3.5" : "left-0.5"
+                )} />
+              </div>
+              <Moon size={13} className={theme === 'dark' ? "opacity-30" : "opacity-100"} />
             </button>
             <button 
               onClick={() => setActiveTab('dashboard')}
               className={cn(
                 "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               )}
             >
               <LayoutDashboard size={14} />
@@ -867,7 +900,7 @@ export default function PilotScreen() {
               onClick={() => setActiveTab('monitor')}
               className={cn(
                 "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                activeTab === 'monitor' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                activeTab === 'monitor' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               )}
             >
               <Monitor size={14} />
@@ -877,7 +910,7 @@ export default function PilotScreen() {
               onClick={() => setActiveTab('history')}
               className={cn(
                 "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                activeTab === 'history' ? "bg-blue-600 text-white shadow-lg" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                activeTab === 'history' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               )}
             >
               <History size={14} />
@@ -885,7 +918,7 @@ export default function PilotScreen() {
             </button>
             <button 
               onClick={handleLogout} 
-              className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 hover:bg-red-500 hover:text-white shrink-0"
+              className="p-1 px-1.5 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 dark:border-red-900/20 hover:bg-red-500 dark:hover:bg-red-600 hover:text-white shrink-0"
             >
               {t('logout')}
             </button>
@@ -893,24 +926,24 @@ export default function PilotScreen() {
         </div>
         
         {activeTab === 'monitor' && selectedMachineId && (
-          <div className="flex flex-col gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-gray-100 mb-4 shadow-xl shadow-slate-200/50">
+          <div className="flex flex-col gap-4 bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 mb-4 shadow-xl dark:shadow-none">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
               <div className="flex items-center gap-5">
-                <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-200 border-4 border-white">
+                <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl dark:shadow-none border-4 border-white dark:border-gray-800">
                   <LayoutGrid size={32} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[8px] font-black uppercase tracking-widest rounded-full border border-blue-100">SCADA LIVE V4.0</span>
+                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-widest rounded-full border border-blue-100 dark:border-blue-900/50">SCADA LIVE V4.0</span>
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   </div>
                   <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none uppercase italic">
+                    <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-none uppercase italic">
                       {machines.find(m => m.id === selectedMachineId)?.name}
                     </h2>
                     <button 
                       onClick={() => handleMachineSelect('')}
-                      className="text-[10px] font-black text-blue-600 uppercase hover:underline leading-none mt-1"
+                      className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase hover:underline leading-none mt-1 focus:outline-none"
                     >
                       ({t('change')})
                     </button>
@@ -919,25 +952,25 @@ export default function PilotScreen() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
-                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Efficience</p>
-                    <p className="text-lg font-black text-blue-600 leading-none tabular-nums">{analytics.availability.toFixed(1)}%</p>
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Efficience</p>
+                    <p className="text-lg font-black text-blue-600 dark:text-blue-400 leading-none tabular-nums">{analytics.availability.toFixed(1)}%</p>
                  </div>
-                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Lignes Actives</p>
-                    <p className="text-lg font-black text-gray-800 leading-none tabular-nums">
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Lignes Actives</p>
+                    <p className="text-lg font-black text-gray-800 dark:text-gray-200 leading-none tabular-nums">
                       {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length}
                     </p>
                  </div>
-                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">En Arrêt</p>
-                    <p className="text-lg font-black text-rose-600 leading-none tabular-nums">
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">En Arrêt</p>
+                    <p className="text-lg font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
                       {lines.filter(l => l.machineId === selectedMachineId && l.status === 'STOPPED' && l.isActive !== false).length}
                     </p>
                  </div>
-                 <div className="bg-gray-50/50 p-2 px-3 rounded-2xl border border-gray-100">
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Prod Total</p>
-                    <p className="text-lg font-black text-emerald-600 leading-none tabular-nums">{analytics.totalPallets}</p>
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Prod Total</p>
+                    <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{analytics.totalPallets}</p>
                  </div>
               </div>
 
@@ -945,7 +978,7 @@ export default function PilotScreen() {
                 {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
                   <button 
                     onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 dark:shadow-none hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
                   >
                     <Play size={20} fill="currentColor" />
                     REDÉMARRAGE MACHINE
@@ -953,7 +986,7 @@ export default function PilotScreen() {
                 ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).some(l => l.status === 'RUNNING') ? (
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 dark:shadow-none hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in focus:outline-none"
                   >
                     <Activity size={20} className="animate-pulse" />
                     ARRÊT D'URGENCE GLOBAL
@@ -961,7 +994,7 @@ export default function PilotScreen() {
                 ) : (
                   <button 
                     onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 dark:shadow-none hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
                   >
                     <Play size={20} fill="currentColor" />
                     REPRISE DE LA MACHINE
@@ -972,20 +1005,20 @@ export default function PilotScreen() {
 
             {/* LIVE ALERTS SECTION */}
             {criticalAlerts.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-3">
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-3">
                 {criticalAlerts.map(alert => (
                   <motion.div 
                     key={alert.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-2xl border flex-1 min-w-[280px] shadow-sm",
-                      alert.type === 'danger' ? "bg-rose-50 border-rose-100 text-rose-800" :
-                      alert.type === 'warning' ? "bg-orange-50 border-orange-100 text-orange-800" : "bg-blue-50 border-blue-100 text-blue-800"
+                      "flex items-center gap-3 p-3 rounded-2xl border flex-1 min-w-[280px] shadow-sm dark:shadow-none",
+                      alert.type === 'danger' ? "bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/20 text-rose-800 dark:text-rose-200" :
+                      alert.type === 'warning' ? "bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-900/20 text-orange-800 dark:text-orange-200" : "bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/20 text-blue-800 dark:text-blue-200"
                     )}
                   >
                     <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm",
+                      "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm dark:shadow-none",
                       alert.type === 'danger' ? "bg-rose-600 text-white" :
                       alert.type === 'warning' ? "bg-orange-500 text-white" : "bg-blue-600 text-white"
                     )}>
@@ -1006,7 +1039,7 @@ export default function PilotScreen() {
           <select 
             value={selectedMachineId}
             onChange={e => handleMachineSelect(e.target.value)}
-            className="w-full p-4 bg-gray-50/50 rounded-2xl font-bold border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner text-gray-700 appearance-none cursor-pointer"
+            className="w-full p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl font-bold border border-gray-100 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner dark:shadow-none text-gray-700 dark:text-gray-300 appearance-none cursor-pointer"
           >
             <option value="">{t('machine_select')}...</option>
             {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -1016,13 +1049,13 @@ export default function PilotScreen() {
 
       {/* Mobile-only machine selector when in monitor tab */}
       {activeTab === 'monitor' && (
-        <div className="px-2 py-1 sm:hidden bg-white border-b border-gray-100 space-y-1 shadow-sm">
+        <div className="px-2 py-1 sm:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 space-y-1 shadow-sm dark:shadow-none">
            {selectedMachineId && (
              <div className="flex gap-1">
                 {lines.filter(l => l.machineId === selectedMachineId).some(l => l.status === 'RUNNING') ? (
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-red-600 text-white rounded-lg font-black text-[8px] uppercase tracking-tight shadow-md shadow-red-50 active:scale-95 transition-all"
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-red-600 text-white rounded-lg font-black text-[8px] uppercase tracking-tight shadow-md dark:shadow-none shadow-red-50 active:scale-95 transition-all focus:outline-none"
                   >
                     <Activity size={10} className="animate-pulse" />
                     ARRÊT
@@ -1030,7 +1063,7 @@ export default function PilotScreen() {
                 ) : lines.filter(l => l.machineId === selectedMachineId).some(l => l.activeDowntimeId) ? (
                   <button 
                     onClick={handleResumeMachine}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-green-600 text-white rounded-lg font-black text-[8px] uppercase tracking-tight shadow-md shadow-green-50 active:scale-95 transition-all"
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-green-600 text-white rounded-lg font-black text-[8px] uppercase tracking-tight shadow-md dark:shadow-none shadow-green-50 active:scale-95 transition-all focus:outline-none"
                   >
                     <Activity size={10} />
                     RELANCER
@@ -1038,7 +1071,7 @@ export default function PilotScreen() {
                 ) : null}
                 <button 
                   onClick={() => handleMachineSelect('')}
-                  className="px-1.5 py-1 bg-gray-50 text-gray-400 border border-gray-100 rounded-lg font-black text-[7px] uppercase tracking-widest shrink-0"
+                  className="px-1.5 py-1 bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border border-gray-100 dark:border-gray-700 rounded-lg font-black text-[7px] uppercase tracking-widest shrink-0 focus:outline-none"
                 >
                   CHANGE
                 </button>
@@ -1064,18 +1097,18 @@ export default function PilotScreen() {
               <div className="flex items-center gap-2 mb-1">
                 <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">{currentShift?.name || 'Shift Actif'}</span>
                 {selectedMachineId && (
-                  <span className="bg-gray-100 text-gray-400 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">{machines.find(m => m.id === selectedMachineId)?.name}</span>
+                  <span className="bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">{machines.find(m => m.id === selectedMachineId)?.name}</span>
                 )}
               </div>
-              <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 leading-none">
-                {t('dashboard')} <span className="text-blue-600 uppercase text-[10px] md:text-xs tracking-widest ml-1">Pilot Intelligence</span>
+              <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">
+                {t('dashboard')} <span className="text-blue-600 dark:text-blue-400 uppercase text-[10px] md:text-xs tracking-widest ml-1">Pilot Intelligence</span>
               </h2>
-              <p className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase mt-1 italic">Stats de l'équipe • Direct {currentShift?.name}</p>
+              <p className="text-[8px] md:text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mt-1 italic">Stats de l'équipe • Direct {currentShift?.name}</p>
             </div>
             <div className="text-right flex flex-col items-end">
-              <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-full border border-blue-100 mb-1">
+              <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-full border border-blue-100 dark:border-blue-900/50 mb-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                <p className="text-[8px] md:text-[10px] font-black text-blue-700 uppercase tracking-tight">Analyse Active</p>
+                <p className="text-[8px] md:text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-tight">Analyse Active</p>
               </div>
             </div>
           </div>
@@ -1096,7 +1129,7 @@ export default function PilotScreen() {
                <motion.div 
                 variants={item}
                 key={stat.label} 
-                className="card p-2 md:p-4 flex flex-col gap-2 md:gap-3 hover:shadow-xl transition-all group relative overflow-hidden bg-white"
+                className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-2 md:p-4 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden shadow-sm dark:shadow-none"
                >
                  <div className={cn(
                    "absolute -right-2 -top-2 w-16 h-16 opacity-5 transition-transform group-hover:scale-150 rotate-12",
@@ -1117,17 +1150,17 @@ export default function PilotScreen() {
                    </div>
                    <span className={cn(
                      "text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded italic",
-                     stat.color === 'blue' ? "bg-blue-50 text-blue-600" :
-                     stat.color === 'green' ? "bg-green-50 text-green-600" :
-                     stat.color === 'orange' ? "bg-orange-50 text-orange-600" : "bg-red-50 text-red-600"
+                     stat.color === 'blue' ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" :
+                     stat.color === 'green' ? "bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400" :
+                     stat.color === 'orange' ? "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400" : "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
                    )}>
                      {stat.trend}
                    </span>
                  </div>
                  <div>
-                   <p className="text-[7px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
-                   <p className="text-sm md:text-2xl font-black text-slate-900 leading-none mt-1 tabular-nums">{stat.val}</p>
-                   <p className="text-[7px] md:text-[9px] font-bold text-slate-400 mt-1">{stat.sub}</p>
+                   <p className="text-[7px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
+                   <p className="text-sm md:text-2xl font-black text-slate-900 dark:text-white leading-none mt-1 tabular-nums">{stat.val}</p>
+                   <p className="text-[7px] md:text-[9px] font-bold text-slate-400 dark:text-gray-500 mt-1">{stat.sub}</p>
                  </div>
                </motion.div>
              ))}
@@ -1137,27 +1170,27 @@ export default function PilotScreen() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             
             {/* FREQUENT STOPS */}
-            <motion.div variants={item} className="card p-4 bg-white flex flex-col">
+            <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 flex flex-col shadow-sm dark:shadow-none">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
                   <AlertTriangle size={16} className="text-orange-500" /> Arrêts Fréquents (Shift)
                 </h3>
-                <span className="text-[8px] font-bold text-gray-400 uppercase">Top 5 récurrents</span>
+                <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">Top 5 récurrents</span>
               </div>
               
               <div className="space-y-2 flex-1">
                 {analytics.frequentStops.length > 0 ? (
                   analytics.frequentStops.map((stop, idx) => (
-                    <div key={stop.typeId} className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100 group hover:border-orange-200 transition-all">
-                      <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-lg shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
+                    <div key={stop.typeId} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 group hover:border-orange-200 dark:hover:border-orange-900/50 transition-all">
+                      <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-800 flex items-center justify-center text-lg shadow-sm dark:shadow-none border border-gray-100 dark:border-gray-700 group-hover:scale-110 transition-transform">
                         {stop.icon}
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-center mb-1">
-                           <span className="text-[10px] font-black text-gray-800 uppercase tracking-tight">{stop.typeName}</span>
-                           <span className="text-[10px] font-black text-orange-600 italic">{stop.count} fois</span>
+                           <span className="text-[10px] font-black text-gray-800 dark:text-gray-200 uppercase tracking-tight">{stop.typeName}</span>
+                           <span className="text-[10px] font-black text-orange-600 dark:text-orange-400 italic">{stop.count} fois</span>
                         </div>
-                        <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                            <div 
                              className="h-full bg-orange-500 rounded-full" 
                              style={{ width: `${(stop.count / (analytics.frequentStops[0]?.count || 1)) * 100}%` }} 
@@ -1167,41 +1200,41 @@ export default function PilotScreen() {
                     </div>
                   ))
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center py-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                    <CheckCircle2 size={24} className="text-green-300 mb-2" />
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Aucun arrêt enregistré sur ce shift</p>
+                  <div className="h-full flex flex-col items-center justify-center py-8 text-center bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                    <CheckCircle2 size={24} className="text-green-300 dark:text-green-900/50 mb-2" />
+                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Aucun arrêt enregistré sur ce shift</p>
                   </div>
                 )}
               </div>
             </motion.div>
 
             {/* TEAM PERFORMANCE (PILOT'S OPERATORS) */}
-            <motion.div variants={item} className="card p-4 bg-white">
-              <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 mb-4 flex items-center gap-2">
+            <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 shadow-sm dark:shadow-none">
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <Users size={16} className="text-blue-500" /> Performance des Opérateurs
               </h3>
               <div className="space-y-3">
                 {analytics.teamPerformance.map(op => (
-                  <div key={op.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:bg-white transition-all">
+                  <div key={op.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 group hover:bg-white dark:hover:bg-gray-800 transition-all">
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-600 uppercase">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase">
                           {op.name.charAt(0)}
                         </div>
-                        <span className="text-[10px] font-black text-gray-900 uppercase italic">{op.name}</span>
+                        <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">{op.name}</span>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                        <div>
-                          <p className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Production</p>
-                          <p className="text-xs font-black text-gray-800">{op.pallets} <span className="opacity-50 text-[8px]">Pal.</span></p>
+                          <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Production</p>
+                          <p className="text-xs font-black text-gray-800 dark:text-gray-200">{op.pallets} <span className="opacity-50 text-[8px]">Pal.</span></p>
                        </div>
                        <div className="text-right">
-                          <p className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Temps d'Arrêt</p>
-                          <p className="text-xs font-black text-red-600">{op.downtime} <span className="opacity-50 text-[8px]">min</span></p>
+                          <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Temps d'Arrêt</p>
+                          <p className="text-xs font-black text-red-600 dark:text-red-400">{op.downtime} <span className="opacity-50 text-[8px]">min</span></p>
                        </div>
                     </div>
-                    <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                        <div 
                         className="h-full bg-blue-600 rounded-full" 
                         style={{ width: `${Math.min(100, (op.pallets / (analytics.totalPallets || 1)) * 100)}%` }} 
@@ -1210,25 +1243,25 @@ export default function PilotScreen() {
                   </div>
                 ))}
                 {analytics.teamPerformance.length === 0 && (
-                  <p className="text-center py-6 text-[10px] font-black text-gray-300 uppercase tracking-widest italic">Aucun opérateur actif</p>
+                  <p className="text-center py-6 text-[10px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest italic">Aucun opérateur actif</p>
                 )}
               </div>
             </motion.div>
           </div>
 
           {/* REAL TIME STOPS / ACTIVE ALERTS (ONLY FOR THIS MACHINE) */}
-          <div className="card overflow-hidden bg-white mt-4">
-             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-               <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm dark:shadow-none mt-4">
+             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30">
+               <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
                   <Activity size={16} className="text-red-500 animate-pulse" /> Arrêts en Temps Réel
                </h3>
                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Live Monitor</span>
+                  <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Live Monitor</span>
                </div>
              </div>
              <div className="overflow-x-auto">
                <table className="w-full text-left">
-                  <thead className="bg-white text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] border-b border-gray-100">
+                  <thead className="bg-white dark:bg-gray-900 text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] border-b border-gray-100 dark:border-gray-800">
                     <tr>
                       <th className="px-6 py-5 whitespace-nowrap">Ligne</th>
                       <th className="px-6 py-5 whitespace-nowrap">Motif de l'arrêt</th>
@@ -1236,37 +1269,37 @@ export default function PilotScreen() {
                       <th className="px-6 py-5 whitespace-nowrap text-right">Action</th>
                     </tr>
                   </thead>
-                 <tbody className="divide-y divide-gray-50">
+                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                     {lines
                       .filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId)
                       .map(l => {
                         const down = downLogs.find(d => d.id === l.activeDowntimeId);
                         const type = downtimeTypes.find(t => t.id === down?.typeId);
                         return (
-                          <tr key={l.id} className="text-sm hover:bg-red-50/30 transition-all group/line animate-in slide-in-from-left duration-300">
+                          <tr key={l.id} className="text-sm hover:bg-red-50/30 dark:hover:bg-red-900/10 transition-all group/line animate-in slide-in-from-left duration-300">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center">
                                   <AlertTriangle size={16} />
                                 </div>
-                                <p className="font-black text-gray-900 leading-none">{l.name}</p>
+                                <p className="font-black text-gray-900 dark:text-white leading-none">{l.name}</p>
                               </div>
                             </td>
                             <td className="px-6 py-4">
                                <div className="flex items-center gap-2">
                                   <span className="text-lg">{type?.icon}</span>
-                                  <span className="font-black text-red-700 uppercase italic text-[11px]">{type?.name}</span>
+                                  <span className="font-black text-red-700 dark:text-red-400 uppercase italic text-[11px]">{type?.name}</span>
                                </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-[10px] font-mono font-black text-gray-500 italic">
+                              <span className="text-[10px] font-mono font-black text-gray-500 dark:text-gray-400 italic">
                                 {down ? format(parseISO(down.startTime), 'HH:mm:ss') : '—'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
                                <button 
                                 onClick={() => handleStopSpecificDowntime(l.id)}
-                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg shadow-green-100 hover:scale-105 transition-all"
+                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg dark:shadow-none shadow-green-100 hover:scale-105 transition-all focus:outline-none"
                                >
                                  Relancer
                                </button>
@@ -1292,15 +1325,15 @@ export default function PilotScreen() {
       ) : activeTab === 'monitor' ? (
         !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">
-          <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
+          <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-300 dark:text-blue-500">
              <LayoutGrid size={20} />
           </div>
-          <p className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">{t('machine_select')}</p>
+          <p className="text-gray-400 dark:text-gray-500 font-bold uppercase text-[9px] tracking-widest">{t('machine_select')}</p>
         </div>
       ) : (
           <div className="p-2 sm:p-4 space-y-8">
             {/* SCADA Global Controls */}
-            <div className="bg-slate-900 p-4 rounded-[2rem] border-4 border-slate-800 shadow-2xl flex flex-wrap items-center justify-between gap-4">
+            <div className="bg-slate-900 dark:bg-black p-4 rounded-[2rem] border-4 border-slate-800 dark:border-gray-800 shadow-2xl dark:shadow-none flex flex-wrap items-center justify-between gap-4">
                <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-rose-600 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-900/50 border-2 border-rose-400 animate-pulse">
                      <AlertTriangle className="text-white" size={24} />
@@ -1314,13 +1347,13 @@ export default function PilotScreen() {
                <div className="flex items-center gap-3">
                   <button 
                     onClick={() => handleResumeMachine()}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800"
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800 focus:outline-none"
                   >
                     Redémarrage Global
                   </button>
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-rose-800 flex items-center gap-2"
+                    className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-rose-800 flex items-center gap-2 focus:outline-none"
                   >
                     <Square size={14} fill="currentColor" />
                     Arrêt Global Machine
@@ -1340,9 +1373,9 @@ export default function PilotScreen() {
               return (
                 <div key={track.name} className="space-y-4">
                   <div className="flex items-center gap-3 px-2">
-                    <div className="h-0.5 flex-1 bg-slate-200" />
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] italic">{track.name}</h3>
-                    <div className="h-0.5 flex-1 bg-slate-200" />
+                    <div className="h-0.5 flex-1 bg-slate-200 dark:bg-gray-800" />
+                    <h3 className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.4em] italic">{track.name}</h3>
+                    <div className="h-0.5 flex-1 bg-slate-200 dark:bg-gray-800" />
                   </div>
 
                   <motion.div 
@@ -1357,7 +1390,7 @@ export default function PilotScreen() {
                       const down = activeDowntimes[line.id];
                       const downType = downtimeTypes.find(t => t.id === down?.typeId);
                       const isMachineLevel = down?.lineId === 'MACHINE_LEVEL';
-                      const isActive = line.isActive !== 0;
+                      const isActive = line.isActive !== false && line.isActive !== 0;
 
                       return (
                         <motion.div 
@@ -1365,27 +1398,27 @@ export default function PilotScreen() {
                           variants={item}
                           layout
                           className={cn(
-                            "scada-card transition-all flex flex-col overflow-hidden border-2 rounded-[2.5rem] bg-white relative",
-                            !isActive ? "border-slate-200 opacity-80 grayscale bg-slate-50" :
-                            line.status === 'RUNNING' ? "border-emerald-500 shadow-xl shadow-emerald-500/10" :
-                            line.status === 'STOPPED' ? "border-rose-500 shadow-xl shadow-rose-500/20 ring-4 ring-rose-500/5 animate-pulse-slow" : "border-slate-200"
+                            "scada-card transition-all flex flex-col overflow-hidden border-2 rounded-[2.5rem] bg-white dark:bg-gray-900 relative",
+                            !isActive ? "border-slate-200 dark:border-gray-800 opacity-80 grayscale bg-slate-50 dark:bg-gray-950" :
+                            line.status === 'RUNNING' ? "border-emerald-500 shadow-xl dark:shadow-none shadow-emerald-500/10" :
+                            line.status === 'STOPPED' ? "border-rose-500 shadow-xl dark:shadow-none shadow-rose-500/20 ring-4 ring-rose-500/5 animate-pulse-slow" : "border-slate-200 dark:border-gray-800"
                           )}
                         >
                           {/* Active Line Overlay is removed for better look, replaced with gray state */}
                           
                           <div className={cn(
                             "px-6 py-4 flex justify-between items-center border-b",
-                            !isActive ? "bg-slate-200" : line.status === 'RUNNING' ? "bg-emerald-50/50" : line.status === 'STOPPED' ? "bg-rose-50/80" : "bg-slate-50"
+                            !isActive ? "bg-slate-200 dark:bg-gray-800" : line.status === 'RUNNING' ? "bg-emerald-50/50 dark:bg-emerald-900/10" : line.status === 'STOPPED' ? "bg-rose-50/80 dark:bg-rose-900/20" : "bg-slate-50 dark:bg-gray-800/30"
                           )}>
                             <div className="flex flex-col">
-                              <h3 className={cn("font-black text-base tracking-tighter uppercase italic truncate max-w-[160px]", !isActive ? "text-slate-500" : "text-slate-900")}>
+                              <h3 className={cn("font-black text-base tracking-tighter uppercase italic truncate max-w-[160px]", !isActive ? "text-slate-500 dark:text-gray-400" : "text-slate-900 dark:text-white")}>
                                 {line.name}
                               </h3>
                               <div className={cn(
                                 "flex items-center gap-2 mt-1 px-3 py-1 rounded-full w-fit text-[9px] font-black tracking-widest uppercase border",
-                                !isActive ? "bg-slate-300 text-slate-600 border-slate-400" :
+                                !isActive ? "bg-slate-300 dark:bg-gray-700 text-slate-600 dark:text-gray-400 border-slate-400 dark:border-gray-600" :
                                 line.status === 'RUNNING' ? "bg-emerald-600 text-white border-emerald-700" :
-                                line.status === 'STOPPED' ? "bg-rose-600 text-white border-rose-700" : "bg-slate-100 text-slate-500"
+                                line.status === 'STOPPED' ? "bg-rose-600 text-white border-rose-700" : "bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 border-slate-200 dark:border-gray-700"
                               )}>
                                 <span className={cn(
                                   "w-2 h-2 rounded-full",
@@ -1399,7 +1432,7 @@ export default function PilotScreen() {
                                {isActive && (
                                  <button 
                                    onClick={() => handleToggleLineActive(line.id, true)}
-                                   className="p-3 bg-white text-slate-400 hover:text-rose-600 rounded-2xl shadow-sm border border-slate-100 transition-all hover:scale-110 active:scale-95"
+                                   className="p-3 bg-white dark:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl shadow-sm dark:shadow-none border border-slate-100 dark:border-gray-700 transition-all hover:scale-110 active:scale-95 focus:outline-none"
                                    title="Désactiver la ligne"
                                  >
                                    <Square size={18} />
@@ -1408,7 +1441,7 @@ export default function PilotScreen() {
                                {!isActive && (
                                  <button 
                                    onClick={() => handleToggleLineActive(line.id, false)}
-                                   className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
+                                   className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg dark:shadow-none hover:bg-blue-700 active:scale-95 transition-all focus:outline-none"
                                  >
                                    DÉMARRER
                                  </button>
@@ -1419,26 +1452,26 @@ export default function PilotScreen() {
                           <div className={cn("p-6 space-y-6 flex-1", !isActive && "opacity-40 grayscale pointer-events-none")}>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Programme</span>
+                                <span className="text-[9px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-2">Programme</span>
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200">
+                                  <div className="w-10 h-10 bg-slate-100 dark:bg-gray-800 rounded-xl flex items-center justify-center text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700">
                                     <Package size={18} />
                                   </div>
                                   <div className="truncate">
-                                    <p className="font-black text-xs text-slate-900 truncate leading-none uppercase italic">{prog?.name || '---'}</p>
-                                    <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{prog?.parameters || 'Production Standby'}</p>
+                                    <p className="font-black text-xs text-slate-900 dark:text-white truncate leading-none uppercase italic">{prog?.name || '---'}</p>
+                                    <p className="text-[8px] font-bold text-slate-400 dark:text-gray-500 mt-1 uppercase">{prog?.parameters || 'Production Standby'}</p>
                                   </div>
                                 </div>
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Opérateur</span>
+                                <span className="text-[9px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-2">Opérateur</span>
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 border border-blue-100">
+                                  <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
                                     <Users size={18} />
                                   </div>
                                   <div className="truncate">
-                                    <p className="font-black text-xs text-slate-900 truncate leading-none uppercase">{op?.name || 'POSTE VIDE'}</p>
-                                    <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">SHIFT {currentShift?.name || '...'}</p>
+                                    <p className="font-black text-xs text-slate-900 dark:text-white truncate leading-none uppercase">{op?.name || 'POSTE VIDE'}</p>
+                                    <p className="text-[8px] font-bold text-slate-400 dark:text-gray-500 mt-1 uppercase">SHIFT {currentShift?.name || '...'}</p>
                                   </div>
                                 </div>
                               </div>
@@ -1446,15 +1479,15 @@ export default function PilotScreen() {
 
                             {/* Production Pulse */}
                             {line.tracksProduction !== 0 && (
-                              <div className="relative overflow-hidden bg-slate-900/5 p-4 rounded-[1.5rem] border border-slate-100 flex justify-between items-end">
+                              <div className="relative overflow-hidden bg-slate-900/5 dark:bg-gray-800/50 p-4 rounded-[1.5rem] border border-slate-100 dark:border-gray-800 flex justify-between items-end">
                                 <div>
-                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Flux Production</span>
-                                  <p className="text-3xl font-black text-slate-900 tabular-nums">
+                                  <span className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em]">Flux Production</span>
+                                  <p className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">
                                     {prog?.producedPallets || 0}
-                                    <span className="ml-1 text-[10px] text-blue-600 uppercase">pal</span>
+                                    <span className="ml-1 text-[10px] text-blue-600 dark:text-blue-400 uppercase">pal</span>
                                   </p>
                                 </div>
-                                <Activity className="text-blue-200 animate-pulse" size={40} />
+                                <Activity className="text-blue-200 dark:text-blue-900/30 animate-pulse" size={40} />
                               </div>
                             )}
 
@@ -1462,8 +1495,8 @@ export default function PilotScreen() {
                             {down && (
                               <div className="space-y-4 pt-2">
                                 <div className={cn(
-                                  "p-4 rounded-[1.5rem] border-2",
-                                  isMachineLevel ? "bg-rose-900 border-rose-600 text-white shadow-xl shadow-rose-200" : "bg-rose-50 border-rose-200 text-rose-900"
+                                  "p-4 rounded-[1.5rem] border-2 shadow-sm dark:shadow-none",
+                                  isMachineLevel ? "bg-rose-900 border-rose-600 text-white" : "bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-900/30 text-rose-900 dark:text-rose-200"
                                 )}>
                                   <div className="flex justify-between items-start mb-3">
                                     <div className="flex items-center gap-2">
@@ -1473,13 +1506,13 @@ export default function PilotScreen() {
                                         <p className="font-black text-xs italic uppercase truncate max-w-[120px]">{downType?.name}</p>
                                       </div>
                                     </div>
-                                    <div className="font-mono font-black text-xs bg-white text-rose-600 px-2 py-1 rounded-lg border border-rose-100">
+                                    <div className="font-mono font-black text-xs bg-white dark:bg-gray-900 text-rose-600 dark:text-rose-400 px-2 py-1 rounded-lg border border-rose-100 dark:border-rose-900/50">
                                       {formatDowntimeDisplay(Math.floor((globalTimer - new Date(down.startTime).getTime()) / 1000))}
                                     </div>
                                   </div>
                                   
                                   {down.description && (
-                                    <p className={cn("text-[10px] p-2 rounded-xl mb-2", isMachineLevel ? "bg-white/10" : "bg-white/50 border border-rose-100")}>
+                                    <p className={cn("text-[10px] p-2 rounded-xl mb-2", isMachineLevel ? "bg-white/10" : "bg-white/50 dark:bg-gray-800/50 border border-rose-100 dark:border-rose-900/20")}>
                                       "{down.description}"
                                     </p>
                                   )}
@@ -1490,7 +1523,7 @@ export default function PilotScreen() {
                                         <button 
                                           key={i} 
                                           onClick={() => setSelectedFullImage(img)}
-                                          className="w-10 h-10 rounded-lg overflow-hidden border border-white shadow-sm hover:scale-110 transition-all"
+                                          className="w-10 h-10 rounded-lg overflow-hidden border border-white dark:border-gray-700 shadow-sm dark:shadow-none hover:scale-110 transition-all focus:outline-none"
                                         >
                                           <img src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" />
                                         </button>
@@ -1500,7 +1533,7 @@ export default function PilotScreen() {
                                   
                                   <button 
                                     onClick={() => handleStopSpecificDowntime(line.id)}
-                                    className="w-full mt-3 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all"
+                                    className="w-full mt-3 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg dark:shadow-none border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all focus:outline-none"
                                   >
                                     Relancer Production
                                   </button>
@@ -1513,14 +1546,14 @@ export default function PilotScreen() {
                               <div className="grid grid-cols-2 gap-2 mt-auto">
                                 <button 
                                   onClick={() => setDeclaringDowntimeLineId(line.id)}
-                                  className="py-3 bg-rose-50 text-rose-600 rounded-2xl flex flex-col items-center gap-1 border border-rose-100 hover:bg-rose-600 hover:text-white transition-all active:scale-95"
+                                  className="py-3 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl flex flex-col items-center gap-1 border border-rose-100 dark:border-rose-900/20 hover:bg-rose-600 hover:text-white transition-all active:scale-95 focus:outline-none"
                                 >
                                   <Square size={14} fill="currentColor" />
                                   <span className="text-[8px] font-black uppercase">Arrêt</span>
                                 </button>
                                 <button 
                                   onClick={() => setIsAssigning(line.id)}
-                                  className="py-3 bg-blue-50 text-blue-600 rounded-2xl flex flex-col items-center gap-1 border border-blue-100 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+                                  className="py-3 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 rounded-2xl flex flex-col items-center gap-1 border border-blue-100 dark:border-blue-900/20 hover:bg-blue-600 hover:text-white transition-all active:scale-95 focus:outline-none"
                                 >
                                   <Pencil size={14} />
                                   <span className="text-[8px] font-black uppercase">Assigner</span>
@@ -1540,26 +1573,26 @@ export default function PilotScreen() {
       ) : (
         !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
-          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-300">
+          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-300 dark:text-blue-500">
              <History size={32} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-xl font-black text-gray-900 uppercase italic">Aucune machine sélectionnée</h3>
-            <p className="text-sm text-gray-500 font-medium max-w-xs mx-auto">Veuillez sélectionner une machine dans le menu pour voir son historique.</p>
+            <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase italic">Aucune machine sélectionnée</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium max-w-xs mx-auto">Veuillez sélectionner une machine dans le menu pour voir son historique.</p>
           </div>
         </div>
       ) : (
         <div className="p-2 space-y-4 max-w-full mx-auto animate-in fade-in duration-300">
               <div className="flex flex-col gap-4 px-1">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase italic leading-none">{t('history')}</h2>
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tight uppercase italic leading-none">{t('history')}</h2>
                   
-                  <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto shadow-inner">
+                  <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-full sm:w-auto shadow-inner dark:shadow-none">
                     <button 
                       onClick={() => setHistoryLogType('production')}
                       className={cn(
                         "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                        historyLogType === 'production' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                        historyLogType === 'production' ? "bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 shadow-sm dark:shadow-none" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                       )}
                     >
                       {t('production_log').split(' ')[2] || 'Production'}
@@ -1568,7 +1601,7 @@ export default function PilotScreen() {
                       onClick={() => setHistoryLogType('downtime')}
                       className={cn(
                         "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                        historyLogType === 'downtime' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                        historyLogType === 'downtime' ? "bg-white dark:bg-gray-900 text-red-600 dark:text-red-400 shadow-sm dark:shadow-none" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                       )}
                     >
                       {t('downtime_log').split(' ')[2] || 'Arrêts'}
@@ -1578,11 +1611,11 @@ export default function PilotScreen() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-1">
                   <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('line')}</p>
                      <select 
                       value={historyLineFilter}
                       onChange={e => setHistoryLineFilter(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                      className="w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none text-gray-900 dark:text-white"
                      >
                        <option value="">{t('all_lines')}</option>
                        {lines
@@ -1594,22 +1627,22 @@ export default function PilotScreen() {
                   </div>
 
                   <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_date') || 'Début'}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('start_date') || 'Début'}</p>
                      <input 
                       type="date"
                       value={historyDateFilter}
                       onChange={e => setHistoryDateFilter(e.target.value)}
-                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                      className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none h-[38px] text-gray-900 dark:text-white"
                      />
                   </div>
 
                   <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_date') || 'Fin'}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('end_date') || 'Fin'}</p>
                      <input 
                       type="date"
                       value={historyEndDateFilter}
                       onChange={e => setHistoryEndDateFilter(e.target.value)}
-                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                      className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none h-[38px] text-gray-900 dark:text-white"
                      />
                   </div>
                 </div>
@@ -1618,14 +1651,14 @@ export default function PilotScreen() {
           <div className="space-y-8">
             {historyLogType === 'production' ? (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                  <Package className="text-blue-600" size={16} />
+                <h3 className="text-sm md:text-base font-black text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-widest">
+                  <Package className="text-blue-600 dark:text-blue-400" size={16} />
                   {t('production_log').toUpperCase()}
                 </h3>
-                <div className="card overflow-hidden">
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm dark:shadow-none">
                   <div className="overflow-x-auto">
                       <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
+                        <thead className="bg-gray-50 dark:bg-gray-800/50 text-[8px] md:text-[9px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest border-b border-gray-100 dark:border-gray-800">
                           <tr>
                             <th className="px-2 md:px-5 py-2 md:py-3 text-left">{t('date')}</th>
                             <th className="px-2 md:px-5 py-2 md:py-3 text-left">{t('line')}</th>
@@ -1634,7 +1667,7 @@ export default function PilotScreen() {
                             <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
+                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800 text-[10px] md:text-xs">
                           <AnimatePresence mode="popLayout">
                             {sortedProdLogs
                               .filter(log => {
@@ -1650,25 +1683,25 @@ export default function PilotScreen() {
                                   initial={{ opacity: 1 }}
                                   exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
                                   transition={{ duration: 0.2 }}
-                                  className="hover:bg-gray-50/50"
+                                  className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50"
                                 >
-                                  <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900 whitespace-nowrap">
+                                  <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900 dark:text-white whitespace-nowrap">
                                     {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                   </td>
                                   <td className="px-2 md:px-5 py-2 md:py-3">
-                                    <p className="font-bold text-gray-700 truncate max-w-[60px] md:max-w-none">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
-                                    <p className="text-[7px] md:text-[9px] font-bold text-gray-400 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                    <p className="font-bold text-gray-700 dark:text-gray-200 truncate max-w-[60px] md:max-w-none">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                    <p className="text-[7px] md:text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
                                   </td>
-                                  <td className="px-2 md:px-5 py-2 md:py-3 font-medium text-gray-600 hidden sm:table-cell">
+                                  <td className="px-2 md:px-5 py-2 md:py-3 font-medium text-gray-600 dark:text-gray-400 hidden sm:table-cell">
                                     {users.find(u => u.id === log.operatorId)?.name || '—'}
                                   </td>
                                   <td className="px-2 md:px-5 py-2 md:py-3 text-center">
-                                    <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-black">{log.count}</span>
+                                    <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded font-black">{log.count}</span>
                                   </td>
                                   <td className="px-2 md:px-5 py-2 md:py-3 text-right">
                                     <div className="flex justify-end gap-1">
-                                      <button onClick={() => openEditModal('prod', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                                      <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                      <button onClick={() => openEditModal('prod', log)} className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 p-1 md:p-2 focus:outline-none"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                      <button onClick={() => setConfirmDelete({col: 'production_logs', id: log.id, name: `Production ${log.count} pal`})} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 p-1 md:p-2 focus:outline-none"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                                     </div>
                                   </td>
                                 </motion.tr>
@@ -1681,14 +1714,14 @@ export default function PilotScreen() {
               </div>
             ) : (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                  <Timer className="text-orange-600" size={16} />
+                <h3 className="text-sm md:text-base font-black text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-widest">
+                  <Timer className="text-orange-600 dark:text-orange-400" size={16} />
                   LOG DES ARRÊTS
                 </h3>
-                <div className="card overflow-hidden">
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm dark:shadow-none">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                      <thead className="bg-gray-50 text-[8px] md:text-[9px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
+                      <thead className="bg-gray-50 dark:bg-gray-800/50 text-[8px] md:text-[9px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest border-b border-gray-100 dark:border-gray-800">
                         <tr>
                           <th className="px-2 md:px-5 py-2 md:py-3">Début</th>
                           <th className="px-2 md:px-5 py-2 md:py-3">Durée</th>
@@ -1698,7 +1731,7 @@ export default function PilotScreen() {
                           <th className="px-2 md:px-5 py-2 md:py-3 text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50 text-[10px] md:text-xs">
+                      <tbody className="divide-y divide-gray-50 dark:divide-gray-800 text-[10px] md:text-xs">
                         <AnimatePresence mode="popLayout">
                           {sortedDownLogs
                             .filter(log => {
@@ -1714,24 +1747,24 @@ export default function PilotScreen() {
                                 initial={{ opacity: 1 }}
                                 exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
                                 transition={{ duration: 0.2 }}
-                                className="hover:bg-gray-50/50"
+                                className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50"
                               >
-                                <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900">
+                                <td className="px-2 md:px-5 py-2 md:py-3 font-bold text-gray-900 dark:text-white">
                                   {new Date(log.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3">
                                   {log.duration || !log.endTime ? (
-                                    <span className="font-mono font-bold bg-blue-50 px-2 py-0.5 rounded text-blue-700 border border-blue-100">
+                                    <span className="font-mono font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
                                       {formatDowntimeDisplay(getLogDurationSec(log))}
                                     </span>
-                                  ) : <span className="text-orange-500 font-black uppercase bg-orange-50 px-2 py-0.5 rounded border border-orange-100 animate-pulse">En cours</span>}
+                                  ) : <span className="text-orange-500 dark:text-orange-400 font-black uppercase bg-orange-50 dark:bg-orange-900/10 px-2 py-0.5 rounded border border-orange-100 dark:border-orange-900/30 animate-pulse">En cours</span>}
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3 italic">
                                   <div className="flex items-center gap-1.5">
-                                    <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-black uppercase text-gray-500 border border-gray-200">
+                                    <div className="w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
                                       {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
                                     </div>
-                                    <span className="font-black text-gray-600 truncate max-w-[80px] md:max-w-none">
+                                    <span className="font-black text-gray-600 dark:text-gray-400 truncate max-w-[80px] md:max-w-none">
                                       {users.find(u => u.id === log.operatorId)?.name || '—'}
                                     </span>
                                   </div>
@@ -1739,11 +1772,11 @@ export default function PilotScreen() {
                                 <td className="px-2 md:px-5 py-2 md:py-3">
                                   <div className="flex items-center gap-2">
                                     <span className="text-base">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                    <p className="font-bold text-gray-700 leading-tight">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                    <p className="font-bold text-gray-700 dark:text-gray-300 leading-tight">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
                                   </div>
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3">
-                                  <p className="font-bold text-gray-700">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                  <p className="font-bold text-gray-700 dark:text-gray-300">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3 text-right">
                                   <div className="flex justify-end gap-1 items-center">
@@ -1762,15 +1795,15 @@ export default function PilotScreen() {
                                           <button 
                                             key={i}
                                             onClick={() => setSelectedFullImage(img)}
-                                            className="w-6 h-6 rounded-full border-2 border-white bg-blue-500 flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm"
+                                            className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 bg-blue-500 flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm dark:shadow-none"
                                           >
                                             <Camera size={10} />
                                           </button>
                                         ))}
                                       </div>
                                     )}
-                                    <button onClick={() => openEditModal('down', log)} className="text-gray-400 hover:text-blue-600 p-1 md:p-2"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                                    <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 hover:text-red-500 p-1 md:p-2"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                    <button onClick={() => openEditModal('down', log)} className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 p-1 md:p-2 focus:outline-none"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                    <button onClick={() => setConfirmDelete({col: 'downtime_logs', id: log.id, name: `Arrêt ${downtimeTypes.find(t => t.id === log.typeId)?.name}`})} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 p-1 md:p-2 focus:outline-none"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                                   </div>
                                 </td>
                               </motion.tr>
@@ -1789,18 +1822,18 @@ export default function PilotScreen() {
 
     {/* DELETE CONFIRMATION */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-          <div className="bg-white rounded-[32px] p-6 max-w-xs w-full space-y-4 shadow-2xl">
-             <div className="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center mx-auto">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-[32px] p-6 max-w-xs w-full space-y-4 shadow-2xl dark:shadow-none border border-gray-100 dark:border-gray-800">
+             <div className="w-12 h-12 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center mx-auto">
                <Trash2 size={24} />
              </div>
              <div className="text-center space-y-1">
-               <h3 className="text-lg font-black text-gray-900 italic uppercase">Supprimer ?</h3>
-               <p className="text-[11px] text-gray-500 font-medium leading-tight">Voulez-vous supprimer cet enregistrement ?<br/><span className="text-gray-900 font-bold">{confirmDelete.name}</span></p>
+               <h3 className="text-lg font-black text-gray-900 dark:text-white italic uppercase">Supprimer ?</h3>
+               <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium leading-tight">Voulez-vous supprimer cet enregistrement ?<br/><span className="text-gray-900 dark:text-white font-bold">{confirmDelete.name}</span></p>
              </div>
              <div className="flex gap-2.5 mt-2">
-                <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 font-bold text-gray-400 hover:bg-gray-50 rounded-xl transition-all uppercase text-[9px] tracking-widest">Annuler</button>
-                <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-600 text-white font-black rounded-xl shadow-lg shadow-red-50 active:scale-95 transition-all text-[9px] tracking-widest uppercase">Supprimer</button>
+                <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 font-bold text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-all uppercase text-[9px] tracking-widest focus:outline-none">Annuler</button>
+                <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-600 text-white font-black rounded-xl shadow-lg dark:shadow-none shadow-red-50 active:scale-95 transition-all text-[9px] tracking-widest uppercase focus:outline-none">Supprimer</button>
              </div>
           </div>
         </div>
@@ -1808,34 +1841,34 @@ export default function PilotScreen() {
 
       {/* EDIT MODAL */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-[32px] p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100"
+            className="bg-white dark:bg-gray-900 rounded-[32px] p-6 max-w-sm w-full space-y-4 shadow-2xl dark:shadow-none border border-gray-100 dark:border-gray-800"
           >
             <div className="space-y-0.5">
-              <h3 className="text-lg font-black text-gray-900 uppercase italic">Corriger</h3>
-              <p className="text-[7px] text-gray-400 font-black uppercase tracking-widest">Enregistrement manuel</p>
+              <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase italic">Corriger</h3>
+              <p className="text-[7px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">Enregistrement manuel</p>
             </div>
 
             <div className="space-y-4">
               {editModalType === 'prod' ? (
                 <>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantité</label>
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Quantité</label>
                     <input 
                       type="number"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-900 dark:text-white"
                       value={editModalData.count || ''}
                       onChange={e => setEditModalData({...editModalData, count: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date</label>
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Date</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-900 dark:text-white"
                       value={editModalData.timestamp ? new Date(editModalData.timestamp).toISOString().slice(0, 16) : ''}
                       onChange={e => setEditModalData({...editModalData, timestamp: new Date(e.target.value).toISOString()})}
                     />
@@ -1844,9 +1877,9 @@ export default function PilotScreen() {
               ) : (
                 <>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Motif</label>
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Motif</label>
                     <select 
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-900 dark:text-white"
                       value={editModalData.typeId || ''}
                       onChange={e => setEditModalData({...editModalData, typeId: e.target.value})}
                     >
@@ -1854,10 +1887,10 @@ export default function PilotScreen() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Début</label>
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Début</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-900 dark:text-white"
                       value={editModalData.startTime ? format(new Date(editModalData.startTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1873,10 +1906,10 @@ export default function PilotScreen() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fin</label>
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fin</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-900 dark:text-white"
                       value={editModalData.endTime ? format(new Date(editModalData.endTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1893,10 +1926,10 @@ export default function PilotScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Photos</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Photos</label>
                     <div className="flex flex-wrap gap-2">
                       {(editModalData.images || []).map((img: string, i: number) => (
-                        <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200">
+                        <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
                           <img src={`/uploads/${img}`} className="w-full h-full object-cover" alt="Preview" />
                           <button 
                             onClick={() => {
@@ -1912,7 +1945,7 @@ export default function PilotScreen() {
                       ))}
                       <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-all"
+                        className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all focus:outline-none"
                       >
                         <Plus size={20} />
                         <span className="text-[7px] font-black uppercase">Ajouter</span>
@@ -1924,10 +1957,10 @@ export default function PilotScreen() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-100 rounded-2xl transition-all uppercase text-[10px] tracking-widest">Annuler</button>
+              <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-4 font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all uppercase text-[10px] tracking-widest focus:outline-none">Annuler</button>
               <button 
                 onClick={handleEditSubmit}
-                className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 transition-all uppercase text-[10px] tracking-widest"
+                className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl dark:shadow-none shadow-blue-100 transition-all uppercase text-[10px] tracking-widest focus:outline-none"
               >
                 Sauvegarder
               </button>
@@ -1937,11 +1970,11 @@ export default function PilotScreen() {
       )}
 
       {isAssigning && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-2">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]"
+            className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl dark:shadow-none flex flex-col max-h-[92vh] border border-gray-100 dark:border-gray-800"
           >
             <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
               <div className="space-y-0.5">
@@ -1954,30 +1987,30 @@ export default function PilotScreen() {
 
             <div className="p-4 md:p-6 overflow-y-auto space-y-6">
               <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                  <h3 className="text-[9px] font-black text-gray-700 uppercase tracking-widest mb-3">{t('new_program')}</h3>
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-[9px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-widest mb-3">{t('new_program')}</h3>
                   <div className="flex flex-col gap-2">
                     <input 
                       type="text"
                       value={newProgName}
                       onChange={e => setNewProgName(e.target.value)}
                       placeholder={t('program_name') + "..."}
-                      className="w-full p-2.5 bg-white rounded-xl border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs"
+                      className="w-full p-2.5 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs text-gray-900 dark:text-white"
                     />
                     <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
+                      <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
                       <textarea 
                         value={newProgParams}
                         onChange={e => setNewProgParams(e.target.value)}
                         placeholder="Vitesse, Pression, etc..."
                         rows={2}
-                        className="w-full p-2.5 bg-white rounded-xl border border-gray-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-[10px]"
+                        className="w-full p-2.5 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-[10px] text-gray-900 dark:text-white"
                       />
                     </div>
                     <button 
                       disabled={!newProgName}
                       onClick={handleAssignProgramme}
-                      className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all shadow-md shadow-blue-100"
+                      className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all shadow-md dark:shadow-none shadow-blue-100 focus:outline-none"
                     >
                       {t('save_assign').toUpperCase()}
                     </button>
@@ -1986,20 +2019,20 @@ export default function PilotScreen() {
               </div>
             </div>
             
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+            <div className="p-6 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800 flex gap-3 text-gray-900 dark:text-white">
               <button 
                 onClick={() => {
                   setIsAssigning(null);
                   setShowCreateNew(false);
                 }}
-                className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-100 rounded-2xl transition-colors uppercase text-xs tracking-widest"
+                className="flex-1 py-4 font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-colors uppercase text-xs tracking-widest focus:outline-none"
               >
                 {t('cancel')}
               </button>
               {showCreateNew && (
                 <button 
                   onClick={handleAssignProgramme}
-                  className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-200 uppercase text-xs tracking-widest active:scale-95 transition-all"
+                  className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl dark:shadow-none shadow-blue-200 uppercase text-xs tracking-widest active:scale-95 transition-all focus:outline-none"
                 >
                   Créer & Assigner
                 </button>
@@ -2010,11 +2043,11 @@ export default function PilotScreen() {
       )}
       {/* DOWNTIME PICKER MODAL */}
       {declaringDowntimeLineId && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-2">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]"
+            className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl dark:shadow-none flex flex-col max-h-[92vh] border border-gray-100 dark:border-gray-800"
           >
             <div className="p-4 bg-orange-600 text-white">
               <h2 className="text-lg font-black tracking-tight uppercase italic leading-none">{t('machine_stop')}</h2>
@@ -2024,25 +2057,25 @@ export default function PilotScreen() {
             </div>
             <div className="p-4 space-y-4 overflow-y-auto">
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1">{t('reason')}</label>
+                <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">{t('reason')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {downtimeTypes.map(type => (
                     <button
                       key={type.id}
                       onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id, manualStopForm.description)}
-                      className="p-3 border border-orange-50 rounded-2xl flex flex-col items-center gap-1 hover:bg-orange-50 transition-all group shadow-sm bg-white"
+                      className="p-3 border border-orange-50 dark:border-orange-900/30 rounded-2xl flex flex-col items-center gap-1 hover:bg-orange-50 dark:hover:bg-orange-900 transition-all group shadow-sm dark:shadow-none bg-white dark:bg-gray-800 focus:outline-none"
                     >
                       <span className="text-xl group-hover:scale-110 transition-transform">{type.icon}</span>
-                      <span className="text-[8px] font-black uppercase text-gray-700 text-center leading-tight">{type.name}</span>
+                      <span className="text-[8px] font-black uppercase text-gray-700 dark:text-gray-200 text-center leading-tight">{type.name}</span>
                     </button>
                   ))}
                 </div>
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1">{t('comment_description') || 'Commentaire / Description'}</label>
+                <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">{t('comment_description') || 'Commentaire / Description'}</label>
                 <textarea 
-                  className="w-full p-3 bg-orange-50/50 border border-orange-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all placeholder:text-gray-400 placeholder:italic"
+                  className="w-full p-3 bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all placeholder:text-gray-400 placeholder:italic text-gray-900 dark:text-white"
                   rows={2}
                   placeholder="Expliquez la cause de l'arrêt..."
                   value={manualStopForm.description}
@@ -2050,10 +2083,10 @@ export default function PilotScreen() {
                 />
               </div>
             </div>
-            <div className="p-4 bg-gray-50 flex gap-3">
+            <div className="p-4 bg-gray-50 dark:bg-gray-800/30 flex gap-3 border-t border-gray-100 dark:border-gray-800">
               <button 
                 onClick={() => setDeclaringDowntimeLineId(null)}
-                className="w-full py-4 text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 rounded-2xl"
+                className="w-full py-4 text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all focus:outline-none"
               >
                 Annuler
               </button>
@@ -2064,53 +2097,53 @@ export default function PilotScreen() {
 
       {/* MANUAL STOP MODAL */}
       {showManualStopModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+            className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl dark:shadow-none flex flex-col border border-gray-100 dark:border-gray-800"
           >
             <div className="p-6 bg-blue-600 text-white">
-              <h2 className="text-xl font-black tracking-tight uppercase italic">Saisie Manuelle</h2>
-              <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest leading-none mt-1">
+              <h2 className="text-xl font-black tracking-tight uppercase italic pb-1 border-b border-blue-400/30">Saisie Manuelle</h2>
+              <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest leading-none mt-2">
                 Ligne: {lines.find(l => l.id === manualStopForm.lineId)?.name}
               </p>
             </div>
             <div className="p-4 space-y-4">
                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Début</label>
+                    <label className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Début</label>
                     <input 
                       type="datetime-local"
                       min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-xl text-[10px] font-black text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                       value={manualStopForm.startTime}
                       onChange={e => setManualStopForm({...manualStopForm, startTime: e.target.value})}
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Fin</label>
+                    <label className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fin</label>
                     <input 
                       type="datetime-local"
                       min={format(startOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
                       max={format(endOfDay(new Date()), "yyyy-MM-dd'T'HH:mm")}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-xl text-[10px] font-black text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                       value={manualStopForm.endTime}
                       onChange={e => setManualStopForm({...manualStopForm, endTime: e.target.value})}
                     />
                   </div>
                </div>
 
-               <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100">
-                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none">Durée totale</p>
-                  <p className="text-sm font-black text-blue-900 font-mono italic">{calculateManualDuration()}</p>
+               <div className="flex justify-between items-center bg-blue-50/50 dark:bg-blue-900/20 p-2 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-[8px] font-black text-blue-400 dark:text-blue-500 uppercase tracking-widest leading-none">Durée totale</p>
+                  <p className="text-sm font-black text-blue-900 dark:text-blue-300 font-mono italic">{calculateManualDuration()}</p>
                </div>
 
                <div className="space-y-1">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Motif de l'arrêt</label>
+                 <label className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Motif de l'arrêt</label>
                  <select 
-                   className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                   className="w-full p-2.5 bg-slate-50 dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-xl text-[10px] font-black text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                    value={manualStopForm.typeId}
                    onChange={e => setManualStopForm({...manualStopForm, typeId: e.target.value})}
                  >
@@ -2120,10 +2153,10 @@ export default function PilotScreen() {
                </div>
 
                <div className="space-y-1">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Photos</label>
+                 <label className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Photos</label>
                  <div className="flex flex-wrap gap-2">
                    {imagePreviews.map((p, i) => (
-                     <div key={i} className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-200">
+                     <div key={i} className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-200 dark:border-gray-700">
                        <img src={p} className="w-full h-full object-cover" alt="Preview" />
                        <button 
                         onClick={() => {
@@ -2142,7 +2175,7 @@ export default function PilotScreen() {
                    ))}
                    <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all"
+                    className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all focus:outline-none"
                    >
                      {isUploading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" /> : <Camera size={18} />}
                    </button>
@@ -2156,16 +2189,16 @@ export default function PilotScreen() {
                  />
                </div>
             </div>
-            <div className="p-4 bg-gray-50 flex gap-3">
+            <div className="p-4 bg-gray-50 dark:bg-gray-800/30 flex gap-3 border-t border-gray-100 dark:border-gray-800">
               <button 
                 onClick={() => setShowManualStopModal(false)}
-                className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 rounded-2xl transition-all"
+                className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all focus:outline-none"
               >
                 Annuler
               </button>
               <button 
                 onClick={() => handleManualStop(manualStopForm)}
-                className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-200 uppercase text-xs tracking-widest active:scale-95 transition-all"
+                className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl dark:shadow-none shadow-blue-200 uppercase text-xs tracking-widest active:scale-95 transition-all focus:outline-none"
               >
                 Valider Saisie
               </button>
@@ -2180,12 +2213,12 @@ export default function PilotScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-3xl overflow-hidden"
+              className="bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-w-2xl shadow-3xl dark:shadow-none overflow-hidden border border-gray-100 dark:border-gray-800"
             >
               <div className="p-8 space-y-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-start">
@@ -2194,54 +2227,54 @@ export default function PilotScreen() {
                       <Activity size={24} className="text-white" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-black text-gray-900 tracking-tighter uppercase italic leading-none mb-1">Arrêts Groupés Intelligents</h2>
-                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Pilot Hub Feature</p>
+                      <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none mb-1">Arrêts Groupés Intelligents</h2>
+                      <p className="text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-[0.2em]">Pilot Hub Feature</p>
                     </div>
                   </div>
-                  <button onClick={() => setShowFeatureInfo(false)} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors">
+                  <button onClick={() => setShowFeatureInfo(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors focus:outline-none">
                     <X size={20} />
                   </button>
                 </div>
 
                 <div className="space-y-6">
-                  <section className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
-                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <section className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                    <h4 className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                        <TrendingUp size={14} /> Détection de Proximité Temporelle
                     </h4>
-                    <p className="text-xs font-bold text-gray-700 leading-relaxed italic">
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-200 leading-relaxed italic">
                       "Comment le système identifie que des arrêts sur différentes lignes sont liés."
                     </p>
-                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
                       L'algorithme AgroSync analyse les flags d'arrêts en temps réel. Si plusieurs lignes déclarent le même incident dans une fenêtre critique (moins de 2 minutes), le système fusionne ces données pour refléter la réalité de la panne machine globale.
                     </p>
                   </section>
 
-                  <section className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <section className="p-5 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-800">
+                    <h4 className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                        <Users size={14} /> Propagation de l'Action de Groupe
                     </h4>
-                    <p className="text-xs font-bold text-gray-700 leading-relaxed italic">
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-200 leading-relaxed italic">
                       "Le premier opérateur qui déclare l'arrêt propage l'état."
                     </p>
-                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
                       Fini les doubles saisies. Dès qu'un arrêt est qualifié sur une ligne, le système peut propager automatiquement cet état aux autres lignes de la machine. Cela assure une synchronisation parfaite entre les opérateurs et le Pilot.
                     </p>
                   </section>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
-                      <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                      <h4 className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                         <Box size={14} /> Consolidation
                       </h4>
-                      <p className="text-[11px] text-emerald-800/80 leading-relaxed font-bold">
+                      <p className="text-[11px] text-emerald-800/80 dark:text-emerald-200/80 leading-relaxed font-bold">
                         Un seul événement en base de données pour toute la machine. Rapports simplifiés et statistiques OEE fiables.
                       </p>
                     </div>
-                    <div className="p-5 bg-orange-50 rounded-2xl border border-orange-100">
-                      <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <div className="p-5 bg-orange-50 dark:bg-orange-900/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
+                      <h4 className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                         <Activity size={14} /> Avantage Industriel
                       </h4>
-                      <p className="text-[11px] text-orange-800/80 leading-relaxed font-bold">
+                      <p className="text-[11px] text-orange-800/80 dark:text-orange-200/80 leading-relaxed font-bold">
                         Réduction de 40% de la charge administrative des opérateurs et précision accrue du suivi des temps d'arrêt.
                       </p>
                     </div>
@@ -2250,7 +2283,7 @@ export default function PilotScreen() {
 
                 <button 
                   onClick={() => setShowFeatureInfo(false)}
-                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl dark:shadow-none active:scale-95 transition-all focus:outline-none"
                 >
                   FERMER
                 </button>
@@ -2268,7 +2301,7 @@ export default function PilotScreen() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setSelectedFullImage(null)}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 cursor-pointer"
+            className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 cursor-pointer"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
@@ -2280,12 +2313,12 @@ export default function PilotScreen() {
               <img 
                 src={selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`}
                 alt="Downtime Evidence" 
-                className="w-full h-auto max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                className="w-full h-auto max-h-[90vh] object-contain rounded-2xl shadow-2xl dark:shadow-none border dark:border-gray-800"
                 referrerPolicy="no-referrer"
               />
               <button 
                 onClick={() => setSelectedFullImage(null)}
-                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors bg-white/10 p-2 rounded-full backdrop-blur-md"
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors bg-white/10 p-2 rounded-full backdrop-blur-md focus:outline-none"
               >
                 <X size={24} />
               </button>

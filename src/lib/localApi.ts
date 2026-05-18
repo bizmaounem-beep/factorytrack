@@ -2,6 +2,16 @@
 import { io } from 'socket.io-client';
 
 const API_BASE = '/api/db';
+
+const getHeaders = (extraHeaders = {}) => {
+  const token = localStorage.getItem('factory_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...extraHeaders
+  };
+};
+
 const socket = io({
   reconnection: true,
   reconnectionAttempts: Infinity,
@@ -18,7 +28,9 @@ socket.on('connect_error', (err) => {
 export const localApi = {
   async getCollection(collection: string) {
     try {
-      const res = await fetch(`${API_BASE}/${collection}`);
+      const res = await fetch(`${API_BASE}/${collection}`, {
+        headers: getHeaders()
+      });
       const contentType = res.headers.get('content-type');
       if (!res.ok) {
         throw new Error('Erreur de connexion');
@@ -37,7 +49,7 @@ export const localApi = {
     try {
       const res = await fetch(`${API_BASE}/${collection}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(data)
       });
       if (!res.ok) {
@@ -54,7 +66,7 @@ export const localApi = {
     try {
       const res = await fetch(`${API_BASE}/${collection}/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(data)
       });
       if (!res.ok) {
@@ -70,7 +82,8 @@ export const localApi = {
   async deleteDoc(collection: string, id: string) {
     try {
       const res = await fetch(`${API_BASE}/${collection}/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getHeaders()
       });
       if (!res.ok) {
         throw new Error('Échec de la suppression');
@@ -86,7 +99,7 @@ export const localApi = {
     try {
       const res = await fetch(`/api/machine/${machineId}/global-stop`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(data)
       });
       if (!res.ok) throw new Error('Échec de l\'arrêt global');
@@ -100,7 +113,8 @@ export const localApi = {
   async globalResume(machineId: string) {
     try {
       const res = await fetch(`/api/machine/${machineId}/global-resume`, {
-        method: 'POST'
+        method: 'POST',
+        headers: getHeaders()
       });
       if (!res.ok) throw new Error('Échec du redémarrage global');
       return res.json();
@@ -179,7 +193,11 @@ export const loginLocal = async (username: string, password: string) => {
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error('Erreur de serveur');
     }
-    return res.json();
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('factory_token', data.token);
+    }
+    return data;
   } catch (e) {
     if ((e as Error).message === 'Identifiants incorrects') throw e;
     console.error('Login error:', e);

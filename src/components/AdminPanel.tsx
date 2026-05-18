@@ -737,13 +737,13 @@ export default function AdminPanel() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row transition-colors duration-300 font-sans">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col md:flex-row transition-colors duration-300 font-sans">
       {/* MOBILE HEADER */}
-      <header className="md:hidden bg-white border-b border-gray-200 px-3 py-1 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+      <header className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 py-1 flex justify-between items-center sticky top-0 z-40 shadow-sm dark:shadow-none">
         <div className="flex items-center gap-1.5">
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -751,20 +751,36 @@ export default function AdminPanel() {
             <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
               A
             </div>
-            <h1 className="font-black text-sm tracking-tighter text-gray-900 leading-none uppercase italic">FACTORY<span className="text-blue-600">CLOUD</span></h1>
+            <h1 className="font-black text-sm tracking-tighter text-gray-900 dark:text-white leading-none uppercase italic">FACTORY<span className="text-blue-600">CLOUD</span></h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={toggleTheme}
-            className="p-1 px-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            className={cn(
+              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
+              theme === 'dark'
+                ? "bg-slate-800 border-slate-700 text-yellow-400"
+                : "bg-gray-100 border-gray-200 text-gray-500"
+            )}
             title="Changer le thème"
+            aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
           >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            <Sun size={13} className={theme === 'dark' ? "opacity-100" : "opacity-30"} />
+            <div className={cn(
+              "w-7 h-4 rounded-full transition-colors duration-300 relative flex-shrink-0",
+              theme === 'dark' ? "bg-blue-600" : "bg-gray-300"
+            )}>
+              <div className={cn(
+                "absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all duration-300",
+                theme === 'dark' ? "left-3.5" : "left-0.5"
+              )} />
+            </div>
+            <Moon size={13} className={theme === 'dark' ? "opacity-30" : "opacity-100"} />
           </button>
           <button 
             onClick={logout}
-            className="p-1 px-1.5 text-red-500 bg-red-50 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50"
+            className="p-1 px-1.5 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 dark:border-red-900/30"
           >
             {t('logout')}
           </button>
@@ -792,16 +808,16 @@ export default function AdminPanel() {
               exit={{ x: -280 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               className={cn(
-                "bg-white w-64 md:w-56 min-h-screen border-r border-gray-200 p-4 shrink-0 flex flex-col gap-6 z-50 transition-all overflow-y-auto",
+                "bg-white dark:bg-gray-900 w-64 md:w-56 min-h-screen border-r border-gray-200 dark:border-gray-800 p-4 shrink-0 flex flex-col gap-6 z-50 transition-all overflow-y-auto",
                 "fixed inset-y-0 left-0 md:sticky md:top-0",
                 !isMobileMenuOpen && "hidden md:flex"
               )}
             >
               <div className="flex items-center gap-2 px-1">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-200">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-200 dark:shadow-none">
                   A
                 </div>
-                <h1 className="font-black text-lg tracking-tighter text-gray-900 leading-none capitalize italic">FACTORY<br/><span className="text-blue-600">CLOUD</span></h1>
+                <h1 className="font-black text-lg tracking-tighter text-gray-900 dark:text-white leading-none capitalize italic">FACTORY<br/><span className="text-blue-600">CLOUD</span></h1>
               </div>
               
               <nav className="flex flex-col gap-1 flex-1">
@@ -815,8 +831,8 @@ export default function AdminPanel() {
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
                       activeTab === tab.id 
-                        ? "bg-blue-600 text-white shadow-lg shadow-blue-50" 
-                        : "text-gray-400 hover:bg-gray-50"
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-50 dark:shadow-none" 
+                        : "text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
                     )}
                   >
                     <tab.icon size={16} strokeWidth={2.5} />
@@ -824,10 +840,17 @@ export default function AdminPanel() {
                   </button>
                 ))}
                 
-                <div className="mt-auto pt-4 border-t border-gray-100 space-y-2">
+                <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+                  <button 
+                    onClick={toggleTheme}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 w-full transition-all"
+                  >
+                    {theme === 'dark' ? <Sun size={14} strokeWidth={2.5} /> : <Moon size={14} strokeWidth={2.5} />}
+                    {theme === 'dark' ? 'Mode Clair' : 'Mode Sombre'}
+                  </button>
                   <button 
                     onClick={logout}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 w-full transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 w-full transition-colors"
                   >
                     <Trash2 size={14} strokeWidth={2.5} />
                     {t('logout')}
@@ -847,15 +870,15 @@ export default function AdminPanel() {
             <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300">
               <div className="flex justify-between items-center px-1">
                 <div>
-                  <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 leading-none">
+                  <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">
                     {t('dashboard')} <span className="text-blue-600 uppercase text-[10px] md:text-xs tracking-widest ml-1">Analytical</span>
                   </h2>
-                  <p className="text-[8px] md:text-[10px] font-bold text-gray-400 uppercase mt-1 italic">Dernières 24 heures • Mise à jour en temps réel</p>
+                  <p className="text-[8px] md:text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mt-1 italic">Dernières 24 heures • Mise à jour en temps réel</p>
                 </div>
                 <div className="text-right flex flex-col items-end">
-                  <div className="flex items-center gap-1.5 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                  <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-950 px-2 py-1 rounded-full border border-green-100 dark:border-green-900/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <p className="text-[8px] md:text-[10px] font-black text-green-700 uppercase tracking-tight">{t('connected')}</p>
+                    <p className="text-[8px] md:text-[10px] font-black text-green-700 dark:text-green-400 uppercase tracking-tight">{t('connected')}</p>
                   </div>
                 </div>
               </div>
@@ -876,7 +899,7 @@ export default function AdminPanel() {
                    <motion.div 
                     variants={item}
                     key={stat.label} 
-                    className="card p-2 md:p-4 flex flex-col gap-2 md:gap-3 hover:shadow-xl transition-all group relative overflow-hidden"
+                    className="bg-white dark:bg-gray-900 p-2 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden"
                    >
                      <div className={cn(
                        "absolute -right-2 -top-2 w-16 h-16 opacity-5 transition-transform group-hover:scale-150 rotate-12",
@@ -889,25 +912,25 @@ export default function AdminPanel() {
                      <div className="flex justify-between items-start">
                        <div className={cn(
                          "w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-white/20 shrink-0",
-                         stat.color === 'blue' ? "bg-blue-600 text-white shadow-blue-200" :
-                         stat.color === 'green' ? "bg-green-600 text-white shadow-green-200" :
-                         stat.color === 'orange' ? "bg-orange-600 text-white shadow-orange-200" : "bg-red-600 text-white shadow-red-200"
+                         stat.color === 'blue' ? "bg-blue-600 text-white shadow-blue-200 dark:shadow-none" :
+                         stat.color === 'green' ? "bg-green-600 text-white shadow-green-200 dark:shadow-none" :
+                         stat.color === 'orange' ? "bg-orange-600 text-white shadow-orange-200 dark:shadow-none" : "bg-red-600 text-white shadow-red-200 dark:shadow-none"
                        )}>
                          <stat.icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
                        </div>
                        <span className={cn(
                          "text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded italic",
-                         stat.color === 'blue' ? "bg-blue-50 text-blue-600" :
-                         stat.color === 'green' ? "bg-green-50 text-green-600" :
-                         stat.color === 'orange' ? "bg-orange-50 text-orange-600" : "bg-red-50 text-red-600"
+                         stat.color === 'blue' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
+                         stat.color === 'green' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
+                         stat.color === 'orange' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
                        )}>
                          {stat.trend}
                        </span>
                      </div>
                      <div>
-                       <p className="text-[7px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
-                       <p className="text-sm md:text-2xl font-black text-slate-900 leading-none mt-1 tabular-nums">{stat.val}</p>
-                       <p className="text-[7px] md:text-[9px] font-bold text-slate-400 mt-1">{stat.sub}</p>
+                       <p className="text-[7px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
+                       <p className="text-sm md:text-2xl font-black text-gray-900 dark:text-white leading-none mt-1 tabular-nums">{stat.val}</p>
+                       <p className="text-[7px] md:text-[9px] font-bold text-slate-400 dark:text-gray-500 mt-1">{stat.sub}</p>
                      </div>
                    </motion.div>
                  ))}
@@ -919,9 +942,9 @@ export default function AdminPanel() {
                     startTime: new Date().toISOString(),
                     operatorId: user?.id,
                   })}
-                  className="bg-white border border-gray-200 text-gray-900 px-4 py-2.5 rounded-xl font-black shadow-sm active:scale-95 transition-all text-[10px] tracking-widest uppercase flex items-center gap-2 hover:bg-gray-50 group"
+                  className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-black shadow-sm dark:shadow-none active:scale-95 transition-all text-[10px] tracking-widest uppercase flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 group"
                 >
-                  <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
+                  <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-sm dark:shadow-none group-hover:scale-110 transition-transform">
                     <Plus size={12} strokeWidth={3} />
                   </div>
                   {t('add_downtime_log')}
@@ -931,28 +954,28 @@ export default function AdminPanel() {
               {/* BOTTOM ROW: SHIFT PERF & LIVE MONITOR */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* SHIFT PERFORMANCE */}
-                <motion.div variants={item} className="card p-4 lg:col-span-1">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 mb-4 flex items-center gap-2">
+                <motion.div variants={item} className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 lg:col-span-1">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <TrendingUp size={16} className="text-green-500" /> Performance Équipes
                   </h3>
                   <div className="space-y-3">
                     {analytics.shiftPerf.map(s => (
-                      <div key={s.name} className="p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:bg-white transition-all">
+                      <div key={s.name} className="p-3 bg-gray-50 dark:bg-gray-950 rounded-xl border border-gray-100 dark:border-gray-800 group hover:bg-white dark:hover:bg-gray-800 transition-all">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-[10px] font-black text-gray-900 uppercase italic">{s.name}</span>
-                          <span className="text-[9px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded italic">#{analytics.shiftPerf.indexOf(s) + 1}</span>
+                          <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">{s.name}</span>
+                          <span className="text-[9px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded italic">#{analytics.shiftPerf.indexOf(s) + 1}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                            <div>
-                              <p className="text-[7px] font-black text-gray-400 uppercase">Production</p>
-                              <p className="text-xs font-black text-gray-800">{s.pallets} <span className="opacity-50">Pal.</span></p>
+                              <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase">Production</p>
+                              <p className="text-xs font-black text-gray-800 dark:text-gray-200">{s.pallets} <span className="opacity-50">Pal.</span></p>
                            </div>
                            <div className="text-right">
-                              <p className="text-[7px] font-black text-gray-400 uppercase">Arrets</p>
-                              <p className="text-xs font-black text-red-600">{s.downtime} <span className="opacity-50">min</span></p>
+                              <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase">Arrets</p>
+                              <p className="text-xs font-black text-red-600 dark:text-red-400">{s.downtime} <span className="opacity-50">min</span></p>
                            </div>
                         </div>
-                        <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                            <div 
                             className="h-full bg-blue-600 rounded-full" 
                             style={{ width: `${Math.min(100, (s.pallets / (analytics.totalPallets || 1)) * 100)}%` }} 
@@ -964,19 +987,19 @@ export default function AdminPanel() {
                 </motion.div>
 
                 {/* LIVE MONITOR (REFRACHED VERSION) */}
-                <div className="card overflow-hidden lg:col-span-2">
-                   <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                     <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden lg:col-span-2">
+                   <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-950/50">
+                     <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
                         <Activity size={16} className="text-green-500 animate-pulse" /> {t('live_monitor')}
                      </h3>
                      <div className="flex gap-2">
-                        <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Running</span></div>
-                        <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Stopped</span></div>
+                        <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Running</span></div>
+                        <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Stopped</span></div>
                      </div>
                    </div>
                    <div className="overflow-x-auto">
                      <table className="w-full text-left">
-                        <thead className="bg-white text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] border-b border-gray-100">
+                        <thead className="bg-white dark:bg-gray-900 text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] border-b border-gray-100 dark:border-gray-800">
                           <tr>
                             <th className="px-6 py-5">{t('line_short')}</th>
                             <th className="px-6 py-5">{t('stat_short')}</th>
@@ -984,7 +1007,7 @@ export default function AdminPanel() {
                             <th className="px-6 py-5">{t('op_short')}</th>
                           </tr>
                         </thead>
-                       <tbody className="divide-y divide-gray-50">
+                       <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                           {lines.filter(l => l.isActive !== false && l.status !== 'IDLE').map(l => {
                             const prog = programmes.find(p => p.id === l.currentProgrammeId);
                             const op = users.find(u => u.id === l.currentOperatorId);
@@ -998,38 +1021,38 @@ export default function AdminPanel() {
                                   <div className="flex items-center gap-3">
                                     <div className={cn(
                                       "w-8 h-8 rounded-lg flex items-center justify-center transition-all group-hover/line:scale-110",
-                                      l.status === 'RUNNING' ? "bg-green-50 text-green-600" :
-                                      l.status === 'STOPPED' ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-500"
+                                      l.status === 'RUNNING' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
+                                      l.status === 'STOPPED' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" : "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
                                     )}>
                                       <Box size={16} />
                                     </div>
                                     <div>
-                                      <p className="font-black text-gray-900 leading-none mb-1 whitespace-nowrap">{l.name}</p>
-                                      <p className="text-[9px] font-bold text-blue-500 uppercase tracking-tight italic">{mach?.name}</p>
+                                      <p className="font-black text-gray-900 dark:text-white leading-none mb-1 whitespace-nowrap">{l.name}</p>
+                                      <p className="text-[9px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-tight italic">{mach?.name}</p>
                                     </div>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
                                    <span className={cn(
                                      "px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tight border",
-                                     l.status === 'RUNNING' ? "bg-green-50 text-green-700 border-green-200" :
-                                     l.status === 'STOPPED' ? "bg-red-50 text-red-700 border-red-200" : "bg-gray-50 text-gray-600 border-gray-200"
+                                     l.status === 'RUNNING' ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/50" :
+                                     l.status === 'STOPPED' ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/50" : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                                    )}>{l.status === 'RUNNING' ? 'Running' : l.status}</span>
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex flex-col">
-                                    <p className="text-sm font-black text-blue-600 italic leading-none">{prog?.producedPallets || 0}</p>
-                                    <div className="w-16 h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                                    <p className="text-sm font-black text-blue-600 dark:text-blue-400 italic leading-none">{prog?.producedPallets || 0}</p>
+                                    <div className="w-16 h-1 bg-gray-100 dark:bg-gray-800 rounded-full mt-2 overflow-hidden">
                                        <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (prog?.producedPallets || 0) / 10)}%` }} />
                                     </div>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 bg-white rounded-full border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500 shadow-sm group-hover/line:border-blue-200 transition-colors">
+                                    <div className="w-7 h-7 bg-white dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-500 dark:text-gray-400 shadow-sm dark:shadow-none group-hover/line:border-blue-200 dark:group-hover/line:border-blue-800 transition-colors">
                                       {op?.name?.substring(0, 1).toUpperCase() || '—'}
                                     </div>
-                                    <span className="text-gray-600 font-black text-[10px] uppercase truncate max-w-[80px]">{(op?.name || '—').split(' ')[0]}</span>
+                                    <span className="text-gray-600 dark:text-gray-400 font-black text-[10px] uppercase truncate max-w-[80px]">{(op?.name || '—').split(' ')[0]}</span>
                                   </div>
                                 </td>
                               </tr>
@@ -1046,35 +1069,35 @@ export default function AdminPanel() {
           {activeTab === 'users' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('users')}</h2>
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">{t('users')}</h2>
                 <button 
                   onClick={() => openModal('user')}
-                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 dark:shadow-none active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
                 >
                   <Plus size={12} strokeWidth={3} /> {t('add')}
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                 {users.map(u => (
-                  <div key={u.id} className="card p-2 md:p-4 group flex justify-between items-center hover:border-blue-200 transition-colors">
+                  <div key={u.id} className="bg-white dark:bg-gray-900 p-2 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 group flex justify-between items-center hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
                     <div className="flex items-center gap-2 md:gap-3">
                       <div className={cn(
                         "w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-sm",
-                        u.role === 'ADMIN' ? "bg-red-50 text-red-600" :
-                        u.role === 'PILOT' ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-600"
+                        u.role === 'ADMIN' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
+                        u.role === 'PILOT' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
                       )}>
                         {u.name?.substring(0, 1) || '?'}
                       </div>
                       <div>
-                        <p className="font-black text-[10px] md:text-sm text-gray-900 leading-tight">{u.name}</p>
-                        <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">PIN: <span className="bg-gray-100 px-1 rounded text-gray-400 font-mono italic">••••</span> • {u.role}</p>
+                        <p className="font-black text-[10px] md:text-sm text-gray-900 dark:text-white leading-tight">{u.name}</p>
+                        <p className="text-[8px] md:text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter mt-0.5">Mot de passe: <span className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-gray-400 dark:text-gray-500 font-mono italic">••••</span> • {u.role}</p>
                       </div>
                     </div>
                     <div className="flex gap-0.5">
-                      <button onClick={() => openModal('user', u)} className="text-gray-300 hover:text-blue-600 transition-colors p-1.5">
+                      <button onClick={() => openModal('user', u)} className="text-gray-300 dark:text-gray-600 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1.5 focus:outline-none">
                         <Pencil size={14} />
                       </button>
-                      <button onClick={() => initiateDelete('users', u.id, u.name)} className="text-gray-300 hover:text-red-500 transition-colors p-1.5">
+                      <button onClick={() => initiateDelete('users', u.id, u.name)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1.5 focus:outline-none">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -1088,39 +1111,39 @@ export default function AdminPanel() {
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-1">
-                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('parc_machine')}</h2>
+                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">{t('parc_machine')}</h2>
                   <button 
                      onClick={() => openModal('machine')}
-                     className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase"
+                     className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 dark:shadow-none active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase"
                   >
                      + {t('machine').toUpperCase()}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                    {machines.map(m => (
-                    <div key={m.id} className="card p-3 md:p-4 flex flex-col gap-3 md:gap-4">
+                    <div key={m.id} className="bg-white dark:bg-gray-900 p-3 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-3 md:gap-4">
                       <div className="flex justify-between items-center">
-                        <h3 className="font-black text-base md:text-lg italic tracking-tighter text-gray-900">{m.name}</h3>
+                        <h3 className="font-black text-base md:text-lg italic tracking-tighter text-gray-900 dark:text-white">{m.name}</h3>
                         <div className="flex gap-1.5 items-center">
                            <button 
                              onClick={() => openModal('line', { machineId: m.id })}
-                             className="px-1.5 py-1 bg-blue-50 text-blue-600 rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-tight hover:bg-blue-100 transition-all border border-blue-100 shrink-0"
+                             className="px-1.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-tight hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all border border-blue-100 dark:border-blue-900/50 shrink-0"
                            >
                              + {t('line_short')}
                            </button>
-                           <button onClick={() => openModal('machine', m)} className="text-gray-300 hover:text-blue-600 p-1 transition-colors"><Pencil size={14} /></button>
-                           <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={14} /></button>
+                           <button onClick={() => openModal('machine', m)} className="text-gray-300 dark:text-gray-600 hover:text-blue-600 dark:hover:text-blue-400 p-1 transition-colors"><Pencil size={14} /></button>
+                           <button onClick={() => initiateDelete('machines', m.id, m.name)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-1 transition-colors"><Trash2 size={14} /></button>
                         </div>
                       </div>
 
                       <div className="flex flex-col gap-0.5">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none">{t('pilot')} {t('idle')}</p>
-                        <div className="flex items-center justify-between bg-blue-50/30 p-1.5 rounded-md border border-blue-100/50">
-                          <span className="text-[10px] md:text-sm font-bold text-blue-900">{users.find(u => u.id === m.currentPilotId)?.name || t('free')}</span>
+                        <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter leading-none">{t('pilot')} {t('idle')}</p>
+                        <div className="flex items-center justify-between bg-blue-50/30 dark:bg-blue-900/10 p-1.5 rounded-md border border-blue-100/50 dark:border-blue-900/20">
+                          <span className="text-[10px] md:text-sm font-bold text-blue-900 dark:text-blue-300">{users.find(u => u.id === m.currentPilotId)?.name || t('free')}</span>
                           {m.currentPilotId && (
                             <button 
                               onClick={() => localApi.updateDoc('machines', m.id, { currentPilotId: null })}
-                              className="text-[8px] font-black text-red-500 hover:underline uppercase"
+                              className="text-[8px] font-black text-red-500 dark:text-red-400 hover:underline uppercase"
                             >
                               {t('release')}
                             </button>
@@ -1129,29 +1152,29 @@ export default function AdminPanel() {
                       </div>
 
                       <div className="space-y-1">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Lignes</p>
+                        <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Lignes</p>
                         <div className="flex flex-wrap gap-1.5">
                           {lines.filter(l => l.machineId === m.id).map(l => (
                             <div 
                               key={l.id} 
                               className={cn(
                                 "border px-1.5 py-1 rounded flex items-center gap-1.5 group/line transition-all",
-                                l.isActive === false ? "bg-red-50 border-red-100 opacity-60" : "bg-gray-50 border-gray-100 hover:bg-white"
+                                l.isActive === false ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20 opacity-60" : "bg-gray-50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-900"
                               )}
                             >
                               <span className={cn(
                                 "text-[9px] md:text-xs font-bold",
-                                l.isActive === false ? "text-red-700 italic flex items-center gap-1" : "text-gray-700"
+                                l.isActive === false ? "text-red-700 dark:text-red-400 italic flex items-center gap-1" : "text-gray-700 dark:text-gray-300"
                               )}>
                                 {l.isActive === false && <Timer size={10} className="text-red-400" />}
                                 {l.name}
                                 {l.isActive === false && <span className="text-[7px] uppercase tracking-tighter opacity-50 ml-1">({t('out_of_service')})</span>}
                               </span>
                               <div className="flex gap-0.5">
-                                <button onClick={() => openModal('line', l)} className="text-gray-300 hover:text-blue-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
+                                <button onClick={() => openModal('line', l)} className="text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
                                   <Pencil size={10} />
                                 </button>
-                                <button onClick={() => initiateDelete('lines', l.id, l.name)} className="text-gray-300 hover:text-red-500 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
+                                <button onClick={() => initiateDelete('lines', l.id, l.name)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
                                   <Trash2 size={10} />
                                 </button>
                               </div>
@@ -1169,10 +1192,10 @@ export default function AdminPanel() {
           {activeTab === 'programmes' && (
             <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('programmes')}</h2>
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">{t('programmes')}</h2>
                 <button 
                   onClick={() => openModal('programme')}
-                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 dark:shadow-none active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
                 >
                   <Plus size={12} strokeWidth={3} /> {t('new').toUpperCase()}
                 </button>
@@ -1181,35 +1204,35 @@ export default function AdminPanel() {
               {/* ACTIVE PROGRAMMES */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 px-1">
-                  <Activity size={16} className="text-blue-600" />
-                  <h3 className="text-xs font-black uppercase tracking-widest text-blue-600">{t('active_programmes')}</h3>
+                  <Activity size={16} className="text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">{t('active_programmes')}</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                   {programmes.filter(p => p.status === 'ACTIVE').map(p => (
-                    <div key={p.id} className="card p-3 md:p-4 border-l-4 border-blue-500 transition-all">
+                    <div key={p.id} className="bg-white dark:bg-gray-900 p-3 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 border-l-4 border-l-blue-500 transition-all">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{machines.find(m => m.id === p.machineId)?.name} • {lines.find(l => l.id === p.lineId)?.name}</p>
-                          <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight">{p.name}</h3>
+                          <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">{machines.find(m => m.id === p.machineId)?.name} • {lines.find(l => l.id === p.lineId)?.name}</p>
+                          <h3 className="font-black text-sm md:text-base text-gray-900 dark:text-white leading-tight">{p.name}</h3>
                         </div>
-                        <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter bg-blue-100 text-blue-700">ACTIVE</span>
+                        <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">ACTIVE</span>
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] md:text-xs font-bold">
-                          <span className="text-gray-500">{p.producedPallets} {t('pallets').toLowerCase()}</span>
+                          <span className="text-gray-500 dark:text-gray-400">{p.producedPallets} {t('pallets').toLowerCase()}</span>
                         </div>
                       </div>
-                      <div className="mt-3 pt-2 border-t border-gray-50 flex justify-between items-center">
-                         <p className="text-[8px] font-bold text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</p>
+                      <div className="mt-3 pt-2 border-t border-gray-50 dark:border-gray-800 flex justify-between items-center">
+                         <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500">{new Date(p.createdAt).toLocaleDateString()}</p>
                          <div className="flex gap-1">
-                            <button onClick={() => openModal('programme', p)} className="text-gray-300 hover:text-blue-500 p-1"><Pencil size={12} /></button>
-                            <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={12} /></button>
+                            <button onClick={() => openModal('programme', p)} className="text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 p-1 transition-colors"><Pencil size={12} /></button>
+                            <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-1 transition-colors"><Trash2 size={12} /></button>
                          </div>
                       </div>
                     </div>
                   ))}
                   {programmes.filter(p => p.status === 'ACTIVE').length === 0 && (
-                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-300 bg-white/50 rounded-[32px] border-2 border-dashed border-gray-100">
+                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 bg-white/50 dark:bg-gray-900/50 rounded-[32px] border-2 border-dashed border-gray-100 dark:border-gray-800">
                       <Package size={40} strokeWidth={1} className="mb-2 opacity-50" />
                       <p className="text-[10px] font-black uppercase tracking-widest">{t('no_prog_available')}</p>
                     </div>
@@ -1220,30 +1243,30 @@ export default function AdminPanel() {
               {/* FINISHED PROGRAMMES */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 px-1">
-                  <History size={16} className="text-gray-400" />
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">{t('finished_programmes')}</h3>
+                  <History size={16} className="text-gray-400 dark:text-gray-600" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-600">{t('finished_programmes')}</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3">
                   {programmes.filter(p => p.status === 'FINISHED').map(p => (
-                    <div key={p.id} className="card p-2 md:p-3 bg-gray-50/50 border-gray-200 transition-all opacity-80 hover:opacity-100 group">
+                    <div key={p.id} className="bg-gray-50/50 dark:bg-gray-800/50 p-2 md:p-3 rounded-xl border border-gray-200 dark:border-gray-700 transition-all opacity-80 hover:opacity-100 group">
                       <div className="flex justify-between items-start mb-1.5">
                         <div className="truncate flex-1">
-                          <p className="text-[7px] font-black text-gray-400 uppercase tracking-tighter truncate">{lines.find(l => l.id === p.lineId)?.name || '—'}</p>
-                          <h3 className="font-black text-[10px] md:text-xs text-gray-700 leading-tight truncate">{p.name}</h3>
+                          <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter truncate">{lines.find(l => l.id === p.lineId)?.name || '—'}</p>
+                          <h3 className="font-black text-[10px] md:text-xs text-gray-700 dark:text-gray-300 leading-tight truncate">{p.name}</h3>
                         </div>
                         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                          <button onClick={() => openModal('programme', p)} className="text-gray-300 hover:text-blue-500 p-0.5"><Pencil size={10} /></button>
-                          <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 hover:text-red-500 p-0.5"><Trash2 size={10} /></button>
+                          <button onClick={() => openModal('programme', p)} className="text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 p-0.5"><Pencil size={10} /></button>
+                          <button onClick={() => initiateDelete('programmes', p.id, p.name)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-0.5"><Trash2 size={10} /></button>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center mt-2 pt-1 border-t border-gray-100">
-                        <span className="text-[9px] font-black text-gray-500">{p.producedPallets} <span className="text-[7px] uppercase tracking-tighter opacity-60">Pal</span></span>
-                        <p className="text-[7px] font-bold text-gray-400 italic">{new Date(p.createdAt).toLocaleDateString()}</p>
+                      <div className="flex justify-between items-center mt-2 pt-1 border-t border-gray-100 dark:border-gray-700">
+                        <span className="text-[9px] font-black text-gray-500 dark:text-gray-400">{p.producedPallets} <span className="text-[7px] uppercase tracking-tighter opacity-60">Pal</span></span>
+                        <p className="text-[7px] font-bold text-gray-400 dark:text-gray-600 italic">{new Date(p.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                   ))}
                   {programmes.filter(p => p.status === 'FINISHED').length === 0 && (
-                     <div className="col-span-full py-6 text-center text-gray-300 font-bold text-[9px] uppercase tracking-widest">
+                     <div className="col-span-full py-6 text-center text-gray-300 dark:text-gray-700 font-bold text-[9px] uppercase tracking-widest">
                        — Aucun programme terminé —
                      </div>
                   )}
@@ -1255,31 +1278,31 @@ export default function AdminPanel() {
           {activeTab === 'shifts' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('shifts')}</h2>
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">{t('shifts')}</h2>
                 <button 
                   onClick={() => openModal('shift')}
-                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 dark:shadow-none active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase flex items-center gap-1"
                 >
                   <Plus size={12} strokeWidth={3} /> {t('add')}
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                 {shifts.map(s => (
-                  <div key={s.id} className="card p-4 group flex justify-between items-center hover:border-blue-200 transition-colors">
+                  <div key={s.id} className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 group flex justify-between items-center hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                      <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400">
                         <Clock size={20} />
                       </div>
                       <div>
-                        <p className="font-black text-sm text-gray-900 leading-tight">{s.name}</p>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">{s.startTime} — {s.endTime}</p>
+                        <p className="font-black text-sm text-gray-900 dark:text-white leading-tight">{s.name}</p>
+                        <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter mt-0.5">{s.startTime} — {s.endTime}</p>
                       </div>
                     </div>
                     <div className="flex gap-0.5">
-                      <button onClick={() => openModal('shift', s)} className="text-gray-300 hover:text-blue-600 transition-colors p-1.5">
+                      <button onClick={() => openModal('shift', s)} className="text-gray-300 dark:text-gray-600 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1.5 focus:outline-none">
                         <Pencil size={14} />
                       </button>
-                      <button onClick={() => initiateDelete('shifts', s.id, s.name)} className="text-gray-300 hover:text-red-500 transition-colors p-1.5">
+                      <button onClick={() => initiateDelete('shifts', s.id, s.name)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1.5 focus:outline-none">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -1292,26 +1315,26 @@ export default function AdminPanel() {
         {activeTab === 'types' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">Motifs d'Arrêt</h2>
+                <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">Motifs d'Arrêt</h2>
                 <button 
                   onClick={() => openModal('downtime')}
-                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase"
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black shadow-lg shadow-blue-50 dark:shadow-none active:scale-95 transition-all text-[9px] md:text-[10px] tracking-widest uppercase"
                 >
                   NOUVEAU
                 </button>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
                 {downtimeTypes.map(t => (
-                  <div key={t.id} className="card p-2 md:p-4 text-center animate-in zoom-in-95 group relative hover:border-orange-200 transition-all">
+                  <div key={t.id} className="bg-white dark:bg-gray-900 p-2 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 text-center animate-in zoom-in-95 group relative hover:border-orange-200 dark:hover:border-orange-900 transition-all">
                     <div className="text-2xl md:text-3xl mb-2 grayscale group-hover:grayscale-0 transition-all">{t.icon || '⚠️'}</div>
-                    <p className="font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-700 leading-tight">{t.name}</p>
+                    <p className="font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-700 dark:text-gray-300 leading-tight">{t.name}</p>
                     <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
                       {t.name.toUpperCase() !== 'AUTRE' && (
                         <>
-                          <button onClick={() => openModal('downtime', t)} className="text-gray-300 hover:text-blue-500 p-1">
+                          <button onClick={() => openModal('downtime', t)} className="text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 p-1 focus:outline-none">
                             <Pencil size={12} />
                           </button>
-                          <button onClick={() => initiateDelete('downtime_types', t.id, t.name)} className="text-gray-300 hover:text-red-500 p-1">
+                          <button onClick={() => initiateDelete('downtime_types', t.id, t.name)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-1 focus:outline-none">
                             <Trash2 size={12} />
                           </button>
                         </>
@@ -1328,10 +1351,10 @@ export default function AdminPanel() {
               <div className="flex flex-col gap-4 px-1">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('history')}</h2>
+                    <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">{t('history')}</h2>
                     <button 
                       onClick={() => exportToExcel(historyLogType === 'production' ? 'production' : 'downtime')}
-                      className="p-1 px-2 md:px-3 bg-white border border-gray-200 rounded-lg text-[7px] md:text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 transition-all flex items-center gap-1 shadow-sm"
+                      className="p-1 px-2 md:px-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-[7px] md:text-[9px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center gap-1 shadow-sm dark:shadow-none"
                     >
                       <Download size={9} className="md:w-3 md:h-3" /> {t('export')}
                     </button>
@@ -1340,18 +1363,18 @@ export default function AdminPanel() {
                         startTime: new Date().toISOString(),
                         operatorId: user?.id || '',
                       })}
-                      className="p-1 px-2 md:px-4 bg-green-600 hover:bg-green-700 rounded-lg text-[8px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-lg active:scale-95 transition-all flex items-center gap-1 md:gap-2"
+                      className="p-1 px-2 md:px-4 bg-green-600 hover:bg-green-700 rounded-lg text-[8px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-lg dark:shadow-none active:scale-95 transition-all flex items-center gap-1 md:gap-2"
                     >
                       <Plus size={10} strokeWidth={3} className="md:w-3.5 md:h-3.5" /> {t('add_downtime_log') || 'Saisir un arrêt manuel'}
                     </button>
                   </div>
                   
-                  <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
+                  <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-full sm:w-auto">
                     <button 
                       onClick={() => setHistoryLogType('production')}
                       className={cn(
                         "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                        historyLogType === 'production' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                        historyLogType === 'production' ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm dark:shadow-none" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                       )}
                     >
                       {t('production_label_short')}
@@ -1360,7 +1383,7 @@ export default function AdminPanel() {
                       onClick={() => setHistoryLogType('downtime')}
                       className={cn(
                         "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                        historyLogType === 'downtime' ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                        historyLogType === 'downtime' ? "bg-white dark:bg-gray-700 text-red-600 dark:text-red-400 shadow-sm dark:shadow-none" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                       )}
                     >
                       {t('stop_label_short')}
@@ -1370,14 +1393,14 @@ export default function AdminPanel() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('machine')}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('machine')}</p>
                      <select 
                       value={historyMachineFilter}
                       onChange={e => {
                         setHistoryMachineFilter(e.target.value);
                         setHistoryLineFilter('');
                       }}
-                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                      className="w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none text-gray-900 dark:text-white"
                      >
                        <option value="">{t('all_machines')}</option>
                        {machines.map(m => (
@@ -1387,11 +1410,11 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('line')}</p>
                      <select 
                       value={historyLineFilter}
                       onChange={e => setHistoryLineFilter(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                      className="w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none text-gray-900 dark:text-white"
                      >
                        <option value="">{t('all_lines')}</option>
                        {lines
@@ -1403,11 +1426,11 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('shift')}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('shift')}</p>
                      <select 
                       value={historyShiftFilter}
                       onChange={e => setHistoryShiftFilter(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                      className="w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none text-gray-900 dark:text-white"
                      >
                        <option value="">{t('all_shifts')}</option>
                        {shifts.map(s => (
@@ -1417,11 +1440,11 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Opérateur</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Opérateur</p>
                      <select 
                       value={historyOperatorFilter}
                       onChange={e => setHistoryOperatorFilter(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                      className="w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none text-gray-900 dark:text-white"
                      >
                        <option value="">{t('all_operators') || 'Tous'}</option>
                        {users.map(u => (
@@ -1431,22 +1454,22 @@ export default function AdminPanel() {
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_date') || 'Début'}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('start_date') || 'Début'}</p>
                      <input 
                       type="date"
                       value={historyDateFilter}
                       onChange={e => setHistoryDateFilter(e.target.value)}
-                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                      className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none h-[38px] text-gray-900 dark:text-white"
                      />
                    </div>
 
                    <div className="space-y-1">
-                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_date') || 'Fin'}</p>
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('end_date') || 'Fin'}</p>
                      <input 
                       type="date"
                       value={historyEndDateFilter}
                       onChange={e => setHistoryEndDateFilter(e.target.value)}
-                      className="w-full p-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm h-[38px]"
+                      className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none h-[38px] text-gray-900 dark:text-white"
                      />
                    </div>
                 </div>
@@ -1455,14 +1478,14 @@ export default function AdminPanel() {
               <div className="space-y-6 md:space-y-8">
                 {historyLogType === 'production' ? (
                   <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
-                    <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                      <Package className="text-blue-600" size={16} />
+                    <h3 className="text-xs md:text-sm font-black text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-widest">
+                      <Package className="text-blue-600 dark:text-blue-400" size={16} />
                       {t('production_log').toUpperCase()}
                     </h3>
-                    <div className="card overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-[32px] border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-none">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                          <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                          <thead className="bg-gray-50 dark:bg-gray-800 text-[7px] md:text-[9px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
                             <tr>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('date')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell text-left">{t('line_short')}</th>
@@ -1473,7 +1496,7 @@ export default function AdminPanel() {
                               <th className="px-2 md:px-6 py-2 md:py-3 text-right">{t('actions')}</th>
                             </tr>
                           </thead>
-                        <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
+                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800 text-[9px] md:text-xs text-gray-900 dark:text-gray-300">
                           <AnimatePresence mode="popLayout">
                             {sortedProdLogs
                               .filter(log => {
@@ -1492,20 +1515,20 @@ export default function AdminPanel() {
                                   initial={{ opacity: 1 }}
                                   exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
                                   transition={{ duration: 0.2 }}
-                                  className="hover:bg-gray-50/50"
+                                  className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50"
                                 >
-                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900 whitespace-nowrap">
+                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                                     {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
-                                    <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                    <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                    <p className="text-[7px] md:text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                                   </td>
-                                  <td className="px-2 md:px-6 py-2 md:py-3 text-blue-600 font-bold truncate max-w-[60px] md:max-w-none">
+                                  <td className="px-2 md:px-6 py-2 md:py-3 text-blue-600 dark:text-blue-400 font-bold truncate max-w-[60px] md:max-w-none">
                                     {programmes.find(p => p.id === log.programmeId)?.name || '—'}
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
-                                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[7px] md:text-[9px] font-black uppercase italic">
+                                    <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-[7px] md:text-[9px] font-black uppercase italic">
                                       {shifts.find(s => s.id === log.shiftId)?.name || '—'}
                                     </span>
                                   </td>
@@ -1513,12 +1536,12 @@ export default function AdminPanel() {
                                     {users.find(u => u.id === log.operatorId)?.name || '—'}
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 text-center">
-                                    <span className="bg-blue-50 text-blue-700 px-1 py-0.5 rounded font-black">{log.count}</span>
+                                    <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1 py-0.5 rounded font-black">{log.count}</span>
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                     <div className="flex justify-end gap-1">
-                                      <button onClick={() => openModal('production_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                      <button onClick={() => initiateDelete('production_logs', log.id, `${t('production_of')} ${log.count} ${t('pallets')}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => openModal('production_log', log)} className="text-gray-300 dark:text-gray-600 hover:text-blue-600 dark:hover:text-blue-400 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => initiateDelete('production_logs', log.id, `${t('production_of')} ${log.count} ${t('pallets')}`)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                     </div>
                                   </td>
                                 </motion.tr>
@@ -1531,14 +1554,14 @@ export default function AdminPanel() {
                   </div>
                 ) : (
                   <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
-                    <h3 className="text-xs md:text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                      <Timer className="text-orange-600" size={16} />
+                    <h3 className="text-xs md:text-sm font-black text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-widest">
+                      <Timer className="text-orange-600 dark:text-orange-400" size={16} />
                       {t('downtime_log').toUpperCase()}
                     </h3>
-                    <div className="card overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-[32px] border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-none">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                          <thead className="bg-gray-50 text-[7px] md:text-[9px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
+                          <thead className="bg-gray-50 dark:bg-gray-800 text-[7px] md:text-[9px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
                             <tr>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('start_time')}</th>
                               <th className="px-2 md:px-6 py-2 md:py-3 text-left">{t('end_time')}</th>
@@ -1550,7 +1573,7 @@ export default function AdminPanel() {
                               <th className="px-2 md:px-6 py-2 md:py-3 text-right">{t('actions')}</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-50 text-[9px] md:text-xs">
+                          <tbody className="divide-y divide-gray-50 dark:divide-gray-800 text-[9px] md:text-xs">
                           <AnimatePresence mode="popLayout">
                             {sortedDownLogs
                               .filter(log => {
@@ -1569,43 +1592,43 @@ export default function AdminPanel() {
                                   initial={{ opacity: 1 }}
                                   exit={{ opacity: 0, x: -20, backgroundColor: 'rgba(254, 226, 226, 0.5)' }}
                                   transition={{ duration: 0.2 }}
-                                  className="hover:bg-gray-50/50"
+                                  className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50"
                                 >
-                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900">
+                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-900 dark:text-white">
                                     {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </td>
-                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-600">
-                                    {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 animate-pulse font-black uppercase text-[7px] md:text-[9px]">Active</span>}
+                                  <td className="px-2 md:px-6 py-2 md:py-3 font-medium text-gray-600 dark:text-gray-400">
+                                    {log.endTime ? new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-orange-500 dark:text-orange-400 animate-pulse font-black uppercase text-[7px] md:text-[9px]">Active</span>}
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3">
                                     {log.duration || !log.endTime ? (
-                                      <span className="font-mono text-[9px] md:text-[10px] text-blue-700 font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                      <span className="font-mono text-[9px] md:text-[10px] text-blue-700 dark:text-blue-400 font-black bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-900/50">
                                         {formatDowntimeDisplay(getLogDurationSec(log))}
                                       </span>
-                                    ) : <span className="text-orange-500 font-bold text-[8px] uppercase">En cours</span>}
+                                    ) : <span className="text-orange-500 dark:text-orange-400 font-bold text-[8px] uppercase">En cours</span>}
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3">
                                     <div className="flex items-center gap-1">
                                       <span className="text-sm">{downtimeTypes.find(t => t.id === log.typeId)?.icon || '⚠️'}</span>
-                                      <p className="font-bold text-gray-800 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
+                                      <p className="font-bold text-gray-800 dark:text-gray-200 truncate max-w-[60px] md:max-w-none">{downtimeTypes.find(t => t.id === log.typeId)?.name || '—'}</p>
                                     </div>
                                   </td>
-                                  <td className="px-2 md:px-6 py-2 md:py-3 italic">
+                                  <td className="px-2 md:px-6 py-2 md:py-3 italic text-gray-900 dark:text-gray-300">
                                     <div className="flex items-center gap-1.5">
-                                      <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-[8px] font-black uppercase text-gray-500 border border-gray-200">
+                                      <div className="w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-[8px] font-black uppercase text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
                                         {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
                                       </div>
-                                      <span className="font-black text-gray-600 truncate max-w-[80px] md:max-w-none">
+                                      <span className="font-black text-gray-600 dark:text-gray-400 truncate max-w-[80px] md:max-w-none">
                                         {users.find(u => u.id === log.operatorId)?.name || '—'}
                                       </span>
                                     </div>
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
-                                    <p className="font-bold text-gray-800">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
-                                    <p className="text-[7px] md:text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200">{machines.find(m => m.id === log.machineId)?.name || '—'}</p>
+                                    <p className="text-[7px] md:text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">{lines.find(l => l.id === log.lineId)?.name || '—'}</p>
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 hidden sm:table-cell">
-                                    <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded text-[7px] md:text-[9px] font-black uppercase italic">
+                                    <span className="px-1.5 py-0.5 bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded text-[7px] md:text-[9px] font-black uppercase italic">
                                       {shifts.find(s => s.id === log.shiftId)?.name || '—'}
                                     </span>
                                   </td>
@@ -1614,7 +1637,7 @@ export default function AdminPanel() {
                                       {log.image_path && (
                                         <button 
                                           onClick={() => setSelectedFullImage(log.image_path)}
-                                          className="text-white bg-blue-500 p-1 rounded-lg hover:bg-blue-600 transition-colors"
+                                          className="text-white bg-blue-500 dark:bg-blue-600 p-1 rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
                                           title="Voir la photo"
                                         >
                                           <Camera size={14} />
@@ -1626,15 +1649,15 @@ export default function AdminPanel() {
                                             <button 
                                               key={i}
                                               onClick={() => setSelectedFullImage(img)}
-                                              className="w-6 h-6 rounded-full border-2 border-white bg-blue-500 flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm"
+                                              className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-900 bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm dark:shadow-none"
                                             >
                                               <Camera size={10} />
                                             </button>
                                           ))}
                                         </div>
                                       )}
-                                      <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 hover:text-blue-600 p-1"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                      <button onClick={() => initiateDelete('downtime_logs', log.id, `${t('stop_recorded')} ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => openModal('downtime_log', log)} className="text-gray-300 dark:text-gray-600 hover:text-blue-600 dark:hover:text-blue-400 p-1 focus:outline-none"><Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                      <button onClick={() => initiateDelete('downtime_logs', log.id, `${t('stop_recorded')} ${downtimeTypes.find(t => t.id === log.typeId)?.name}`)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-1 focus:outline-none"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                     </div>
                                   </td>
                                 </motion.tr>
@@ -1652,43 +1675,43 @@ export default function AdminPanel() {
           {activeTab === 'reports' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
                 <div className="px-1 flex items-center gap-4">
-                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 leading-none">{t('exports')}</h2>
+                  <h2 className="text-lg md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">{t('exports')}</h2>
                 </div>
               <div className="grid md:grid-cols-2 gap-4">
-                 <div className="card p-4 md:p-6 flex flex-col gap-4 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 text-blue-50/50 group-hover:text-blue-100/50 transition-colors rotate-12">
+                 <div className="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 text-blue-50/50 dark:text-blue-900/10 group-hover:text-blue-100/50 dark:group-hover:text-blue-900/20 transition-colors rotate-12">
                        <Package size={80} />
                     </div>
-                    <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 relative z-10">
+                    <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 dark:shadow-none relative z-10">
                        <History size={20} strokeWidth={2.5} />
                     </div>
                     <div className="relative z-10">
-                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">{t('production_log')}</h3>
-                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">{t('production_logs_desc')}</p>
+                      <h3 className="text-base font-black text-gray-900 dark:text-white tracking-tight mb-1">{t('production_log')}</h3>
+                      <p className="text-gray-500 dark:text-gray-400 text-[10px] md:text-xs font-medium leading-tight">{t('production_logs_desc')}</p>
                     </div>
                     <button 
                       onClick={() => exportToExcel('production')}
-                      className="w-full py-1.5 md:py-2.5 bg-blue-600 text-white rounded-lg font-black shadow-lg shadow-blue-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"
+                      className="w-full py-1.5 md:py-2.5 bg-blue-600 text-white rounded-lg font-black shadow-lg shadow-blue-50 dark:shadow-none active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"
                     >
                       <Download size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" />
                       {t('export')}
                     </button>
                  </div>
 
-                 <div className="card p-4 md:p-6 flex flex-col gap-4 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 text-orange-50/50 group-hover:text-orange-100/50 transition-colors rotate-12">
+                 <div className="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 text-orange-50/50 dark:text-orange-900/10 group-hover:text-orange-100/50 dark:group-hover:text-orange-900/20 transition-colors rotate-12">
                        <Timer size={80} />
                     </div>
-                    <div className="w-10 h-10 bg-orange-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-orange-100 relative z-10">
+                    <div className="w-10 h-10 bg-orange-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-orange-100 dark:shadow-none relative z-10">
                        <Activity size={20} strokeWidth={2.5} />
                     </div>
                     <div className="relative z-10">
-                      <h3 className="text-base font-black text-gray-900 tracking-tight mb-1">{t('downtime_log')}</h3>
-                      <p className="text-gray-500 text-[10px] md:text-xs font-medium leading-tight">{t('downtime_analysis_desc')}</p>
+                      <h3 className="text-base font-black text-gray-900 dark:text-white tracking-tight mb-1">{t('downtime_log')}</h3>
+                      <p className="text-gray-500 dark:text-gray-400 text-[10px] md:text-xs font-medium leading-tight">{t('downtime_analysis_desc')}</p>
                     </div>
                     <button 
                       onClick={() => exportToExcel('downtime')}
-                      className="w-full py-1.5 md:py-2.5 bg-orange-600 text-white rounded-lg font-black shadow-lg shadow-orange-50 active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"
+                      className="w-full py-1.5 md:py-2.5 bg-orange-600 text-white rounded-lg font-black shadow-lg shadow-orange-50 dark:shadow-none active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"
                     >
                       <Download size={12} strokeWidth={3} className="md:w-3.5 md:h-3.5" />
                       {t('export')}
@@ -1736,14 +1759,14 @@ export default function AdminPanel() {
 
       {/* MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white w-full max-w-[98%] sm:max-w-sm md:max-w-xl rounded-2xl md:rounded-[32px] p-4 md:p-8 space-y-3 md:space-y-6 shadow-2xl border border-gray-100 max-h-[92vh] overflow-y-auto"
+            className="bg-white dark:bg-gray-900 w-full max-w-[98%] sm:max-w-sm md:max-w-xl rounded-2xl md:rounded-[32px] p-4 md:p-8 space-y-3 md:space-y-6 shadow-2xl dark:shadow-none border border-gray-100 dark:border-gray-800 max-h-[92vh] overflow-y-auto"
           >
             <div className="space-y-0.5">
-              <h3 className="text-base font-black tracking-tight text-gray-900 uppercase italic leading-none">
+              <h3 className="text-base font-black tracking-tight text-gray-900 dark:text-white uppercase italic leading-none">
                 {editingId ? t('edit') : t('new')} {
                   modalType === 'user' ? t('user') : 
                   modalType === 'machine' ? t('machine') : 
@@ -1751,7 +1774,7 @@ export default function AdminPanel() {
                   modalType === 'programme' ? t('program') : 
                   modalType === 'shift' ? t('shift') : t('downtime_reason')}
               </h3>
-              <p className="text-[7px] text-gray-400 font-black uppercase tracking-widest">{t('configuration')}</p>
+              <p className="text-[7px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">{t('configuration')}</p>
             </div>
 
             <div className="space-y-4">
@@ -1759,25 +1782,25 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={t('shift_name')}
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_time')}</label>
+                      <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('start_time')}</label>
                       <input 
                         type="time"
-                        className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                        className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                         value={modalData.startTime || ''}
                         onChange={e => setModalData({...modalData, startTime: e.target.value})}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_time')}</label>
+                      <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('end_time')}</label>
                       <input 
                         type="time"
-                        className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                        className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                         value={modalData.endTime || ''}
                         onChange={e => setModalData({...modalData, endTime: e.target.value})}
                       />
@@ -1789,19 +1812,19 @@ export default function AdminPanel() {
               {modalType === 'production_log' && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('quantity')} ({t('pallets')})</label>
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('quantity')} ({t('pallets')})</label>
                     <input 
                       type="number"
-                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                      className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                       value={modalData.count || ''}
                       onChange={e => setModalData({...modalData, count: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('date')}</label>
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('date')}</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                      className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                       value={modalData.timestamp ? format(new Date(modalData.timestamp), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1820,9 +1843,9 @@ export default function AdminPanel() {
               {modalType === 'downtime_log' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('machine')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('machine')}</label>
                     <select 
-                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-xs"
                       value={modalData.machineId || ''}
                       onChange={e => {
                         const mId = e.target.value;
@@ -1834,9 +1857,9 @@ export default function AdminPanel() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('line')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('line')}</label>
                     <select 
-                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-xs"
                       disabled={!modalData.machineId}
                       value={modalData.lineId || ''}
                       onChange={e => setModalData({...modalData, lineId: e.target.value})}
@@ -1848,9 +1871,9 @@ export default function AdminPanel() {
                     </select>
                   </div>
                   <div className="space-y-1.5 md:col-span-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('operator')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('operator')}</label>
                     <select 
-                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-xs"
                       value={modalData.operatorId || ''}
                       onChange={e => setModalData({...modalData, operatorId: e.target.value})}
                     >
@@ -1861,9 +1884,9 @@ export default function AdminPanel() {
                     </select>
                   </div>
                   <div className="space-y-1.5 md:col-span-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('downtime_reason')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('downtime_reason')}</label>
                     <select 
-                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-xs"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-xs"
                       value={modalData.typeId || ''}
                       onChange={e => setModalData({...modalData, typeId: e.target.value})}
                     >
@@ -1872,10 +1895,10 @@ export default function AdminPanel() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('start_time')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('start_time')}</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs text-gray-900 dark:text-white"
                       value={modalData.startTime ? format(new Date(modalData.startTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1891,10 +1914,10 @@ export default function AdminPanel() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('end_time')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('end_time')}</label>
                     <input 
                       type="datetime-local"
-                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs text-gray-900 dark:text-white"
                       value={modalData.endTime ? format(new Date(modalData.endTime), "yyyy-MM-dd'T'HH:mm") : ''}
                       onChange={e => {
                         try {
@@ -1910,9 +1933,9 @@ export default function AdminPanel() {
                     />
                   </div>
                   <div className="space-y-1.5 md:col-span-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('description_comment')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('description_comment')}</label>
                     <textarea 
-                      className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs min-h-[80px]"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs min-h-[80px] text-gray-900 dark:text-white"
                       placeholder={t('comments')}
                       value={modalData.description || ''}
                       onChange={e => setModalData({...modalData, description: e.target.value})}
@@ -1920,11 +1943,11 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Photos Galerie</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Photos Galerie</label>
                     <div className="grid grid-cols-4 gap-2">
                        {/* Legacy single photo handling */}
                        {modalData.image_path && (
-                         <div className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 group">
+                         <div className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 group">
                            <img 
                              src={`/uploads/${modalData.image_path}`} 
                              className="w-full h-full object-cover cursor-pointer"
@@ -1941,7 +1964,7 @@ export default function AdminPanel() {
                        
                        {/* Multi-photos handling */}
                        {(Array.isArray(modalData.images) ? modalData.images : (modalData.images ? JSON.parse(modalData.images) : [])).map((img: string, idx: number) => (
-                         <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 group">
+                         <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 group">
                            <img 
                              src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} 
                              className="w-full h-full object-cover cursor-pointer"
@@ -1984,7 +2007,7 @@ export default function AdminPanel() {
                             };
                             input.click();
                          }}
-                         className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:text-blue-500 hover:border-blue-500 transition-all"
+                         className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:text-blue-500 hover:border-blue-500 transition-all font-bold text-xs"
                        >
                          <Camera size={20} />
                        </button>
@@ -1997,12 +2020,12 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={t('program_name')}
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   <select 
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-sm"
                     value={modalData.machineId || ''}
                     onChange={e => setModalData({...modalData, machineId: e.target.value})}
                   >
@@ -2010,7 +2033,7 @@ export default function AdminPanel() {
                     {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                   <select 
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-sm"
                     disabled={!modalData.machineId}
                     value={modalData.lineId || ''}
                     onChange={e => setModalData({...modalData, lineId: e.target.value})}
@@ -2022,7 +2045,7 @@ export default function AdminPanel() {
                   </select>
                   {editingId && (
                     <select 
-                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
+                      className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-sm"
                       value={modalData.status || 'ACTIVE'}
                       onChange={e => setModalData({...modalData, status: e.target.value})}
                     >
@@ -2031,10 +2054,10 @@ export default function AdminPanel() {
                     </select>
                   )}
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
+                    <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('technical_parameters')}</label>
                     <textarea 
                       placeholder="Pression, Vitesse, Température..."
-                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs md:text-sm"
+                      className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-xs md:text-sm text-gray-900 dark:text-white"
                       rows={2}
                       value={modalData.parameters || ''}
                       onChange={e => setModalData({...modalData, parameters: e.target.value})}
@@ -2047,7 +2070,7 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={t('full_name')}
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
@@ -2055,20 +2078,20 @@ export default function AdminPanel() {
                     <input 
                       placeholder={editingId ? t('new_password_placeholder') || 'Nouveau mot de passe (optionnel)' : t('password') || 'Mot de passe'}
                       type="password"
-                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                      className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                       value={modalData.pin || ''}
                       onChange={e => setModalData({...modalData, pin: e.target.value})}
                     />
                     <input 
                       placeholder={t('confirm_password') || 'Confirmer le mot de passe'}
                       type="password"
-                      className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                      className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                       value={confirmPin}
                       onChange={e => setConfirmPin(e.target.value)}
                     />
                   </div>
                   <select 
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-gray-700 dark:text-gray-300 text-sm"
                     value={modalData.role || ''}
                     onChange={e => setModalData({...modalData, role: e.target.value})}
                   >
@@ -2084,31 +2107,31 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder={modalType === 'machine' ? t('machine_name') : t('line_name')}
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   {modalType === 'line' && (
                     <div className="space-y-2">
-                       <div className="flex items-center gap-3 p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100">
+                       <div className="flex items-center gap-3 p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 transition-all">
                         <input 
                           type="checkbox"
                           id="isActive"
-                          className="w-5 h-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
                           checked={modalData.isActive !== false}
                           onChange={e => setModalData({...modalData, isActive: e.target.checked})}
                         />
-                        <label htmlFor="isActive" className="text-sm font-bold text-gray-700">{t('active_service')}</label>
+                        <label htmlFor="isActive" className="text-sm font-bold text-gray-700 dark:text-gray-300 transition-colors">{t('active_service')}</label>
                       </div>
-                      <div className="flex items-center gap-3 p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100">
+                      <div className="flex items-center gap-3 p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 transition-all">
                         <input 
                           type="checkbox"
                           id="tracksProduction"
-                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                           checked={modalData.tracksProduction !== false}
                           onChange={e => setModalData({...modalData, tracksProduction: e.target.checked})}
                         />
-                        <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700">{t('track_production')}</label>
+                        <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700 dark:text-gray-300 transition-colors">{t('track_production')}</label>
                       </div>
                     </div>
                   )}
@@ -2119,13 +2142,13 @@ export default function AdminPanel() {
                 <>
                   <input 
                     placeholder="Nom du motif"
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                     value={modalData.name || ''}
                     onChange={e => setModalData({...modalData, name: e.target.value})}
                   />
                   <input 
                     placeholder="Emoji (ex: 🛠️)"
-                    className="w-full p-3 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm"
+                    className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
                     value={modalData.icon || ''}
                     onChange={e => setModalData({...modalData, icon: e.target.value})}
                   />
@@ -2136,13 +2159,13 @@ export default function AdminPanel() {
             <div className="flex gap-3 pt-2 md:pt-4">
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-3 md:py-4 font-black text-gray-400 hover:bg-gray-50 rounded-xl md:rounded-2xl transition-all uppercase text-[8px] md:text-[10px] tracking-widest"
+                className="flex-1 py-3 md:py-4 font-black text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl md:rounded-2xl transition-all uppercase text-[8px] md:text-[10px] tracking-widest focus:outline-none"
               >
                 {t('cancel')}
               </button>
               <button 
                 onClick={handleModalSubmit}
-                className="flex-1 py-3 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black shadow-xl shadow-blue-50 active:scale-95 transition-all uppercase text-[8px] md:text-[10px] tracking-widest"
+                className="flex-1 py-3 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black shadow-xl shadow-blue-50 dark:shadow-none active:scale-95 transition-all uppercase text-[8px] md:text-[10px] tracking-widest focus:outline-none"
               >
                 {t('save')}
               </button>
@@ -2158,7 +2181,7 @@ export default function AdminPanel() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 md:p-12"
+            className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 md:p-12"
             onClick={() => setSelectedFullImage(null)}
           >
             <button 
@@ -2171,7 +2194,7 @@ export default function AdminPanel() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              src={`/uploads/${selectedFullImage}`}
+              src={selectedFullImage.startsWith('http') || selectedFullImage.startsWith('/') ? selectedFullImage : `/uploads/${selectedFullImage}`}
               alt="Pleine résolution"
               className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
               onClick={(e) => e.stopPropagation()}
@@ -2182,29 +2205,29 @@ export default function AdminPanel() {
 
       {/* CONFIRM DELETE MODAL */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
           <motion.div 
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white w-full max-w-sm rounded-[32px] p-8 text-center space-y-6 shadow-2xl border border-red-100"
+            className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] p-8 text-center space-y-6 shadow-2xl dark:shadow-none border border-red-100 dark:border-red-900/20"
           >
-            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500 mb-2">
+            <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto text-red-500 dark:text-red-400 mb-2">
               <Trash2 size={40} strokeWidth={2.5} />
             </div>
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-gray-900 tracking-tight italic uppercase">{t('delete_question')}</h3>
-              <p className="text-gray-500 font-medium">{t('delete_confirm_msg')} <span className="text-red-600 font-black italic">{confirmDelete.name}</span> ? {t('delete_irreversible')}</p>
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight italic uppercase">{t('delete_question')}</h3>
+              <p className="text-gray-500 dark:text-gray-400 font-medium">{t('delete_confirm_msg')} <span className="text-red-600 dark:text-red-400 font-black italic">{confirmDelete.name}</span> ? {t('delete_irreversible')}</p>
             </div>
             <div className="flex gap-3">
               <button 
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-4 font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all uppercase text-[10px] tracking-widest"
+                className="flex-1 py-4 font-black text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all uppercase text-[10px] tracking-widest focus:outline-none"
               >
                 {t('cancel')}
               </button>
               <button 
                 onClick={deleteItem}
-                className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-xl shadow-red-200 active:scale-95 transition-all uppercase text-[10px] tracking-widest"
+                className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black shadow-xl shadow-red-200 dark:shadow-none active:scale-95 transition-all uppercase text-[10px] tracking-widest focus:outline-none"
               >
                 {t('confirm')}
               </button>
