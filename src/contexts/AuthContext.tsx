@@ -29,8 +29,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const foundUser = await loginLocal(username, password);
       
       if (foundUser) {
-        setUser(foundUser);
-        localStorage.setItem('factory_user', JSON.stringify(foundUser));
+        // Save token separately for API auth headers
+        if (foundUser.token) {
+          localStorage.setItem('factory_token', foundUser.token);
+        }
+        // Save user without the token in the user state
+        const { token, ...userWithoutToken } = foundUser;
+        setUser(userWithoutToken);
+        localStorage.setItem('factory_user', JSON.stringify(userWithoutToken));
         return true;
       }
       return false;
