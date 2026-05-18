@@ -715,9 +715,9 @@ export default function PilotScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-950 pb-20">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-950" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
       {/* MOBILE HEADER */}
-      <header className="sm:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-2 py-0.5 flex justify-between items-center sticky top-0 z-40 shadow-sm dark:shadow-none">
+      <header className="sm:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-3 py-2 flex justify-between items-center sticky top-0 z-40 shadow-sm dark:shadow-none" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-1">
           {selectedMachineId ? (
             <button 
@@ -752,7 +752,7 @@ export default function PilotScreen() {
           <button
             onClick={toggleTheme}
             className={cn(
-              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
+              "relative flex items-center gap-1.5 p-2.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
               theme === 'dark'
                 ? "bg-slate-800 border-slate-700 text-yellow-400"
                 : "bg-gray-100 border-gray-200 text-gray-500"
@@ -774,7 +774,7 @@ export default function PilotScreen() {
           </button>
           <button 
             onClick={handleLogout}
-            className="p-1 px-1.5 border border-red-50 dark:border-red-900/20 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-lg transition-colors font-black text-[7px] uppercase"
+            className="px-4 py-2.5 border border-red-50 dark:border-red-900/20 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-xl transition-colors font-black text-[10px] uppercase"
           >
             {t('logout')}
           </button>
@@ -856,7 +856,7 @@ export default function PilotScreen() {
         )}
       </AnimatePresence>
 
-      <div className="bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-none flex flex-col gap-4 sticky top-0 sm:top-0 z-20 border-b border-gray-200 dark:border-gray-800 hidden sm:block">
+      <div className="bg-white dark:bg-gray-900 p-4 shadow-sm dark:shadow-none flex flex-col gap-4 sticky top-0 sm:top-0 z-20 border-b border-gray-200 dark:border-gray-800 hidden sm:block" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <Monitor className="text-blue-600 dark:text-blue-400" size={24} />
@@ -866,7 +866,7 @@ export default function PilotScreen() {
             <button
               onClick={toggleTheme}
               className={cn(
-                "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest hidden sm:flex",
+                "relative flex items-center gap-1.5 p-2.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest hidden sm:flex",
                 theme === 'dark'
                   ? "bg-slate-800 border-slate-700 text-yellow-400"
                   : "bg-gray-100 border-gray-200 text-gray-500"
@@ -886,39 +886,41 @@ export default function PilotScreen() {
               </div>
               <Moon size={13} className={theme === 'dark' ? "opacity-30" : "opacity-100"} />
             </button>
-            <button 
-              onClick={() => setActiveTab('dashboard')}
-              className={cn(
-                "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-              )}
-            >
-              <LayoutDashboard size={14} />
-              {t('dashboard')}
-            </button>
-            <button 
-              onClick={() => setActiveTab('monitor')}
-              className={cn(
-                "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                activeTab === 'monitor' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-              )}
-            >
-              <Monitor size={14} />
-              {t('monitor')}
-            </button>
-            <button 
-              onClick={() => setActiveTab('history')}
-              className={cn(
-                "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                activeTab === 'history' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-              )}
-            >
-              <History size={14} />
-              {t('history')}
-            </button>
+            <div className="hidden sm:flex items-center gap-2">
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className={cn(
+                  "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                  activeTab === 'dashboard' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                )}
+              >
+                <LayoutDashboard size={14} />
+                {t('dashboard')}
+              </button>
+              <button 
+                onClick={() => setActiveTab('monitor')}
+                className={cn(
+                  "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                  activeTab === 'monitor' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                )}
+              >
+                <Monitor size={14} />
+                {t('monitor')}
+              </button>
+              <button 
+                onClick={() => setActiveTab('history')}
+                className={cn(
+                  "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                  activeTab === 'history' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                )}
+              >
+                <History size={14} />
+                {t('history')}
+              </button>
+            </div>
             <button 
               onClick={handleLogout} 
-              className="p-1 px-1.5 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 dark:border-red-900/20 hover:bg-red-500 dark:hover:bg-red-600 hover:text-white shrink-0"
+              className="px-4 py-2.5 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-xl transition-colors font-black text-[10px] uppercase border border-red-50 dark:border-red-900/20 hover:bg-red-500 dark:hover:bg-red-600 hover:text-white shrink-0"
             >
               {t('logout')}
             </button>
@@ -2326,6 +2328,21 @@ export default function PilotScreen() {
           </motion.div>
         )}
       </AnimatePresence>
+      <nav className="fixed bottom-0 left-0 right-0 sm:hidden bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-50" 
+           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        {[
+          { tab: 'dashboard', icon: LayoutDashboard, label: 'Tableau' },
+          { tab: 'monitor',   icon: Monitor,         label: 'Monitor' },
+          { tab: 'history',   icon: History,         label: 'Historique' },
+        ].map(({ tab, icon: Icon, label }) => (
+          <button key={tab} onClick={() => setActiveTab(tab as any)}
+            className={cn("flex-1 flex flex-col items-center gap-1 py-3 text-[9px] font-black uppercase tracking-wide transition-colors",
+              activeTab === tab ? "text-blue-600" : "text-gray-400")}>
+            <Icon size={22} strokeWidth={activeTab === tab ? 2.5 : 1.5} />
+            {label}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

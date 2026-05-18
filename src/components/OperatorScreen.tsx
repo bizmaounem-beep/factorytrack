@@ -76,14 +76,16 @@ export default function OperatorScreen() {
 
   const currentShiftId = getCurrentShiftId(shifts);
 
+  const [dismissedCategorizationId, setDismissedCategorizationId] = useState<string | null>(null);
+
   // Derive categorizing log
   const categorizingLog = !activeDowntime && activeLine 
-    ? downtimeLogs.find(d => d.lineId === activeLine.id && d.operatorId === user?.id && d.typeId === 'PENDING' && d.endTime) || null 
+    ? downtimeLogs.find(d => d.lineId === activeLine.id && d.operatorId === user?.id && d.typeId === 'PENDING' && d.endTime && d.id !== dismissedCategorizationId) || null 
     : null;
   const categorizingLogId = categorizingLog?.id || null;
 
   const [flashFeedback, setFlashFeedback] = useState(false);
-
+  
   // Manual Stop Form State
   const [manualStopForm, setManualStopForm] = useState({
     typeId: '',
@@ -777,8 +779,8 @@ export default function OperatorScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-950 text-slate-900 dark:text-white font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden transition-colors duration-300">
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 px-4 py-3 shrink-0">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-950 text-slate-900 dark:text-white font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden transition-colors duration-300" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 px-4 py-3 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -795,7 +797,7 @@ export default function OperatorScreen() {
           <button
             onClick={toggleTheme}
             className={cn(
-              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
+              "relative flex items-center gap-1.5 p-2.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
               theme === 'dark'
                 ? "bg-slate-800 border-slate-700 text-yellow-400"
                 : "bg-gray-100 border-gray-200 text-gray-500"
@@ -821,14 +823,14 @@ export default function OperatorScreen() {
             </div>
             <button 
               onClick={() => setShowFeatureInfo(true)}
-              className="p-2 text-slate-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              className="p-2.5 text-slate-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
               title="Aide sur les fonctionnalités"
             >
               <Info size={18} />
             </button>
             <button 
               onClick={handleLogout}
-              className="p-1 px-1.5 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 dark:border-red-900/30 hover:bg-red-500 hover:text-white"
+              className="px-4 py-2.5 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl transition-colors font-black text-[10px] uppercase border border-red-50 dark:border-red-900/30 hover:bg-red-500 hover:text-white"
             >
               {t('logout')}
             </button>
@@ -1002,172 +1004,7 @@ export default function OperatorScreen() {
                         </div>
                       </div>
                     ) : (isInitialSelection || categorizingLogId) ? (
-                      <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
-                        <div className="flex items-center justify-center gap-3">
-                           <div className="flex flex-col items-center">
-                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-gray-500 leading-none mb-1">
-                               {isInitialSelection ? 'Initialisation' : 'Qualification'}
-                             </h3>
-                             <p className="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase leading-none">
-                                {isInitialSelection ? 'Type d\'arrêt' : 'Cause détectée'}
-                             </p>
-                           </div>
-                           {isInitialSelection && (
-                            <button 
-                              onClick={() => setIsInitialSelection(false)}
-                              className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
-                            >
-                              <X size={16} />
-                            </button>
-                          )}
-                        </div>
-
-                        {!selectedStopType ? (
-                          <div className="relative">
-                            <div 
-                              ref={scrollRef}
-                              className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory px-1 items-center"
-                            >
-                              {downtimeTypes.map((type) => (
-                                <button
-                                  key={type.id}
-                                  onClick={() => setSelectedStopType(type.id)}
-                                  className="flex-shrink-0 w-[45%] sm:w-[30%] lg:w-[28%] aspect-square bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 transition-all hover:bg-blue-600 dark:hover:bg-blue-700 hover:border-blue-500 hover:scale-105 active:scale-95 group snap-center shadow-sm dark:shadow-none"
-                                >
-                                  <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-2xl group-hover:bg-white/20 transition-all shadow-inner dark:shadow-black/20">
-                                    {type.icon || '⚠️'}
-                                  </div>
-                                  <span className="text-[9px] font-black uppercase tracking-wider text-center px-2 leading-tight text-slate-500 dark:text-gray-400 group-hover:text-white">
-                                    {type.name}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                            
-                            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#F8FAFC] dark:from-gray-950 to-transparent pointer-events-none z-10" />
-                            <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#F8FAFC] dark:from-gray-950 to-transparent pointer-events-none z-10" />
-                            
-                            <button 
-                              onClick={() => scroll('left')}
-                              className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white dark:bg-gray-800 backdrop-blur-xl border border-gray-100 dark:border-gray-700 flex items-center justify-center shadow-xl dark:shadow-none z-20 hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors text-slate-900 dark:text-white"
-                            >
-                              <ChevronLeft size={16} />
-                            </button>
-                            <button 
-                              onClick={() => scroll('right')}
-                              className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white dark:bg-gray-800 backdrop-blur-xl border border-gray-100 dark:border-gray-700 flex items-center justify-center shadow-xl dark:shadow-none z-20 hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors text-slate-900 dark:text-white"
-                            >
-                              <ChevronRight size={16} />
-                            </button>
-                          </div>
-                        ) : (
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-gray-100 dark:border-gray-800 space-y-6 shadow-lg dark:shadow-none"
-                          >
-                            <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
-                              <div className="text-3xl">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
-                              <div>
-                                 <p className="text-[9px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest">Type sélectionné</p>
-                                 <p className="text-sm font-black text-slate-900 dark:text-white uppercase">{downtimeTypes.find(t => t.id === selectedStopType)?.name}</p>
-                              </div>
-                            </div>
-
-                            {downtimeTypes.find(t => t.id === selectedStopType)?.name?.toUpperCase().includes('FORMAT') && !selectedProgrammeForChange ? (
-                              <div className="grid gap-3">
-                                 <p className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest px-2 text-center">Choisir le programme cible</p>
-                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                   {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
-                                    <button 
-                                      key={p.id}
-                                      onClick={() => setSelectedProgrammeForChange(p.id)}
-                                      className="p-5 bg-white dark:bg-gray-800 hover:bg-blue-600 dark:hover:bg-blue-700 border border-gray-100 dark:border-gray-700 rounded-2xl font-black text-[11px] text-slate-800 dark:text-gray-200 transition-all flex items-center justify-between group"
-                                    >
-                                      <span className="uppercase italic tracking-tight group-hover:text-white">{p.name}</span>
-                                      <Plus size={16} className="text-slate-500 dark:text-gray-400 group-hover:text-white" />
-                                    </button>
-                                   ))}
-                                 </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-4">
-                                <div className="space-y-4">
-                                  <textarea 
-                                    className="w-full p-5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-gray-500"
-                                    placeholder={t('description') + " (optionnel)..."}
-                                    value={downtimeDescription}
-                                    onChange={e => setDowntimeDescription(e.target.value)}
-                                    rows={3}
-                                  />
-                                  
-                                  {/* PHOTO SECTION */}
-                                  <div className="space-y-3">
-                                    <input 
-                                      type="file" 
-                                      accept="image/*" 
-                                      multiple
-                                      className="hidden" 
-                                      ref={fileInputRef}
-                                      onChange={handleFileChange}
-                                    />
-                                    
-                                    <div className="grid grid-cols-3 gap-2">
-                                      {imagePreviews.map((prev, idx) => (
-                                        <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 group/img">
-                                          <img 
-                                            src={prev} 
-                                            alt={`Preview ${idx}`} 
-                                            className="w-full h-full object-cover"
-                                          />
-                                          <button
-                                            onClick={() => {
-                                              setImagePreviews(prevs => prevs.filter((_, i) => i !== idx));
-                                              setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
-                                            }}
-                                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition-all opacity-0 group-hover/img:opacity-100"
-                                          >
-                                            <X size={12} />
-                                          </button>
-                                        </div>
-                                      ))}
-                                      {imagePreviews.length < 5 && (
-                                        <button
-                                          onClick={handleTakeStorePhoto}
-                                          disabled={isUploading}
-                                          className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500/50 dark:hover:border-blue-400/50 transition-all group"
-                                        >
-                                          <Camera size={20} className="group-hover:scale-110 transition-transform" />
-                                          <span className="text-[7px] font-black uppercase tracking-widest leading-none">
-                                            {isUploading ? '...' : '+ Photo'}
-                                          </span>
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <button 
-                                  onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
-                                  disabled={isUploading}
-                                  className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95 transition-all text-center"
-                                >
-                                  {isInitialSelection ? 'Valider l\'arrêt' : 'Enregistrer Qualification'}
-                                </button>
-                              </div>
-                            )}
-                            
-                            <button 
-                               onClick={() => {
-                                 setSelectedStopType(null);
-                                 setSelectedProgrammeForChange(null);
-                               }}
-                               className="w-full py-3 text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
-                            >
-                               <ArrowLeft size={14} /> {t('back_to_selection') || 'Retour aux catégories'}
-                            </button>
-                          </motion.div>
-                        )}
-                      </div>
+                      null
                     ) : (
                       <div className="w-full flex flex-col gap-2.5 max-w-md mx-auto">
                         <button
@@ -1746,6 +1583,120 @@ export default function OperatorScreen() {
               </button>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {(isInitialSelection || categorizingLogId) && (
+          <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center p-4">
+            <motion.div 
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="bg-white dark:bg-gray-900 rounded-[2rem] sm:rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800"
+            >
+              <div className="p-5 space-y-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                      <Activity size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none mb-1">
+                        {isInitialSelection ? 'Type d\'arrêt' : 'Qualification'}
+                      </h3>
+                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest">{isInitialSelection ? 'Initialisation incident' : 'Saisie cause racine'}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setIsInitialSelection(false);
+                      if (categorizingLogId) {
+                        setDismissedCategorizationId(categorizingLogId);
+                      }
+                      setSelectedStopType(null);
+                    }}
+                    className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {!selectedStopType ? (
+                  <div className="grid grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+                    {downtimeTypes.map((type) => (
+                      <button
+                        key={type.id}
+                        onClick={() => setSelectedStopType(type.id)}
+                        className="flex flex-col items-center justify-center gap-2 p-4 min-h-[100px] bg-[#F8FAFC] dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-2xl hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-all active:scale-95 group"
+                      >
+                        <span className="text-3xl group-hover:scale-110 transition-transform">{type.icon || '⚠️'}</span>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-center leading-tight">
+                          {type.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <motion.div 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="space-y-5"
+                  >
+                    <div className="flex items-center gap-4 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                      <div className="text-3xl">{downtimeTypes.find(t => t.id === selectedStopType)?.icon}</div>
+                      <h4 className="text-sm font-black text-blue-900 dark:text-blue-100 uppercase tracking-tight">
+                        {downtimeTypes.find(t => t.id === selectedStopType)?.name}
+                      </h4>
+                    </div>
+
+                    <div className="space-y-4">
+                      <textarea 
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400"
+                        placeholder="Description optionnelle..."
+                        value={downtimeDescription}
+                        onChange={e => setDowntimeDescription(e.target.value)}
+                        rows={3}
+                      />
+                      
+                      <div className="grid grid-cols-5 gap-2">
+                         {imagePreviews.map((p, idx) => (
+                           <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                             <img src={p} className="w-full h-full object-cover" />
+                             <button onClick={() => {
+                               setImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                               setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
+                             }} className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5">
+                                <X size={8} />
+                             </button>
+                           </div>
+                         ))}
+                         {imagePreviews.length < 5 && (
+                           <button onClick={handleTakeStorePhoto} className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center text-slate-400">
+                              <Camera size={16} />
+                           </button>
+                         )}
+                      </div>
+
+                      <button 
+                        onClick={() => isInitialSelection ? handleConfirmStartDowntime(selectedStopType!) : handleCategorizeStop(selectedStopType!)}
+                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-200 dark:shadow-none hover:bg-blue-700 active:scale-[0.98] transition-all"
+                      >
+                        {isInitialSelection ? 'Confirmer l\'arrêt' : 'Enregistrer qualification'}
+                      </button>
+
+                      <button 
+                        onClick={() => setSelectedStopType(null)}
+                        className="w-full py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-600 transition-colors"
+                      >
+                        Retour aux motifs
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

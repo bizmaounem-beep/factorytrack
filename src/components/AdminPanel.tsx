@@ -173,8 +173,8 @@ export default function AdminPanel() {
   const openModal = (type: typeof modalType, data: any = {}) => {
     setModalType(type);
     setConfirmPin('');
-    // When editing a user, we don't want to show the hashed PIN
-    const cleanData = type === 'user' && data.id ? { ...data, pin: '' } : { ...data };
+    // When editing a user, we don't want to show the hashed password
+    const cleanData = type === 'user' && data.id ? { ...data, password: '' } : { ...data };
     setModalData(cleanData);
     setEditingId(data.id || null);
     if (type === 'line' && data.machineId) {
@@ -193,11 +193,11 @@ export default function AdminPanel() {
         }
       }
       if (modalType === 'user') {
-        if (!modalData.name || (!editingId && !modalData.pin) || !modalData.role) {
+        if (!modalData.name || (!editingId && !modalData.password) || !modalData.role) {
           alert(t('fill_all_fields'));
           return;
         }
-        if (modalData.pin && modalData.pin !== confirmPin) {
+        if (modalData.password && modalData.password !== confirmPin) {
           alert(t('passwords_not_match') || 'Les mots de passe ne correspondent pas');
           return;
         }
@@ -232,9 +232,9 @@ export default function AdminPanel() {
 
       let finalData = { ...modalData };
       
-      // If editing a user and PIN is empty, remove it from the update payload so it's not changed
-      if (modalType === 'user' && editingId && !finalData.pin) {
-        delete finalData.pin;
+      // If editing a user and password is empty, remove it from the update payload so it's not changed
+      if (modalType === 'user' && editingId && !finalData.password) {
+        delete finalData.password;
       }
 
       if (modalType === 'production_log' && finalData.count) {
@@ -737,9 +737,9 @@ export default function AdminPanel() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col md:flex-row transition-colors duration-300 font-sans">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col md:flex-row transition-colors duration-300 font-sans" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {/* MOBILE HEADER */}
-      <header className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 py-1 flex justify-between items-center sticky top-0 z-40 shadow-sm dark:shadow-none">
+      <header className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 py-2 flex justify-between items-center sticky top-0 z-40 shadow-sm dark:shadow-none" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-1.5">
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -758,7 +758,7 @@ export default function AdminPanel() {
           <button
             onClick={toggleTheme}
             className={cn(
-              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
+              "relative flex items-center gap-1.5 p-2.5 rounded-full border transition-all duration-300 text-[10px] font-black uppercase tracking-widest",
               theme === 'dark'
                 ? "bg-slate-800 border-slate-700 text-yellow-400"
                 : "bg-gray-100 border-gray-200 text-gray-500"
@@ -780,7 +780,7 @@ export default function AdminPanel() {
           </button>
           <button 
             onClick={logout}
-            className="p-1 px-1.5 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors font-black text-[8px] uppercase border border-red-50 dark:border-red-900/30"
+            className="px-4 py-2.5 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl transition-colors font-black text-[10px] uppercase border border-red-50 dark:border-red-900/30"
           >
             {t('logout')}
           </button>
@@ -1084,7 +1084,7 @@ export default function AdminPanel() {
                       <div className={cn(
                         "w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-sm",
                         u.role === 'ADMIN' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
-                        u.role === 'PILOT' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
                       )}>
                         {u.name?.substring(0, 1) || '?'}
                       </div>
@@ -2079,8 +2079,8 @@ export default function AdminPanel() {
                       placeholder={editingId ? t('new_password_placeholder') || 'Nouveau mot de passe (optionnel)' : t('password') || 'Mot de passe'}
                       type="password"
                       className="w-full p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-sm text-gray-900 dark:text-white"
-                      value={modalData.pin || ''}
-                      onChange={e => setModalData({...modalData, pin: e.target.value})}
+                      value={modalData.password || ''}
+                      onChange={e => setModalData({...modalData, password: e.target.value})}
                     />
                     <input 
                       placeholder={t('confirm_password') || 'Confirmer le mot de passe'}
@@ -2095,10 +2095,9 @@ export default function AdminPanel() {
                     value={modalData.role || ''}
                     onChange={e => setModalData({...modalData, role: e.target.value})}
                   >
-                    <option value="">{t('choose_role')}</option>
-                    <option value="OPERATOR">{t('operator')}</option>
-                    <option value="PILOT">{t('pilot')}</option>
-                    <option value="ADMIN">{t('admin')}</option>
+                    <option value="">{t('choose_role') || 'Choisir un rôle'}</option>
+                    <option value="OPERATOR">{t('operator') || 'Opérateur'}</option>
+                    <option value="ADMIN">{t('admin') || 'Administrateur'}</option>
                   </select>
                 </>
               )}
