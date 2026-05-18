@@ -12,7 +12,7 @@ import {
   ExternalLink, Plus, History, Timer, Pencil, 
   Trash2, Menu, X, ArrowLeft, Clock, Square, 
   Play, TrendingUp, AlertTriangle, CheckCircle2,
-  Box, LayoutDashboard, Info, Camera, Video, Sun, Moon
+  Box, LayoutDashboard, Info, Camera, Video, Image, Sun, Moon
 } from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -608,9 +608,14 @@ export default function PilotScreen() {
     }
   };
 
-  const handleTakeStoreMedia = async (type: 'photo' | 'video') => {
-    mediaInputRef.current?.setAttribute('accept', type === 'photo' ? 'image/*' : 'video/*');
-    mediaInputRef.current?.setAttribute('capture', 'environment');
+  const handleTakeStoreMedia = async (type: 'photo' | 'video' | 'gallery') => {
+    if (type === 'gallery') {
+      mediaInputRef.current?.setAttribute('accept', 'image/*,video/*');
+      mediaInputRef.current?.removeAttribute('capture');
+    } else {
+      mediaInputRef.current?.setAttribute('accept', type === 'photo' ? 'image/*' : 'video/*');
+      mediaInputRef.current?.setAttribute('capture', 'environment');
+    }
     mediaInputRef.current?.click();
   };
 
@@ -1825,15 +1830,18 @@ export default function PilotScreen() {
                                     )}
                                     {log.images && (
                                       <div className="flex -space-x-2">
-                                        {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => (
-                                          <button 
-                                            key={i}
-                                            onClick={() => setSelectedFullImage(img)}
-                                            className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 bg-blue-500 flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm dark:shadow-none"
-                                          >
-                                            <Camera size={10} />
-                                          </button>
-                                        ))}
+                                        {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => {
+                                          const isVid = img.toLowerCase().endsWith('.mp4') || img.toLowerCase().endsWith('.webm') || img.toLowerCase().endsWith('.mov');
+                                          return (
+                                            <button 
+                                              key={i}
+                                              onClick={() => setSelectedFullImage(img)}
+                                              className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 bg-blue-500 flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm dark:shadow-none"
+                                            >
+                                              {isVid ? <Video size={10} /> : <Camera size={10} />}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
                                     )}
                                     <button onClick={() => openEditModal('down', log)} className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 p-1 md:p-2 focus:outline-none"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
@@ -2186,6 +2194,14 @@ export default function PilotScreen() {
                             <Video size={20} />
                             <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+ Vidéo'}</span>
                           </button>
+                          <button 
+                            onClick={() => handleTakeStoreMedia('gallery')}
+                            disabled={isUploading}
+                            className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-all bg-gray-50 dark:bg-gray-800/50"
+                          >
+                            <Image size={20} />
+                            <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+ Galerie'}</span>
+                          </button>
                         </>
                       )}
                     </div>
@@ -2287,30 +2303,60 @@ export default function PilotScreen() {
                <div className="space-y-1">
                  <label className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Photos</label>
                  <div className="flex flex-wrap gap-2">
-                   {imagePreviews.map((p, i) => (
-                     <div key={i} className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-200 dark:border-gray-700">
-                       <img src={p} className="w-full h-full object-cover" alt="Preview" />
+                   {imagePreviews.map((p, i) => {
+                     const path = selectedImagePaths[i] || '';
+                     const isVid = path.toLowerCase().endsWith('.mp4') || path.toLowerCase().endsWith('.webm') || path.toLowerCase().endsWith('.mov');
+                     return (
+                       <div key={i} className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+                         {isVid ? (
+                           <video src={p} className="w-full h-full object-cover" />
+                         ) : (
+                           <img src={p} className="w-full h-full object-cover" alt="Preview" />
+                         )}
+                         <button 
+                          onClick={() => {
+                            const newPreviews = [...imagePreviews];
+                            const newPaths = [...selectedImagePaths];
+                            newPreviews.splice(i, 1);
+                            newPaths.splice(i, 1);
+                            setImagePreviews(newPreviews);
+                            setSelectedImagePaths(newPaths);
+                          }}
+                          className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg z-10"
+                         >
+                           <X size={10} />
+                         </button>
+                       </div>
+                     );
+                   })}
+                   {imagePreviews.length < 5 && (
+                     <div className="flex gap-1.5 pt-0.5">
                        <button 
-                        onClick={() => {
-                          const newPreviews = [...imagePreviews];
-                          const newPaths = [...selectedImagePaths];
-                          newPreviews.splice(i, 1);
-                          newPaths.splice(i, 1);
-                          setImagePreviews(newPreviews);
-                          setSelectedImagePaths(newPaths);
-                        }}
-                        className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg"
-                       >
-                         <X size={10} />
+                         onClick={() => handleTakeStoreMedia('photo')}
+                         disabled={isUploading}
+                         className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all focus:outline-none"
+                        >
+                         <Camera size={18} />
+                         <span className="text-[6px] font-black uppercase mt-1">Photo</span>
+                       </button>
+                       <button 
+                         onClick={() => handleTakeStoreMedia('video')}
+                         disabled={isUploading}
+                         className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all focus:outline-none"
+                        >
+                         <Video size={18} />
+                         <span className="text-[6px] font-black uppercase mt-1">Vidéo</span>
+                       </button>
+                       <button 
+                         onClick={() => handleTakeStoreMedia('gallery')}
+                         disabled={isUploading}
+                         className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all focus:outline-none"
+                        >
+                         <Image size={18} />
+                         <span className="text-[6px] font-black uppercase mt-1">Galerie</span>
                        </button>
                      </div>
-                   ))}
-                   <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all focus:outline-none"
-                   >
-                     {isUploading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" /> : <Camera size={18} />}
-                   </button>
+                   )}
                  </div>
                  <input 
                   type="file" 

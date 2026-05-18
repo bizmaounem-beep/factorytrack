@@ -10,7 +10,7 @@ import {
   Play, Square, Settings, Timer, Package, AlertCircle, 
   CheckCircle, Factory, Monitor, Activity, Plus, Minus, 
   ArrowLeft, X, Clock, Check, Edit, Trash2, History,
-  ChevronRight, ChevronLeft, Info, Camera, Video, Trash, Sun, Moon
+  ChevronRight, ChevronLeft, Info, Camera, Video, Image, Trash, Sun, Moon
 } from 'lucide-react';
 import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -307,7 +307,7 @@ export default function OperatorScreen() {
     }
   };
 
-  const handleTakeStoreMedia = async (type: 'photo' | 'video') => {
+  const handleTakeStoreMedia = async (type: 'photo' | 'video' | 'gallery') => {
     if (Capacitor.isNativePlatform()) {
       if (type === 'photo') {
         try {
@@ -327,16 +327,24 @@ export default function OperatorScreen() {
         } catch (e) {
           console.error('Erreur caméra:', e);
         }
-      } else {
-        // Capacitor doesn't have a built-in video capture plugin as standard as Camera
-        // We'll fallback to the HTML5 file input which works well on mobile browsers
+      } else if (type === 'video') {
         mediaInputRef.current?.setAttribute('accept', 'video/*');
         mediaInputRef.current?.setAttribute('capture', 'environment');
         mediaInputRef.current?.click();
+      } else {
+        // Gallery
+        mediaInputRef.current?.setAttribute('accept', 'image/*,video/*');
+        mediaInputRef.current?.removeAttribute('capture');
+        mediaInputRef.current?.click();
       }
     } else {
-      mediaInputRef.current?.setAttribute('accept', type === 'photo' ? 'image/*' : 'video/*');
-      mediaInputRef.current?.setAttribute('capture', 'environment');
+      if (type === 'gallery') {
+        mediaInputRef.current?.setAttribute('accept', 'image/*,video/*');
+        mediaInputRef.current?.removeAttribute('capture');
+      } else {
+        mediaInputRef.current?.setAttribute('accept', type === 'photo' ? 'image/*' : 'video/*');
+        mediaInputRef.current?.setAttribute('capture', 'environment');
+      }
       mediaInputRef.current?.click();
     }
   };
@@ -1415,6 +1423,14 @@ export default function OperatorScreen() {
                             <Video size={14} className="md:w-4 md:h-4" />
                             <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : 'Vidéo'}</span>
                           </button>
+                          <button
+                            onClick={() => handleTakeStoreMedia('gallery')}
+                            disabled={isUploading}
+                            className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg md:rounded-xl flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500 transition-all font-black"
+                          >
+                            <Image size={14} className="md:w-4 md:h-4" />
+                            <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : 'Galerie'}</span>
+                          </button>
                         </>
                       )}
                     </div>
@@ -1710,6 +1726,13 @@ export default function OperatorScreen() {
                              >
                                 <Video size={16} />
                                 <span className="text-[7px] font-black mt-1">VIDÉO</span>
+                             </button>
+                             <button 
+                               onClick={() => handleTakeStoreMedia('gallery')} 
+                               className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-500 transition-all bg-white dark:bg-gray-900"
+                             >
+                                <Image size={16} />
+                                <span className="text-[7px] font-black mt-1">GALERIE</span>
                              </button>
                            </>
                          )}
