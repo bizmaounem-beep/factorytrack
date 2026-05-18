@@ -228,6 +228,7 @@ export default function PilotScreen() {
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
   const [showFeatureInfo, setShowFeatureInfo] = useState(false);
   const [declaringDowntimeLineId, setDeclaringDowntimeLineId] = useState<string | null>(null);
+  const [selectedDowntimeTypeId, setSelectedDowntimeTypeId] = useState<string | null>(null);
   const [showManualStopModal, setShowManualStopModal] = useState(false);
   const [manualStopForm, setManualStopForm] = useState({
     typeId: '',
@@ -533,6 +534,9 @@ export default function PilotScreen() {
       }
       
       setDeclaringDowntimeLineId(null);
+      setSelectedDowntimeTypeId(null);
+      setImagePreviews([]);
+      setSelectedImagePaths([]);
     } catch (e) {
       console.error(e);
       alert('Erreur lors de la déclaration de l\'arrêt');
@@ -576,8 +580,15 @@ export default function PilotScreen() {
 
       if (res.ok && (data.path || data.success)) {
         const filePath = data.path || (data.url ? data.url.replace('/uploads/', '') : '');
-        setSelectedImagePaths(prev => [...prev, filePath]);
-        setImagePreviews(prev => [...prev, preview]);
+        if (isEditModalOpen) {
+          setEditModalData(prev => ({
+            ...prev,
+            images: [...(prev.images || []), filePath]
+          }));
+        } else {
+          setSelectedImagePaths(prev => [...prev, filePath]);
+          setImagePreviews(prev => [...prev, preview]);
+        }
       } else {
         throw new Error(data.error || `Erreur ${res.status}`);
       }
@@ -2051,48 +2062,129 @@ export default function PilotScreen() {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl dark:shadow-none flex flex-col max-h-[92vh] border border-gray-100 dark:border-gray-800"
           >
-            <div className="p-4 bg-orange-600 text-white">
-              <h2 className="text-lg font-black tracking-tight uppercase italic leading-none">{t('machine_stop')}</h2>
-              <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80 mt-1">
-                {declaringDowntimeLineId === 'global' ? t('general_stop') : `${t('line')} ${lines.find(l => l.id === declaringDowntimeLineId)?.name}`}
-              </p>
-            </div>
-            <div className="p-4 space-y-4 overflow-y-auto">
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">{t('reason')}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {downtimeTypes.map(type => (
-                    <button
-                      key={type.id}
-                      onClick={() => handleStartDowntime(declaringDowntimeLineId, type.id, manualStopForm.description)}
-                      className="p-3 border border-orange-50 dark:border-orange-900/30 rounded-2xl flex flex-col items-center gap-1 hover:bg-orange-50 dark:hover:bg-orange-900 transition-all group shadow-sm dark:shadow-none bg-white dark:bg-gray-800 focus:outline-none"
-                    >
-                      <span className="text-xl group-hover:scale-110 transition-transform">{type.icon}</span>
-                      <span className="text-[8px] font-black uppercase text-gray-700 dark:text-gray-200 text-center leading-tight">{type.name}</span>
-                    </button>
-                  ))}
-                </div>
+            <div className="p-4 bg-orange-600 text-white flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-black tracking-tight uppercase italic leading-none">{t('machine_stop')}</h2>
+                <p className="text-orange-100 text-[10px] font-bold uppercase tracking-widest opacity-80 mt-1">
+                  {declaringDowntimeLineId === 'global' ? t('general_stop') : `${t('line')} ${lines.find(l => l.id === declaringDowntimeLineId)?.name}`}
+                </p>
               </div>
-              
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">{t('comment_description') || 'Commentaire / Description'}</label>
-                <textarea 
-                  className="w-full p-3 bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all placeholder:text-gray-400 placeholder:italic text-gray-900 dark:text-white"
-                  rows={2}
-                  placeholder="Expliquez la cause de l'arrêt..."
-                  value={manualStopForm.description}
-                  onChange={e => setManualStopForm({...manualStopForm, description: e.target.value})}
-                />
-              </div>
-            </div>
-            <div className="p-4 bg-gray-50 dark:bg-gray-800/30 flex gap-3 border-t border-gray-100 dark:border-gray-800">
               <button 
-                onClick={() => setDeclaringDowntimeLineId(null)}
-                className="w-full py-4 text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all focus:outline-none"
+                onClick={() => {
+                  setDeclaringDowntimeLineId(null);
+                  setSelectedDowntimeTypeId(null);
+                  setImagePreviews([]);
+                  setSelectedImagePaths([]);
+                }}
+                className="text-white/60 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
               >
-                Annuler
+                <X size={20} />
               </button>
             </div>
+            <div className="p-4 space-y-4 overflow-y-auto">
+              {!selectedDowntimeTypeId ? (
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">{t('reason')}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {downtimeTypes.map(type => (
+                      <button
+                        key={type.id}
+                        onClick={() => setSelectedDowntimeTypeId(type.id)}
+                        className="p-3 border border-orange-50 dark:border-orange-900/30 rounded-2xl flex flex-col items-center gap-1 hover:bg-orange-50 dark:hover:bg-orange-900 transition-all group shadow-sm dark:shadow-none bg-white dark:bg-gray-800 focus:outline-none"
+                      >
+                        <span className="text-xl group-hover:scale-110 transition-transform">{type.icon}</span>
+                        <span className="text-[8px] font-black uppercase text-gray-700 dark:text-gray-200 text-center leading-tight">{type.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center gap-4 bg-orange-50 dark:bg-orange-900/20 p-4 rounded-2xl border border-orange-100 dark:border-orange-900/30">
+                    <div className="text-3xl">{downtimeTypes.find(t => t.id === selectedDowntimeTypeId)?.icon}</div>
+                    <h4 className="text-sm font-black text-orange-900 dark:text-orange-100 uppercase tracking-tight">
+                      {downtimeTypes.find(t => t.id === selectedDowntimeTypeId)?.name}
+                    </h4>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">{t('comment_description') || 'Commentaire / Description'}</label>
+                    <textarea 
+                      className="w-full p-3 bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all placeholder:text-gray-400 placeholder:italic text-gray-900 dark:text-white"
+                      rows={2}
+                      placeholder="Expliquez la cause de l'arrêt..."
+                      value={manualStopForm.description}
+                      onChange={e => setManualStopForm({...manualStopForm, description: e.target.value})}
+                    />
+                  </div>
+
+                  {/* PHOTO SECTION */}
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-orange-400 dark:text-orange-300 uppercase tracking-widest ml-1">Photos (Optionnel)</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {imagePreviews.map((p, idx) => (
+                        <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+                          <img src={p} className="w-full h-full object-cover" alt="Preview" />
+                          <button 
+                            onClick={() => {
+                              setImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                              setSelectedImagePaths(paths => paths.filter((_, i) => i !== idx));
+                            }} 
+                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 shadow-lg active:scale-95"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                      {imagePreviews.length < 5 && (
+                        <button 
+                          onClick={handleTakeStorePhoto}
+                          disabled={isUploading}
+                          className="aspect-square border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-all bg-gray-50 dark:bg-gray-800/50"
+                        >
+                          <Camera size={20} />
+                          <span className="text-[7px] font-black uppercase mt-1">{isUploading ? '...' : '+ Photo'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => handleStartDowntime(declaringDowntimeLineId, selectedDowntimeTypeId!, manualStopForm.description)}
+                    disabled={isUploading}
+                    className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-200 dark:shadow-none hover:bg-orange-700 active:scale-[0.98] transition-all"
+                  >
+                    Confirmer l'arrêt
+                  </button>
+
+                  <button 
+                    onClick={() => setSelectedDowntimeTypeId(null)}
+                    className="w-full py-2 text-[10px] font-black text-orange-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
+                  >
+                    Retour aux motifs
+                  </button>
+                </motion.div>
+              )}
+            </div>
+            {!selectedDowntimeTypeId && (
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/30 flex gap-3 border-t border-gray-100 dark:border-gray-800">
+                <button 
+                  onClick={() => {
+                    setDeclaringDowntimeLineId(null);
+                    setSelectedDowntimeTypeId(null);
+                    setImagePreviews([]);
+                    setSelectedImagePaths([]);
+                  }}
+                  className="w-full py-4 text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all focus:outline-none"
+                >
+                  Annuler
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
