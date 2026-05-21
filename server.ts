@@ -12,9 +12,17 @@ import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import { networkInterfaces } from 'os';
+import crypto from 'crypto';
 
 const SALT_ROUNDS = 10;
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('FATAL: JWT_SECRET environment variable is missing in production!');
+  process.exit(1);
+}
+// Generate dynamic safe fallback key at runtime so it's not guessed or static in source
+const DYNAMIC_FALLBACK_SECRET = crypto.randomBytes(64).toString('hex');
+const ACTUAL_JWT_SECRET = JWT_SECRET || DYNAMIC_FALLBACK_SECRET;
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 const DB_DIR = process.env.DB_DIR || path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DB_DIR, 'factory.db');
@@ -37,17 +45,33 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'downtime-' + uniqueSuffix + path.extname(file.originalname));
+    const ext = path.extname(file.originalname).toLowerCase();
+    const baseName = path.basename(file.originalname, ext).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    cb(null, 'scada-' + uniqueSuffix + '-' + baseName + ext);
   }
 });
 
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg', 
+  'image/png', 
+  'image/webp', 
+  'application/pdf'
+];
+
+const ALLOWED_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.webp', '.pdf'
+];
+
 const upload = multer({ 
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // Safe 10MB limit for mobiles and SCADA attachments
   fileFilter: (req, file, cb) => {
-    console.log(`[MULTER-DEBUG] Incoming: field=${file.fieldname}, name=${file.originalname}, mime=${file.mimetype}`);
-    // Allow everything for now to fix the user's issue
-    cb(null, true);
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype) || !ALLOWED_EXTENSIONS.includes(ext)) {
+      cb(new Error('Format de fichier non autorisé. Uniquement Images (JPG/PNG/WEBP) et PDF de max 10MB.'));
+    } else {
+      cb(null, true);
+    }
   }
 });
 
@@ -343,6 +367,13 @@ async function startServer() {
     contentSecurityPolicy: false, // Vite handles CSP in dev
   }));
 
+  // JSON and URL encoded body parsing - standard for all apps
+  app.use(express.json({ limit: '20mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+  // Static serving for uploaded media
+  app.use('/uploads', express.static(UPLOADS_DIR));
+
   // 2.5 DIRECT UPLOAD ROUTE (FOR HIGHEST PRIORITY)
   app.post(['/api/upload', '/api/upload/'], (req, res) => {
     console.log(`[SERVER-UPLOAD] Incoming request at ${req.url}`);
@@ -420,7 +451,7 @@ async function startServer() {
       return res.status(401).json({ error: 'Non autorisé' });
     }
     try {
-      const payload = jwt.verify(authHeader.slice(7), JWT_SECRET);
+      const payload = jwt.verify(authHeader.slice(7), ACTUAL_JWT_SECRET);
       req.user = payload;
       next();
     } catch (e) {
@@ -449,7 +480,7 @@ async function startServer() {
         const isValid = await bcrypt.compare(String(pin), user.pin);
         if (isValid) {
           const { pin: _hash, ...safeUser } = user;
-          const token = jwt.sign({ id: safeUser.id, role: safeUser.role }, JWT_SECRET, { expiresIn: '12h' });
+          const token = jwt.sign({ id: safeUser.id, role: safeUser.role }, ACTUAL_JWT_SECRET, { expiresIn: '12h' });
           return res.json({ ...safeUser, token });
         }
       }

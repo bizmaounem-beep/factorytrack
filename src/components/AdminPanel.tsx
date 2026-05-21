@@ -136,10 +136,92 @@ export default function AdminPanel() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+
+  const compressAndValidateFile = async (file: File): Promise<Blob | File | null> => {
+    const type = file.type;
+    const name = file.name || '';
+    const ext = name ? name.substring(name.lastIndexOf('.')).toLowerCase() : '';
+
+    if (!ALLOWED_MIME_TYPES.includes(type) && (!ext || !ALLOWED_EXTS.includes(ext))) {
+       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP et PDF.");
+       return null;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+       alert("Le fichier est trop volumineux (max 10Mo).");
+       return null;
+    }
+
+    if (type.startsWith('image/')) {
+      try {
+        return await new Promise<Blob | File>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              let width = img.width;
+              let height = img.height;
+              const MAX_WIDTH = 1200;
+              const MAX_HEIGHT = 1200;
+              
+              if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                if (width > height) {
+                  height = Math.round((height * MAX_WIDTH) / width);
+                  width = MAX_WIDTH;
+                } else {
+                  width = Math.round((width * MAX_HEIGHT) / height);
+                  height = MAX_HEIGHT;
+                }
+              }
+              
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                resolve(file);
+                return;
+              }
+              ctx.drawImage(img, 0, 0, width, height);
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const compressed = new File([blob], name || 'upload.jpg', {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  });
+                  resolve(compressed);
+                } else {
+                  resolve(file);
+                }
+              }, 'image/jpeg', 0.85);
+            };
+            img.src = event.target?.result as string;
+          };
+          reader.readAsDataURL(file);
+        });
+      } catch (err) {
+        console.warn('Compression failed, uploading original:', err);
+        return file;
+      }
+    }
+
+    return file;
+  };
+
   const uploadFile = async (file: File) => {
     setIsUploading(true);
+    const validated = await compressAndValidateFile(file);
+    if (!validated) {
+      setIsUploading(false);
+      return;
+    }
+
     const formData = new FormData();
-    formData.append('photo', file, 'admin-upload.jpg');
+    const name = 'name' in validated ? (validated as File).name : 'admin-upload.jpg';
+    const ext = name.includes('.') ? name.substring(name.lastIndexOf('.')) : '.jpg';
+    formData.append('photo', validated, `admin-upload-${Date.now()}${ext}`);
 
     try {
       const res = await fetch('/api/upload', {
@@ -163,10 +245,12 @@ export default function AdminPanel() {
     }
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      Array.from(files).forEach((file: File) => uploadFile(file));
+      for (const file of Array.from(files) as File[]) {
+        await uploadFile(file);
+      }
     }
   };
 
@@ -1232,7 +1316,7 @@ export default function AdminPanel() {
                     </div>
                   ))}
                   {programmes.filter(p => p.status === 'ACTIVE').length === 0 && (
-                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 bg-white/50 dark:bg-gray-900/50 rounded-[32px] border-2 border-dashed border-gray-100 dark:border-gray-800">
+                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 bg-white/50 dark:bg-gray-900/50 rounded-2xl md:rounded-[32px] border-2 border-dashed border-gray-100 dark:border-gray-800">
                       <Package size={40} strokeWidth={1} className="mb-2 opacity-50" />
                       <p className="text-[10px] font-black uppercase tracking-widest">{t('no_prog_available')}</p>
                     </div>
@@ -1482,7 +1566,7 @@ export default function AdminPanel() {
                       <Package className="text-blue-600 dark:text-blue-400" size={16} />
                       {t('production_log').toUpperCase()}
                     </h3>
-                    <div className="bg-white dark:bg-gray-900 rounded-[32px] border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-none">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl md:rounded-[32px] border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-none">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left">
                           <thead className="bg-gray-50 dark:bg-gray-800 text-[7px] md:text-[9px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
@@ -1558,7 +1642,7 @@ export default function AdminPanel() {
                       <Timer className="text-orange-600 dark:text-orange-400" size={16} />
                       {t('downtime_log').toUpperCase()}
                     </h3>
-                    <div className="bg-white dark:bg-gray-900 rounded-[32px] border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-none">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl md:rounded-[32px] border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-none">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left">
                           <thead className="bg-gray-50 dark:bg-gray-800 text-[7px] md:text-[9px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
@@ -2230,7 +2314,7 @@ export default function AdminPanel() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] p-8 text-center space-y-6 shadow-2xl dark:shadow-none border border-red-100 dark:border-red-900/20"
+            className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl md:rounded-[32px] p-6 md:p-8 text-center space-y-4 md:space-y-6 shadow-2xl dark:shadow-none border border-red-100 dark:border-red-900/20"
           >
             <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto text-red-500 dark:text-red-400 mb-2">
               <Trash2 size={40} strokeWidth={2.5} />

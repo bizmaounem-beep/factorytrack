@@ -12,11 +12,17 @@ import {
   ArrowLeft, X, Clock, Check, Edit, Trash2, History,
   ChevronRight, ChevronLeft, Info, Camera, Video, Image, Trash, Sun, Moon
 } from 'lucide-react';
-import { formatDuration, formatDowntimeDisplay, cn } from '../lib/utils';
+import { Badge } from './ui/Badge';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
+import { Modal } from './ui/Modal';
+import { StopPicker } from './StopPicker';
+import { formatDuration, formatDowntimeDisplay, cn, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
+import { StatusIndicator } from './ui/StatusIndicator';
 
 export default function OperatorScreen() {
   const { user, logout } = useAuth();
@@ -69,6 +75,7 @@ export default function OperatorScreen() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const mediaInputRef = useRef<HTMLInputElement>(null);
+  const appVersion = 'v1.1-responsive-scada';
 
   const activeLine = lines.find(l => l.id === selectedLineId) || null;
   const activeProgramme = activeLine ? availableProgrammes.find(p => p.id === activeLine.currentProgrammeId) || null : null;
@@ -77,8 +84,10 @@ export default function OperatorScreen() {
   const currentShiftId = getCurrentShiftId(shifts);
 
   // Derive categorizing log
+  const [dismissedLogId, setDismissedLogId] = useState<string | null>(null);
+
   const categorizingLog = !activeDowntime && activeLine 
-    ? downtimeLogs.find(d => d.lineId === activeLine.id && d.operatorId === user?.id && d.typeId === 'PENDING' && d.endTime) || null 
+    ? downtimeLogs.find(d => d.lineId === activeLine.id && d.operatorId === user?.id && d.typeId === 'PENDING' && d.endTime && d.id !== dismissedLogId) || null 
     : null;
   const categorizingLogId = categorizingLog?.id || null;
 
@@ -307,7 +316,87 @@ export default function OperatorScreen() {
     }
   };
 
+  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+
+  const compressAndValidateFile = async (file: File | Blob, mimeType?: string): Promise<Blob | File | null> => {
+    const type = mimeType || file.type;
+    const name = 'name' in file ? (file as File).name : '';
+    const ext = name ? name.substring(name.lastIndexOf('.')).toLowerCase() : '';
+
+    if (!ALLOWED_MIME_TYPES.includes(type) && (!ext || !ALLOWED_EXTS.includes(ext))) {
+       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP et PDF.");
+       return null;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+       alert("Le fichier est trop volumineux (max 10Mo).");
+       return null;
+    }
+
+    // Try client-side compression for images to optimize load times and bandwidth
+    if (type.startsWith('image/')) {
+      try {
+        return await new Promise<Blob | File>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              let width = img.width;
+              let height = img.height;
+              const MAX_WIDTH = 1200;
+              const MAX_HEIGHT = 1200;
+              
+              if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                if (width > height) {
+                  height = Math.round((height * MAX_WIDTH) / width);
+                  width = MAX_WIDTH;
+                } else {
+                  width = Math.round((width * MAX_HEIGHT) / height);
+                  height = MAX_HEIGHT;
+                }
+              }
+              
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                resolve(file);
+                return;
+              }
+              ctx.drawImage(img, 0, 0, width, height);
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const compressed = new File([blob], name || 'upload.jpg', {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  });
+                  resolve(compressed);
+                } else {
+                  resolve(file);
+                }
+              }, 'image/jpeg', 0.85);
+            };
+            img.src = event.target?.result as string;
+          };
+          reader.readAsDataURL(file);
+        });
+      } catch (err) {
+        console.warn('Compression failed, uploading original:', err);
+        return file;
+      }
+    }
+
+    return file;
+  };
+
   const handleTakeStoreMedia = async (type: 'photo' | 'video' | 'gallery') => {
+    if (type === 'video') {
+      alert("Les fichiers vidéo ne sont pas autorisés par les consignes de sécurité.");
+      return;
+    }
+
     if (Capacitor.isNativePlatform()) {
       if (type === 'photo') {
         try {
@@ -322,76 +411,74 @@ export default function OperatorScreen() {
           if (image.webPath) {
             const response = await fetch(image.webPath);
             const blob = await response.blob();
-            uploadFile(blob, image.webPath, false, 'image/jpeg');
+            const validated = await compressAndValidateFile(blob, 'image/jpeg');
+            if (validated) {
+              uploadFile(validated, image.webPath, false, 'image/jpeg');
+            }
           }
         } catch (e) {
           console.error('Erreur caméra:', e);
         }
-      } else if (type === 'video') {
-        mediaInputRef.current?.setAttribute('accept', 'video/*');
-        mediaInputRef.current?.setAttribute('capture', 'environment');
-        mediaInputRef.current?.click();
       } else {
         // Gallery
-        mediaInputRef.current?.setAttribute('accept', 'image/*,video/*');
+        mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
         mediaInputRef.current?.removeAttribute('capture');
         mediaInputRef.current?.click();
       }
     } else {
       if (type === 'gallery') {
-        mediaInputRef.current?.setAttribute('accept', 'image/*,video/*');
+        mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
         mediaInputRef.current?.removeAttribute('capture');
       } else {
-        mediaInputRef.current?.setAttribute('accept', type === 'photo' ? 'image/*' : 'video/*');
+        mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp');
         mediaInputRef.current?.setAttribute('capture', 'environment');
       }
       mediaInputRef.current?.click();
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      Array.from(files).forEach((file: File) => {
-        const preview = URL.createObjectURL(file);
-        uploadFile(file, preview, false, file.type);
-      });
+      for (const file of Array.from(files) as File[]) {
+        const validated = await compressAndValidateFile(file, file.type);
+        if (validated) {
+          const preview = URL.createObjectURL(validated as Blob);
+          uploadFile(validated, preview, false, (validated as any).type);
+        }
+      }
     }
   };
 
   const uploadFile = async (file: Blob | File, preview: string, isManual: boolean = false, mimeType?: string) => {
     setIsUploading(true);
     
-    const isVideo = mimeType?.startsWith('video/') || file.type.startsWith('video/') || ('name' in file && (file as File).name?.toLowerCase().endsWith('.mp4'));
-    const limit = 50 * 1024 * 1024; // Increased to 50MB
+    const limit = 10 * 1024 * 1024; // Strict 10MB limit
 
     if (file.size > limit) {
-      alert(`Le fichier est trop volumineux (max 50Mo).`);
+      alert(`Le fichier est trop volumineux (max 10Mo).`);
       setIsUploading(false);
       return;
     }
 
     const formData = new FormData();
     const getExt = (m: string, f?: Blob | File) => {
-      // 1. Try to get extension from original filename if it's a File
-      if (f && 'name' in f) {
-        const name = (f as File).name;
-        if (name && name.includes('.')) {
-          return name.substring(name.lastIndexOf('.')).toLowerCase();
-        }
+      if (f instanceof File && f.name.includes('.')) {
+        return f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
       }
-      // 2. Fallback to mime type detection
-      if (m.includes('video/mp4')) return '.mp4';
-      if (m.includes('video/quicktime')) return '.mov';
-      if (m.includes('video/webm')) return '.webm';
-      if (m.includes('video/x-matroska')) return '.mkv';
-      if (m.includes('image/png')) return '.png';
-      if (m.includes('image/webp')) return '.webp';
-      if (m.includes('video/')) return '.mp4'; // Default video ext
-      return '.jpg';
+      const mimeMap: Record<string, string> = {
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/webp': '.webp',
+        'application/pdf': '.pdf'
+      };
+      return mimeMap[m] || '.jpg';
     };
     const extension = getExt(mimeType || file.type, file);
-    formData.append('photo', file, `media-${Date.now()}${extension}`);
+    const fileName = `media-${Date.now()}${extension}`;
+    
+    const fileToUpload = file instanceof File ? file : new File([file], fileName, { type: mimeType || file.type });
+    formData.append('photo', fileToUpload);
   
     try {
       const res = await fetch('/api/upload', {
@@ -764,41 +851,52 @@ export default function OperatorScreen() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 overflow-y-auto">
-          <div className="max-w-full mx-auto space-y-4">
-             <h2 className="text-[14px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] border-b border-slate-200 dark:border-gray-800 pb-2">{t('line_select')}</h2>
-             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <main className="flex-1 p-4 overflow-y-auto bg-slate-50 dark:bg-gray-950">
+          <div className="max-w-7xl mx-auto space-y-6">
+             <div className="flex flex-col items-center text-center space-y-2 mb-4">
+                <h2 className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.3em]">{t('line_select')}</h2>
+                <div className="w-12 h-1 bg-blue-600 rounded-full" />
+             </div>
+
+             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-2">
               {lines.filter(l => l.machineId === selectedMachineId).map(l => {
                 const isBusy = l.status !== 'IDLE' && l.currentOperatorId !== user?.id;
                 const operatorName = users.find(u => u.id === l.currentOperatorId)?.name;
 
                 return (
-                   <button
+                   <Card
                     key={l.id}
-                    disabled={isBusy}
-                    onClick={() => handleSelectLine(l)}
+                    variant="scada"
+                    padding="none"
                     className={cn(
-                      "p-4 bg-white dark:bg-gray-900 rounded-xl border-2 transition-all shadow-sm dark:shadow-none flex flex-col items-center justify-center gap-1.5 relative group",
-                      isBusy ? "opacity-40 cursor-not-allowed bg-slate-50 dark:bg-gray-800 border-slate-100 dark:border-gray-800" : "hover:border-blue-500 border-slate-100 dark:border-gray-800"
+                      "group cursor-pointer hover:border-blue-500 transition-all active:scale-[0.98]",
+                      isBusy && "opacity-60 grayscale cursor-not-allowed border-slate-200"
                     )}
+                    onClick={() => !isBusy && handleSelectLine(l)}
                   >
-                    <div className="absolute top-2 right-2">
-                       <span className={cn(
-                         "w-2 h-2 rounded-full",
-                         l.status === 'RUNNING' ? "bg-green-500 animate-pulse" : 
-                         l.status === 'STOPPED' ? "bg-red-500" : "bg-slate-300 dark:bg-gray-700"
-                       )} />
+                    <div className="p-6 flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors",
+                            isBusy ? "bg-slate-100 text-slate-400" : "bg-blue-50 group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-900/20 text-blue-600"
+                          )}>
+                             <Monitor size={24} />
+                          </div>
+                          <div>
+                             <h4 className="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase leading-none">{l.name}</h4>
+                             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">LIGNE PRODUCTION</p>
+                          </div>
+                       </div>
+                       <StatusIndicator status={l.status === 'RUNNING' ? 'running' : l.status === 'STOPPED' ? 'fault' : 'idle'} />
                     </div>
-                    <Monitor size={24} className={cn("text-slate-300 dark:text-gray-700", !isBusy && "group-hover:text-blue-500 transition-colors")} />
-                    <div className="text-center">
-                      <p className="text-[11px] font-black text-slate-800 dark:text-gray-200 uppercase truncate max-w-[100px]">{l.name}</p>
-                      {isBusy && (
-                        <p className="text-[8px] font-bold text-red-500 uppercase mt-0.5 animate-in fade-in">
-                          {operatorName || (l.status === 'STOPPED' ? 'Arrêt Machine' : 'Occupé')}
-                        </p>
-                      )}
-                    </div>
-                  </button>
+                    {isBusy && (
+                      <div className="px-6 py-2 bg-rose-50 dark:bg-rose-900/20 border-t border-rose-100 dark:border-rose-900/30">
+                         <p className="text-[8px] font-black text-rose-600 uppercase tracking-widest text-center">
+                           Occupé par {operatorName || 'un autre opérateur'}
+                         </p>
+                      </div>
+                    )}
+                  </Card>
                 );
               })}
             </div>
@@ -868,32 +966,61 @@ export default function OperatorScreen() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-4 pb-20">
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50 dark:bg-gray-950 pb-20">
         {!selectedLineId ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 py-4 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="col-span-full text-[9px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-[0.2em] text-center mb-1">{t('select_line')}</h2>
-            {lines.filter(l => l.isActive !== false).map((line) => (
-              <button
-                key={line.id}
-                onClick={() => handleSelectLine(line)}
-                className="group relative overflow-hidden p-5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl text-left hover:border-blue-500/50 transition-all hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm active:scale-[0.98] dark:shadow-none"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/5 blur-[40px] group-hover:bg-blue-600/10 transition-colors" />
-                <div className="flex justify-between items-center relative z-10">
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 dark:text-gray-100 italic tracking-tighter mb-0.5 leading-none uppercase">{line.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "w-1.5 h-1.5 rounded-full",
-                        line.status === 'RUNNING' ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)] animate-pulse" : "bg-rose-500"
-                      )} />
-                      <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-gray-400 group-hover:text-slate-300 transition-colors">{line.status}</span>
+          <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="flex flex-col items-center text-center space-y-2">
+               <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-[8px] font-black uppercase tracking-[0.3em] shadow-lg shadow-blue-500/20">SÉLECTION LIGNE</span>
+               <h2 className="text-4xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase">Machine: {machines.find(m => m.id === selectedMachineId)?.name}</h2>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{lines.filter(l => l.machineId === selectedMachineId).length} Lignes Connectées</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).map((line) => {
+                const isBusy = line.status !== 'IDLE' && line.currentOperatorId !== user?.id;
+                const operatorName = users.find(u => u.id === line.currentOperatorId)?.name;
+
+                return (
+                  <Card
+                    key={line.id}
+                    variant="scada"
+                    padding="none"
+                    className={cn(
+                      "group cursor-pointer hover:border-blue-500 transition-all active:scale-[0.98] border-2 h-full flex flex-col",
+                      isBusy && "opacity-60 grayscale border-slate-200"
+                    )}
+                    onClick={() => !isBusy && handleSelectLine(line)}
+                  >
+                    <div className="p-8 flex-1 flex flex-col items-center justify-center text-center space-y-4">
+                       <div className={cn(
+                         "w-20 h-20 rounded-[2.5rem] flex items-center justify-center text-3xl shadow-xl transition-all group-hover:scale-110",
+                         isBusy ? "bg-slate-100 text-slate-400" : "bg-blue-600 text-white shadow-blue-500/20"
+                       )}>
+                         <Monitor size={36} />
+                       </div>
+                       
+                       <div>
+                          <h3 className="text-3xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase leading-none mb-2">{line.name}</h3>
+                          <div className="flex items-center justify-center gap-2">
+                            <StatusIndicator status={line.status === 'RUNNING' ? 'running' : line.status === 'STOPPED' ? 'fault' : 'idle'} />
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{line.status}</span>
+                          </div>
+                       </div>
                     </div>
-                  </div>
-                  <ChevronRight size={18} className="text-slate-700 dark:text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1.5 transition-all" />
-                </div>
-              </button>
-            ))}
+                    
+                    <div className={cn(
+                      "px-8 py-4 border-t flex justify-between items-center transition-colors",
+                      isBusy ? "bg-rose-50 border-rose-100" : "bg-slate-50/50 group-hover:bg-blue-50 border-slate-100 group-hover:border-blue-200"
+                    )}>
+                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                         {isBusy ? `OCCUPÉ PAR ${operatorName?.split(' ')[0] || '...'}` : 'CLIQUEZ POUR ENTRER'}
+                       </span>
+                       <ChevronRight size={18} className={cn("transition-transform group-hover:translate-x-2", isBusy ? "text-rose-400" : "text-blue-600")} />
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -911,384 +1038,236 @@ export default function OperatorScreen() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* LEFT COLUMN: MAIN STATUS & QUALIFICATION */}
-              <div className="lg:col-span-7 space-y-6">
-                {/* MAIN STATUS CARD */}
+        <Modal 
+          isOpen={isInitialSelection || !!categorizingLogId}
+          onClose={() => {
+            if (isInitialSelection) setIsInitialSelection(false);
+            if (categorizingLogId) setDismissedLogId(categorizingLogId);
+          }}
+          title={isInitialSelection ? "QUALIFIER L'ARRÊT EN COURS" : "QUALIFIER L'ARRÊT TERMINÉ"}
+          size="md"
+        >
+          <StopPicker 
+            types={downtimeTypes}
+            selectedId={selectedStopType}
+            onSelect={(id) => {
+              if (categorizingLogId) handleCategorizeStop(id);
+              else handleConfirmStartDowntime(id);
+            }}
+            onTakeMedia={handleTakeStoreMedia}
+            imagePreviews={imagePreviews}
+            isUploading={isUploading}
+          />
+        </Modal>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* LEFT COLUMN: MAIN STATUS */}
+          <div className="lg:col-span-7 space-y-6">
+            <Card variant="scada" padding="lg" className={cn(
+              "relative overflow-hidden transition-all duration-700",
+              activeLine?.status === 'RUNNING' 
+                ? "border-emerald-500/20 bg-emerald-50/10" 
+                : "border-rose-500/20 bg-rose-50/10"
+            )}>
+              <div className="flex flex-col items-center text-center relative z-10 py-4">
                 <div className={cn(
-                  "relative overflow-hidden p-6 sm:p-8 rounded-[2rem] border transition-all duration-700 shadow-sm dark:shadow-none",
-                  activeLine?.status === 'RUNNING' 
-                    ? "bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30" 
-                    : "bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30"
+                  "w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-xl transition-all duration-500",
+                  activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-emerald-500/20" : "bg-rose-500 shadow-rose-500/20"
                 )}>
-                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white to-transparent dark:from-white/5 dark:to-transparent pointer-events-none" />
-                  
-                  {activeLine?.isActive === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center relative z-10 w-full">
-                      <div className="w-20 h-20 bg-slate-100 dark:bg-gray-800 rounded-[2rem] flex items-center justify-center mb-6 shadow-xl dark:shadow-none border-4 border-slate-200 dark:border-gray-700 animate-pulse">
-                        <Square size={32} className="text-slate-400 dark:text-gray-500" fill="currentColor" />
-                      </div>
-                      <h2 className="text-3xl font-black text-slate-900 dark:text-white italic tracking-tighter mb-3 leading-none uppercase">
-                        {activeLine?.name}
-                      </h2>
-                      <div className="px-6 py-2 bg-slate-900 dark:bg-black text-white rounded-full text-[9px] font-black uppercase tracking-[0.3em] mb-6 border-b-4 border-slate-700 dark:border-gray-800 shadow-lg leading-none">
-                        MODE SHUTDOWN / ARRÊT FORCÉ
-                      </div>
-                      <p className="text-slate-500 dark:text-gray-400 font-bold max-w-sm text-sm leading-relaxed mb-8">
-                        Cette ligne est actuellement désactivée par le Pilote. 
-                        Toutes les opérations de saisie de production et d'arrêt sont suspendues jusqu'à réactivation.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center text-center relative z-10">
-                    <div className={cn(
-                      "w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-xl transform transition-transform duration-500 hover:scale-105 active:scale-95",
-                      activeLine?.status === 'RUNNING' ? "bg-emerald-500 shadow-emerald-500/20" : "bg-rose-500 shadow-rose-500/20"
-                    )}>
-                      {activeLine?.status === 'RUNNING' ? <Activity size={28} className="text-white" /> : <AlertCircle size={28} className="text-white" />}
-                    </div>
+                  {activeLine?.status === 'RUNNING' ? <Activity size={32} className="text-white" /> : <AlertCircle size={32} className="text-white" />}
+                </div>
 
-                    <h2 className="text-3xl font-black text-slate-900 dark:text-white italic tracking-tighter mb-1.5 leading-none uppercase">
-                      {activeLine?.name}
-                    </h2>
-                    
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-800 rounded-full border border-gray-100 dark:border-gray-700 backdrop-blur-md mb-6">
-                      <span className={cn(
-                        "w-1.5 h-1.5 rounded-full",
-                        activeLine?.status === 'RUNNING' ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-                      )} />
-                      <span className={cn(
-                        "text-[8px] font-black uppercase tracking-[0.15em]",
-                        activeLine?.status === 'RUNNING' ? "text-emerald-400 dark:text-emerald-500" : "text-rose-400 dark:text-rose-500"
-                      )}>
-                        {activeLine?.status === 'RUNNING' ? 'Machine Operationnelle' : 'Ligne à l\'Arrêt'}
-                      </span>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white italic tracking-tighter mb-2 uppercase">
+                  {activeLine?.name}
+                </h2>
+                
+                <div className="flex items-center gap-2 mb-8">
+                  <StatusIndicator 
+                    status={activeLine?.status === 'RUNNING' ? 'running' : 'fault'} 
+                    label={activeLine?.status === 'RUNNING' ? 'OPÉRATIONNEL' : 'ARRÊTÉ'} 
+                  />
+                </div>
+
+                {activeDowntime ? (
+                  <div className="w-full max-w-sm space-y-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-slate-100 dark:border-gray-800 shadow-sm relative group overflow-hidden">
+                       <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 blur-3xl opacity-50" />
+                       <div className="flex items-center justify-center gap-2 text-rose-500 mb-2">
+                         <Timer size={18} className="animate-pulse" />
+                         <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Chronomètre d'Arrêt</span>
+                       </div>
+                       <p className="text-5xl font-black tracking-tighter tabular-nums text-slate-900 dark:text-white">
+                         {formatDowntimeDisplay(timer)}
+                       </p>
+                       
+                       <Button 
+                         variant="success" 
+                         size="lg"
+                         className="w-full mt-6 h-16 shadow-lg shadow-emerald-500/20"
+                         onClick={handleStopDowntime}
+                       >
+                         <Play size={20} fill="currentColor" className="mr-2" /> REPRENDRE LE CYCLE
+                       </Button>
                     </div>
-
-                    {activeDowntime && !categorizingLogId ? (
-                      <div className="space-y-4 w-full max-w-md mx-auto">
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 backdrop-blur-3xl shadow-sm dark:shadow-none group">
-                          <div className="flex items-center justify-center gap-2 text-rose-500 dark:text-rose-400 mb-2">
-                            <Timer size={18} className="animate-pulse" />
-                            <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-60">Durée d'Arrêt</span>
-                          </div>
-                          <p className="text-4xl font-black tracking-tighter tabular-nums text-slate-900 dark:text-white group-hover:scale-105 transition-transform duration-500">
-                            {formatDowntimeDisplay(timer)}
-                          </p>
-                          {lines.filter(l => l.machineId === activeLine?.machineId && l.activeDowntimeId === activeDowntime.id).length > 1 && (
-                            <div className="flex items-center justify-center gap-1 mt-1 text-blue-600 dark:text-blue-400 animate-pulse">
-                              <Activity size={10} />
-                              <span className="text-[8px] font-black uppercase tracking-widest">Arrêt Groupé Intelligent</span>
-                            </div>
-                          )}
-                          {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
-                            <div className="mt-3">
-                              <span className="px-5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-full text-[9px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest inline-flex items-center gap-2">
-                                 {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={handleStopDowntime}
-                          className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-[0.15em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2.5 hover:bg-emerald-500 shadow-emerald-500/10 dark:shadow-none"
-                        >
-                          <Play size={18} fill="currentColor" /> Relancer la Ligne
-                        </button>
-
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest">Statut Opérationnel</span>
-                            <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-full text-[8px] font-black uppercase tracking-widest border border-rose-200 dark:border-rose-900/50">
-                              Ligne Stoppée
-                            </span>
-                          </div>
-                          
-                          {activeDowntime.typeId && activeDowntime.typeId !== 'PENDING' && (
-                            <div className="flex items-start gap-3 border-t border-gray-100 dark:border-gray-700 pt-3">
-                              <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-900 flex items-center justify-center text-lg flex-shrink-0 shadow-sm dark:shadow-none border border-gray-100 dark:border-gray-700">
-                                {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.icon || '⚠️'}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[9px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Motif Détecté</p>
-                                <p className="text-xs font-black text-slate-900 dark:text-white uppercase truncate">
-                                  {downtimeTypes.find(t => t.id === activeDowntime.typeId)?.name}
-                                </p>
-                                {activeDowntime.description && (
-                                  <p className="mt-1 text-[10px] font-medium text-slate-500 dark:text-gray-400 italic line-clamp-2">
-                                    "{activeDowntime.description}"
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {!activeDowntime.typeId || activeDowntime.typeId === 'PENDING' ? (
-                            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30">
-                               <Info size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                               <p className="text-[9px] font-bold text-blue-700 dark:text-blue-300 leading-tight">
-                                 L'arrêt sera qualifié automatiquement à la reprise du cycle.
-                               </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : (isInitialSelection || categorizingLogId) ? (
-                      null
-                    ) : (
-                      <div className="w-full flex flex-col gap-2.5 max-w-md mx-auto">
-                        <button
-                          onClick={handleStartDowntime}
-                          disabled={isInitialSelection}
-                          className="w-full py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-[0.15em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2.5 hover:bg-rose-500 disabled:opacity-50"
-                        >
-                          <Square size={18} fill="currentColor" /> Démarrer l'arrêt
-                        </button>
-                      </div>
-                    )}
                   </div>
+                ) : (
+                  <Button 
+                    variant="danger" 
+                    size="lg"
+                    className="w-full max-w-sm h-16 shadow-lg shadow-rose-500/20"
+                    onClick={handleStartDowntime}
+                    disabled={activeLine?.isActive === 0}
+                  >
+                    <Square size={20} fill="currentColor" className="mr-2" /> DÉCLARER UN ARRÊT
+                  </Button>
                 )}
-                </div>
               </div>
+            </Card>
 
-              {/* RIGHT COLUMN: PRODUCTION & HISTORY */}
-              <div className="lg:col-span-5 space-y-6">
-                {/* PRODUCTION CONTROLS */}
-                <div className={cn(
-                  "bg-white dark:bg-gray-900 rounded-[2rem] p-6 border border-gray-100 dark:border-gray-800 shadow-sm dark:shadow-none relative overflow-hidden group transition-all duration-500",
-                  flashFeedback ? "ring-2 ring-emerald-500" : ""
-                )}>
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-[80px]" />
-                  
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-purple-600/10 dark:bg-purple-900/20 rounded-xl flex items-center justify-center border border-purple-500/20">
-                        <Package size={16} className="text-purple-500" />
-                      </div>
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-gray-500">Missions & Saisie</h3>
-                    </div>
-                    {activeLine?.status === 'RUNNING' && (
-                      <motion.div 
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-100 dark:border-emerald-900/30"
-                      >
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[8px] font-black uppercase tracking-widest leading-none">Actif</span>
-                      </motion.div>
-                    )}
-                  </div>
-
-                  {!activeProgramme ? (
-                    <div className="text-center py-6 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-                      <p className="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-[0.2em]">{t('no_programme')}</p>
-                      <div className="grid grid-cols-1 gap-2 mt-4 px-3">
-                        {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
-                          <button
-                            key={p.id}
-                            onClick={() => handleSelectProgramme(p.id)}
-                            className="w-full p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 text-left flex justify-between items-center group/btn hover:bg-blue-600 dark:hover:bg-blue-700 transition-all font-black active:scale-95"
-                          >
-                            <span className="text-[10px] uppercase italic tracking-tight group-hover/btn:text-white dark:text-gray-200">{p.name}</span>
-                            <Play size={14} className="text-slate-400 dark:text-gray-500 group-hover/btn:text-white" fill="currentColor" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-end bg-gray-50 dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm dark:shadow-none">
-                        <div className="space-y-1">
-                          <p className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em]">Programme Actuel</p>
-                          <h4 className="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter truncate max-w-[180px] uppercase">{activeProgramme.name}</h4>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] mb-1">Palettes</p>
-                          <div className="flex items-baseline justify-end gap-1.5">
-                            <p className="text-3xl font-black text-slate-900 dark:text-white font-mono tracking-tighter tabular-nums">{activeProgramme.producedPallets || 0}</p>
-                            <span className="text-[9px] font-black text-slate-500 dark:text-gray-400 uppercase">Unit</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {(activeLine?.status === 'RUNNING' || activeLine?.status === 'STOPPED') && (
-                        <div className="space-y-6">
-                          <div className="flex flex-col gap-4">
-                            <div className="relative">
-                              <div className="flex justify-between items-center px-4 mb-3">
-                                <p className="text-[9px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em]">Saisie Rapide</p>
-                                <button 
-                                  onClick={async () => {
-                                    const count = parseInt(palletInput);
-                                    if(isNaN(count) || count <= 0 || !activeProgramme || !user) return;
-                                    await localApi.addDoc('production_logs', {
-                                      programmeId: activeProgramme.id,
-                                      operatorId: user.id,
-                                      machineId: activeLine?.machineId,
-                                      lineId: activeLine?.id,
-                                      shiftId: currentShiftId,
-                                      count,
-                                      timestamp: new Date().toISOString()
-                                    });
-                                    await localApi.updateDoc('programmes', activeProgramme.id, {
-                                      producedPallets: { _inc: count }
-                                    });
-                                    setPalletInput('1');
-                                    setFlashFeedback(true);
-                                    setTimeout(() => setFlashFeedback(false), 500);
-                                  }}
-                                  className="flex items-center gap-1.5 px-2 py-0.5 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg transition-colors font-black text-[9px] uppercase border border-blue-100 dark:border-blue-900/30 hover:bg-blue-600 hover:text-white"
-                                >
-                                  <Plus size={12} />
-                                  Ajouter
-                                </button>
-                              </div>
-                              <div className="flex items-center bg-gray-50 dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm dark:shadow-none">
-                                <input 
-                                  type="number"
-                                  className="flex-1 bg-transparent border-none text-3xl font-black text-slate-900 dark:text-white text-center font-mono outline-none"
-                                  value={palletInput}
-                                  onChange={e => setPalletInput(e.target.value)}
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-
-
-                            <div className="pt-6 border-t border-gray-100 dark:border-gray-700 space-y-3">
-                              <button 
-                                onClick={() => {
-                                  if(window.confirm("Voulez-vous clôturer ce programme ?")) {
-                                    handleAddPallets(0);
-                                  }
-                                }}
-                                className="w-full py-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-gray-100 dark:border-gray-700 transition-all flex items-center justify-center gap-2 italic"
-                              >
-                                 Terminer Mission Programme
-                              </button>
-                              
-                              <button 
-                                onClick={() => setShowStopConfirmation(true)}
-                                className="w-full py-4 bg-white dark:bg-gray-900 text-slate-400 dark:text-gray-500 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 dark:hover:text-rose-400 border border-gray-100 dark:border-gray-700 transition-all flex items-center justify-center gap-2"
-                              >
-                                Arrêter la Production
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {activeLine?.status === 'IDLE' && (
-                    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-700 text-center">
-                      <button 
-                        onClick={handleStartProduction}
-                        className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl dark:shadow-none active:scale-95 transition-all"
-                      >
-                        <Play size={20} fill="currentColor" className="inline-block mr-2" /> Démarrer Production
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* ACTIVITY LOGS */}
-                <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-6 border border-gray-100 dark:border-gray-800 shadow-sm dark:shadow-none relative overflow-hidden">
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-2">
-                      <History size={16} className="text-blue-600 dark:text-blue-400" />
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-gray-500">Activité Récente</h3>
-                    </div>
-                    <button 
-                      onClick={() => setShowManualStopModal(true)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full border border-blue-100 dark:border-blue-900/30 hover:bg-blue-600 hover:text-white transition-all active:scale-95"
-                    >
-                      <Plus size={12} />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Manuel</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto scrollbar-hide pr-1">
-                    {downtimeLogs
-                      .filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime)))
-                      .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-                      .map(log => {
-                        const type = downtimeTypes.find(t => t.id === log.typeId);
-                        return (
-                          <div key={log.id} className="group relative bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 hover:border-blue-100 dark:hover:border-blue-900 transition-all flex items-center justify-between shadow-sm dark:shadow-none">
-                            <div className="flex items-center gap-4">
-                              <div className="w-11 h-11 rounded-xl bg-white dark:bg-gray-900 border border-gray-50 dark:border-gray-800 flex items-center justify-center text-2xl shadow-inner transition-transform group-hover:scale-105">
-                                {type?.icon || '⚠️'}
-                              </div>
-                              <div>
-                                 <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight italic leading-none mb-1.5">
-                                   {type?.name || 'Inconnu'}
-                                 </p>
-                                 <div className="flex items-center gap-2">
-                                   <Clock size={10} className="text-slate-400 dark:text-gray-500" />
-                                   <p className="text-[9px] font-mono font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest">
-                                     {format(parseISO(log.startTime), 'HH:mm')} - {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '--:--'}
-                                     <span className="ml-2 text-blue-600 dark:text-blue-400">
-                                       {log.duration ? formatDowntimeDisplay(log.duration) : 'En cours'}
-                                     </span>
-                                   </p>
-                                 </div>
-                                 {log.images && (
-                                   <div className="flex gap-1 mt-2">
-                                     {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => {
-                                       const isVid = img.toLowerCase().endsWith('.mp4') || img.toLowerCase().endsWith('.webm') || img.toLowerCase().endsWith('.mov');
-                                       return (
-                                         <div 
-                                           key={i} 
-                                           className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:scale-110 transition-all bg-gray-100 dark:bg-gray-800"
-                                           onClick={() => setSelectedFullImage(img)}
-                                         >
-                                           {isVid ? (
-                                             <video src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} className="w-full h-full object-cover" />
-                                           ) : (
-                                             <img 
-                                               src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} 
-                                               className="w-full h-full object-cover" 
-                                               referrerPolicy="no-referrer"
-                                             />
-                                           )}
-                                         </div>
-                                       );
-                                     })}
-                                   </div>
-                                 )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => handleEditStopRequest(log)}
-                                className="p-2 text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
-                              >
-                                <Edit size={14} />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteStop(log.id)}
-                                className="p-2 text-slate-400 dark:text-gray-500 hover:text-rose-600 dark:hover:text-rose-400 transition-all"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
-                      <div className="py-12 text-center bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl border border-dashed border-gray-100 dark:border-gray-800">
-                         <Activity size={24} className="mx-auto text-slate-300 dark:text-gray-600 mb-2 opacity-20" />
-                         <p className="text-[10px] font-black uppercase text-slate-400 dark:text-gray-500 tracking-[0.2em] italic">Historique vide</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+            {activeLine?.status === 'IDLE' && (
+              <div className="text-center p-8 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-[2rem] border border-emerald-100 dark:border-emerald-900/30">
+                 <Button 
+                   variant="success" 
+                   size="lg" 
+                   className="w-full h-16 shadow-xl"
+                   onClick={handleStartProduction}
+                 >
+                   <Play size={20} fill="currentColor" className="mr-2" /> DÉMARRER LA PRODUCTION
+                 </Button>
               </div>
-            </div>
+            )}
           </div>
-        )}
-      </main>
+
+          {/* RIGHT COLUMN: MISSION & LOGS */}
+          <div className="lg:col-span-5 space-y-6">
+            <Modal isOpen={showStopConfirmation} onClose={() => setShowStopConfirmation(false)} title="CLÔTURER LA PRODUCTION" size="sm">
+              <div className="p-2 space-y-6 text-center">
+                 <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 rounded-full flex items-center justify-center mx-auto text-rose-500 border border-rose-100 dark:border-rose-900/30">
+                   <AlertCircle size={32} />
+                 </div>
+                 <p className="text-xs font-bold text-slate-500 dark:text-gray-400">Voulez-vous vraiment arrêter la production sur cette ligne ?</p>
+                 <div className="flex flex-col gap-2">
+                   <Button variant="danger" size="lg" className="w-full" onClick={() => { handleStopProduction(); setShowStopConfirmation(false); }}>OUI, ARRÊTER</Button>
+                   <Button variant="ghost" size="sm" onClick={() => setShowStopConfirmation(false)}>ANNULER</Button>
+                 </div>
+              </div>
+            </Modal>
+
+            <Card variant="scada" padding="none" className="overflow-hidden">
+               <div className="p-4 border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/50 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Package size={16} className="text-blue-600" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-white italic">Mission Active</span>
+                  </div>
+                  {activeProgramme && <Badge variant="success" size="xs">EN COURS</Badge>}
+               </div>
+
+               {!activeProgramme ? (
+                 <div className="p-12 text-center">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Charger un programme</p>
+                   <div className="grid grid-cols-1 gap-2">
+                      {availableProgrammes.filter(p => (p.lineId === selectedLineId || !p.lineId) && p.status === 'ACTIVE').map(p => (
+                        <Button key={p.id} variant="outline" className="h-12 text-[10px] items-center justify-between font-black uppercase" onClick={() => handleSelectProgramme(p.id)}>
+                          {p.name} <Play size={14} className="text-blue-600" fill="currentColor" />
+                        </Button>
+                      ))}
+                   </div>
+                 </div>
+               ) : (
+                 <div className="divide-y divide-slate-100 dark:divide-gray-800">
+                    <div className="p-6">
+                       <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 italic underline decoration-blue-500 underline-offset-4">Article Actuel</p>
+                       <h4 className="text-2xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase mb-4">{activeProgramme.name}</h4>
+                       
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-50 dark:bg-gray-800 p-4 rounded-2xl border border-slate-100">
+                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Palettes</p>
+                             <p className="text-3xl font-black text-blue-600 tabular-nums">{activeProgramme.producedPallets || 0}</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 opacity-40">
+                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Objectif</p>
+                             <p className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">-</p>
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                       <div className="flex items-center gap-2">
+                          <Button variant="outline" size="lg" className="h-16 w-16 rounded-2xl border-2" onClick={() => setPalletInput(Math.max(1, parseInt(palletInput) - 1).toString())}>
+                            <Minus size={24} />
+                          </Button>
+                          <div className="flex-1 h-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-slate-100 flex items-center justify-center font-mono">
+                             <input type="number" className="w-full bg-transparent border-none text-2xl font-black text-center outline-none text-slate-900 dark:text-white" value={palletInput} onChange={e => setPalletInput(e.target.value)} />
+                          </div>
+                          <Button variant="outline" size="lg" className="h-16 w-16 rounded-2xl border-2" onClick={() => setPalletInput((parseInt(palletInput) + 1).toString())}>
+                            <Plus size={24} />
+                          </Button>
+                       </div>
+                       <Button variant="primary" size="lg" className="w-full h-16 shadow-xl shadow-blue-500/20" onClick={async () => {
+                          const count = parseInt(palletInput);
+                          if(isNaN(count) || count <= 0 || !activeProgramme || !user) return;
+                          await localApi.addDoc('production_logs', {
+                            programmeId: activeProgramme.id,
+                            operatorId: user.id,
+                            machineId: activeLine?.machineId,
+                            lineId: activeLine?.id,
+                            shiftId: currentShiftId,
+                            count,
+                            timestamp: new Date().toISOString()
+                          });
+                          await localApi.updateDoc('programmes', activeProgramme.id, { producedPallets: { _inc: count } });
+                          setPalletInput('1');
+                       }}>VALIDER SAISIE</Button>
+                    </div>
+
+                    <div className="p-3 flex gap-2">
+                       <Button variant="ghost" size="sm" className="flex-1 text-[8px] tracking-widest uppercase italic" onClick={() => { if(window.confirm("Clôturer ?")) handleAddPallets(0); }}>FIN MISSION</Button>
+                       <Button variant="ghost" size="sm" className="flex-1 text-[8px] tracking-widest uppercase italic text-rose-500" onClick={() => setShowStopConfirmation(true)}>STOP LIGNE</Button>
+                    </div>
+                 </div>
+               )}
+            </Card>
+
+            <Card variant="scada" padding="none" className="overflow-hidden">
+               <div className="p-4 border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <History size={16} className="text-blue-600" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-white">Derniers Arrêts</span>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-7 text-[8px] uppercase" onClick={() => setShowManualStopModal(true)}>+ MANUEL</Button>
+               </div>
+               <div className="divide-y divide-slate-100 dark:divide-gray-800 max-h-[300px] overflow-y-auto">
+                 {downtimeLogs
+                   .filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime)))
+                   .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+                   .map(log => {
+                     const type = downtimeTypes.find(t => t.id === log.typeId);
+                     return (
+                       <div key={log.id} className="p-4 flex items-center justify-between group">
+                          <div className="flex items-center gap-3">
+                             <div className="text-2xl">{type?.icon || '⚠️'}</div>
+                             <div>
+                                <p className="text-[9px] font-black uppercase text-slate-900 dark:text-white leading-none mb-1">{type?.name || 'Inconnu'}</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">{format(parseISO(log.startTime), 'HH:mm')} • {formatDowntimeDisplay(getLogDurationSec(log))}</p>
+                             </div>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => handleEditStopRequest(log)}><Edit size={14} /></Button>
+                             <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400" onClick={() => handleDeleteStop(log.id)}><Trash2 size={14} /></Button>
+                          </div>
+                       </div>
+                     );
+                   })}
+                 {downtimeLogs.filter(d => d.operatorId === user?.id && d.lineId === selectedLineId && isToday(parseISO(d.startTime))).length === 0 && (
+                   <div className="p-12 text-center italic opacity-30 text-[10px] font-bold uppercase tracking-widest">Aucun arrêt aujourd'hui</div>
+                 )}
+               </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )}
+  </main>
 
       {/* FLOATING STATUS BAR */}
       <AnimatePresence>
