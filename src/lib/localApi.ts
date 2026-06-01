@@ -163,6 +163,9 @@ export const localApi = {
         callback(docs);
       } catch (e) {
         console.error(`Fetch error for ${collection}:`, e);
+        // Automatically schedule a retry in 3 seconds to auto-recover
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(fetchAndCallback, 3000);
       } finally {
         isFetching = false;
         if (pendingUpdate) {

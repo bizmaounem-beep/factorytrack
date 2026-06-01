@@ -16,13 +16,19 @@ import crypto from 'crypto';
 
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn('WARNING: JWT_SECRET environment variable is missing in production! Using a secure dynamic runtime fallback.');
-}
-// Generate dynamic safe fallback key at runtime so it's not guessed or static in source
-const DYNAMIC_FALLBACK_SECRET = crypto.randomBytes(64).toString('hex');
-const ACTUAL_JWT_SECRET = JWT_SECRET || DYNAMIC_FALLBACK_SECRET;
+
+// Generate dynamic safe fallback key at runtime so it's not guessed or static in production
+// But use a stable fallback key in development to avoid constant invalidation on file edits/restarts
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+
+let DYNAMIC_FALLBACK_SECRET = 'factorycloud_stable_fallback_secret_development_key_2026';
+if (process.env.NODE_ENV === 'production') {
+  if (!JWT_SECRET) {
+    console.warn('WARNING: JWT_SECRET environment variable is missing in production! Using a secure dynamic runtime fallback.');
+  }
+  DYNAMIC_FALLBACK_SECRET = crypto.randomBytes(64).toString('hex');
+}
+const ACTUAL_JWT_SECRET = JWT_SECRET || DYNAMIC_FALLBACK_SECRET;
 const DB_DIR = process.env.DB_DIR || path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DB_DIR, 'factory.db');
 const DB_BACKUP_PATH = path.join(DB_DIR, 'factory_backup.db');

@@ -73,9 +73,20 @@ export default function PilotScreen() {
   const [globalTimer, setGlobalTimer] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Show a manual session reset button if connection is slow/stuck
+  const [showReset, setShowReset] = useState(false);
+  useEffect(() => {
+    if (isDataLoading) {
+      const timer = setTimeout(() => setShowReset(true), 3000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowReset(false);
+    }
+  }, [isDataLoading]);
+
   if (!user) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4">
+      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4" id="pilot-init-no-user">
         <div className="text-center">
           <h2 className="text-xl font-black text-gray-950 dark:text-gray-50">INITIALISATION</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-semibold">Chargement de l'utilisateur...</p>
@@ -86,12 +97,41 @@ export default function PilotScreen() {
 
   if (isDataLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <div className="text-center">
-          <h2 className="text-lg font-black text-gray-950 dark:text-gray-50 uppercase tracking-tight">Écran Pilote</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Chargement du synoptique SCADA en temps réel...</p>
+      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-6" id="pilot-scada-loading">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="text-center">
+            <h2 className="text-lg font-black text-gray-950 dark:text-gray-50 uppercase tracking-tight">Écran Pilote</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Chargement du synoptique SCADA en temps réel...</p>
+          </div>
         </div>
+
+        {showReset && (
+          <div className="p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-xl max-w-sm text-center space-y-3 animate-fade-in" id="pilot-scada-reset">
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+              Connexion ralentie. Si vous restez bloqué, vous pouvez réinitialiser votre session.
+            </p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-850 dark:text-gray-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                id="pilot-loading-retry-btn"
+              >
+                Réessayer
+              </button>
+              <button
+                onClick={() => {
+                  logout();
+                  window.location.reload();
+                }}
+                className="px-3 py-1.5 bg-red-655 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors shadow-md shadow-red-500/10 cursor-pointer"
+                id="pilot-loading-logout-btn"
+              >
+                Réinitialiser la session
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
