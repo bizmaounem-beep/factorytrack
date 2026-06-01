@@ -47,6 +47,7 @@ import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 
 export default function PilotScreen() {
   const { user, logout } = useAuth();
+  const userRole = user && user.role ? user.role.toUpperCase() : '';
   const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { 
@@ -199,7 +200,7 @@ export default function PilotScreen() {
       .slice(0, 5);
 
     const teamPerformance = users
-      .filter(u => u.role === 'OPERATOR')
+      .filter(u => u.role && u.role.toUpperCase() === 'OPERATOR')
       .map(u => {
         const pallets = todayProd
           .filter(l => l.operatorId === u.id)

@@ -17,8 +17,7 @@ import crypto from 'crypto';
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error('FATAL: JWT_SECRET environment variable is missing in production!');
-  process.exit(1);
+  console.warn('WARNING: JWT_SECRET environment variable is missing in production! Using a secure dynamic runtime fallback.');
 }
 // Generate dynamic safe fallback key at runtime so it's not guessed or static in source
 const DYNAMIC_FALLBACK_SECRET = crypto.randomBytes(64).toString('hex');

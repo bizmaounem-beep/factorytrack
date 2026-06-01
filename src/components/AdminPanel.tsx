@@ -19,6 +19,7 @@ import { format, startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-f
 
 export default function AdminPanel() {
   const { logout, user } = useAuth();
+  const userRole = user && user.role ? user.role.toUpperCase() : '';
   const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { 
@@ -1167,8 +1168,8 @@ export default function AdminPanel() {
                     <div className="flex items-center gap-2 md:gap-3">
                       <div className={cn(
                         "w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-sm",
-                        u.role === 'ADMIN' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
-                        u.role === 'PILOT' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        (u.role && u.role.toUpperCase()) === 'ADMIN' ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
+                        (u.role && u.role.toUpperCase()) === 'PILOT' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
                       )}>
                         {u.name?.substring(0, 1) || '?'}
                       </div>

@@ -19,7 +19,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for persisted user session
     const savedUser = localStorage.getItem('factory_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.role) {
+          parsed.role = parsed.role.toUpperCase() as any;
+        }
+        setUser(parsed);
+      } catch (err) {
+        console.error('Error parsing loaded user', err);
+      }
     }
     setLoading(false);
   }, []);
@@ -29,6 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const foundUser = await loginLocal(username, password);
       
       if (foundUser) {
+        // Normalize role to uppercase in login response handler
+        if (foundUser.role) {
+          foundUser.role = foundUser.role.toUpperCase();
+        }
         // Save token separately for API auth headers
         if (foundUser.token) {
           localStorage.setItem('factory_token', foundUser.token);

@@ -52,20 +52,23 @@ export default function App() {
   const renderContent = () => {
     if (!user) return <Login />;
 
-    switch (user.role) {
-      case 'ADMIN':
-        return <AdminPanel />;
-      case 'PILOT':
-        return <PilotScreen />;
-      case 'OPERATOR':
-        return <OperatorScreen />;
-      default:
-        return (
-          <div className="p-8 text-center bg-red-50 rounded-2xl m-4 text-red-600 font-bold border-2 border-red-100">
-             {t('access_denied')}
-          </div>
-        );
+    const userRole = user.role ? user.role.toUpperCase() : '';
+
+    if (userRole === 'ADMIN') {
+      return <AdminPanel />;
     }
+    if (userRole === 'OPERATOR') {
+      return <OperatorScreen />;
+    }
+    if (userRole === 'PILOT') {
+      return <PilotScreen />;
+    }
+
+    return (
+      <div className="p-8 text-center bg-red-50 rounded-2xl m-4 text-red-600 font-bold border-2 border-red-100">
+         {t('access_denied')}
+      </div>
+    );
   };
 
   return (

@@ -26,6 +26,7 @@ import { StatusIndicator } from './ui/StatusIndicator';
 
 export default function OperatorScreen() {
   const { user, logout } = useAuth();
+  const userRole = user && user.role ? user.role.toUpperCase() : '';
   const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { 
