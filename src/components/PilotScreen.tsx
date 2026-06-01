@@ -91,7 +91,7 @@ export default function PilotScreen() {
     if (!selectedMachineId) return [];
     const alerts: { id: string; type: 'danger' | 'warning' | 'info'; title: string; desc: string; icon: any }[] = [];
     
-    const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false);
+    const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0);
     
     // 1. Long stops (> 20 mins)
     machineLines.forEach(l => {
@@ -131,7 +131,7 @@ export default function PilotScreen() {
     }
 
     // 3. Inactive lines info
-    const inactiveCount = lines.filter(l => l.machineId === selectedMachineId && l.isActive === false).length;
+    const inactiveCount = lines.filter(l => l.machineId === selectedMachineId && (l.isActive === false || l.isActive === 0)).length;
     if (inactiveCount > 0) {
        alerts.push({
          id: 'inactive-lines',
@@ -177,7 +177,7 @@ export default function PilotScreen() {
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
     const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
-    const activeLines = lines.filter(l => l.isActive !== false && l.machineId === selectedMachineId);
+    const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.machineId === selectedMachineId);
     
     // Calculate availability based on elapsed time in current shift, removing hardcoded defaults
     let shiftDurationSec = 0;
@@ -1153,13 +1153,13 @@ export default function PilotScreen() {
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 font-sans">Lignes Actives</p>
                     <p className="text-sm font-black font-mono text-gray-800 dark:text-gray-200 leading-none tabular-nums">
-                      {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length}
+                      {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).length}
                     </p>
                  </div>
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 font-sans">En Arrêt</p>
                     <p className="text-sm font-black font-mono text-rose-600 dark:text-rose-400 leading-none tabular-nums">
-                      {lines.filter(l => l.machineId === selectedMachineId && l.status === 'STOPPED' && l.isActive !== false).length}
+                      {lines.filter(l => l.machineId === selectedMachineId && l.status === 'STOPPED' && l.isActive !== false && l.isActive !== 0).length}
                     </p>
                  </div>
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
@@ -1169,7 +1169,7 @@ export default function PilotScreen() {
               </div>
 
               <div className="flex items-center gap-2 w-full md:w-auto">
-                {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
+                {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
                   <button 
                     onClick={handleResumeMachine}
                     className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
@@ -1177,7 +1177,7 @@ export default function PilotScreen() {
                     <Play size={14} fill="currentColor" />
                     REDÉMARRAGE MACHINE
                   </button>
-                ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).some(l => l.status === 'RUNNING') ? (
+                ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).some(l => l.status === 'RUNNING') ? (
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
                     className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in focus:outline-none"
@@ -1299,7 +1299,7 @@ export default function PilotScreen() {
 
           {selectedMachineId && (
             <DowntimeHeatmap 
-              lines={lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false)}
+              lines={lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0)}
               downtimeLogs={downLogs.filter(log => log.machineId === selectedMachineId)}
               className="mb-8 border border-neutral-100 dark:border-neutral-800"
             />
@@ -1400,7 +1400,7 @@ export default function PilotScreen() {
                 {/* Gauges row */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full flex-1 max-w-2xl font-mono">
                   {(() => {
-                    const activeLinesCount = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length;
+                    const activeLinesCount = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).length;
                     const targetPallets = Math.max(1, activeLinesCount * 40);
                     const perfRate = Math.min(100, Math.max(70, (analytics.totalPallets / targetPallets) * 100));
                     const qualityRate = 99.2;
@@ -1650,7 +1650,7 @@ export default function PilotScreen() {
                       const down = activeDowntimes[line.id];
                       const downType = downtimeTypes.find(t => t.id === down?.typeId);
                       const isMachineLevel = down?.lineId === 'MACHINE_LEVEL';
-                      const isActive = line.isActive !== false;
+                      const isActive = line.isActive !== false && line.isActive !== 0;
 
                       return (
                         <motion.div 
@@ -1692,7 +1692,7 @@ export default function PilotScreen() {
                                {isActive && (
                                  <button 
                                    onClick={() => handleToggleLineActive(line.id, true)}
-                                   className="p-3 bg-white dark:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl shadow-sm dark:shadow-none border border-slate-100 dark:border-gray-700 transition-all hover:scale-110 active:scale-95 focus:outline-none"
+                                   className="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 text-slate-500 dark:text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl shadow-sm hover:shadow-md border border-slate-200 dark:border-gray-700 transition-all hover:scale-110 active:scale-[0.92] focus:outline-none"
                                    title="Désactiver la ligne"
                                  >
                                    <Square size={18} />
@@ -1738,7 +1738,7 @@ export default function PilotScreen() {
                             </div>
 
                             {/* Production Pulse */}
-                            {line.tracksProduction !== false && (
+                            {line.tracksProduction !== false && line.tracksProduction !== 0 && (
                               <div className="relative overflow-hidden bg-slate-900/5 dark:bg-gray-800/20 p-2.5 px-3.5 rounded-xl border border-slate-100 dark:border-gray-800 flex justify-between items-center transition-colors">
                                 <div>
                                   <span className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] leading-none block mb-0.5">Flux Production</span>

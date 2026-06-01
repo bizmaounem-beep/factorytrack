@@ -53,7 +53,7 @@ export default function AdminPanel() {
     const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
     // OEE Calculation: Dynamically measure actual scheduled time versus unscheduled time on active production lines
-    const activeLines = lines.filter(l => l.isActive !== false && l.tracksProduction !== false);
+    const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.tracksProduction !== false && l.tracksProduction !== 0);
     let shiftDurationSec = 0;
 
     if (shifts && shifts.length > 0) {
@@ -279,7 +279,14 @@ export default function AdminPanel() {
     setModalType(type);
     setConfirmPin('');
     // When editing a user, we don't want to show the hashed PIN
-    const cleanData = type === 'user' && data.id ? { ...data, pin: '' } : { ...data };
+    let cleanData = type === 'user' && data.id ? { ...data, pin: '' } : { ...data };
+    if (type === 'line' && data.id) {
+      cleanData = {
+        ...cleanData,
+        isActive: data.isActive !== 0 && data.isActive !== false,
+        tracksProduction: data.tracksProduction !== 0 && data.tracksProduction !== false,
+      };
+    }
     setModalData(cleanData);
     setEditingId(data.id || null);
     if (type === 'line' && data.machineId) {
@@ -359,13 +366,13 @@ export default function AdminPanel() {
         const machineIdToUse = selectedMachineForLine || modalData.machineId;
         if (machineIdToUse) {
           finalData.machineId = machineIdToUse;
-          // Robust conversion for tracksProduction
-          // If it's explicitly boolean false or number 0, it's 0. Otherwise (true, 1, undefined) it's 1.
-          finalData.tracksProduction = (modalData.tracksProduction === false || modalData.tracksProduction === 0) ? 0 : 1;
         }
+        // Save both tracksProduction and isActive as 0 or 1 integers for database compatibility
+        finalData.tracksProduction = (modalData.tracksProduction === false || modalData.tracksProduction === 0) ? 0 : 1;
+        finalData.isActive = (modalData.isActive === false || modalData.isActive === 0) ? 0 : 1;
+        
         if (!editingId) {
           finalData.status = 'IDLE';
-          finalData.isActive = true;
         }
       }
 
@@ -1132,14 +1139,14 @@ export default function AdminPanel() {
                           </tr>
                         </thead>
                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                          {lines.filter(l => l.isActive !== false && l.status !== 'IDLE').map(l => {
+                          {lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.status !== 'IDLE').map(l => {
                             const prog = programmes.find(p => p.id === l.currentProgrammeId);
                             const op = users.find(u => u.id === l.currentOperatorId);
                             const mach = machines.find(m => m.id === l.machineId);
                             return (
                               <tr key={l.id} className={cn(
                                 "text-sm hover:bg-gray-50/50 transition-all group/line",
-                                l.isActive === false && "opacity-40 grayscale-[0.5]"
+                                (l.isActive === false || l.isActive === 0) && "opacity-40 grayscale-[0.5]"
                               )}>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-3">
@@ -1283,16 +1290,16 @@ export default function AdminPanel() {
                               key={l.id} 
                               className={cn(
                                 "border px-1.5 py-1 rounded flex items-center gap-1.5 group/line transition-all",
-                                l.isActive === false ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20 opacity-60" : "bg-gray-50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-900"
+                                (l.isActive === false || l.isActive === 0) ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20 opacity-60" : "bg-gray-50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-900"
                               )}
                             >
                               <span className={cn(
                                 "text-[9px] md:text-xs font-bold",
-                                l.isActive === false ? "text-red-700 dark:text-red-400 italic flex items-center gap-1" : "text-gray-700 dark:text-gray-300"
+                                (l.isActive === false || l.isActive === 0) ? "text-red-700 dark:text-red-400 italic flex items-center gap-1" : "text-gray-700 dark:text-gray-300"
                               )}>
-                                {l.isActive === false && <Timer size={10} className="text-red-400" />}
+                                {(l.isActive === false || l.isActive === 0) && <Timer size={10} className="text-red-400" />}
                                 {l.name}
-                                {l.isActive === false && <span className="text-[7px] uppercase tracking-tighter opacity-50 ml-1">({t('out_of_service')})</span>}
+                                {(l.isActive === false || l.isActive === 0) && <span className="text-[7px] uppercase tracking-tighter opacity-50 ml-1">({t('out_of_service')})</span>}
                               </span>
                               <div className="flex gap-0.5">
                                 <button onClick={() => openModal('line', l)} className="text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 opacity-50 sm:opacity-0 group-hover/line:opacity-100 transition-opacity">
@@ -2263,7 +2270,7 @@ export default function AdminPanel() {
                           type="checkbox"
                           id="isActive"
                           className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
-                          checked={modalData.isActive !== false}
+                          checked={modalData.isActive !== false && modalData.isActive !== 0}
                           onChange={e => setModalData({...modalData, isActive: e.target.checked})}
                         />
                         <label htmlFor="isActive" className="text-sm font-bold text-gray-700 dark:text-gray-300 transition-colors">{t('active_service')}</label>
@@ -2273,7 +2280,7 @@ export default function AdminPanel() {
                           type="checkbox"
                           id="tracksProduction"
                           className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                          checked={modalData.tracksProduction !== false}
+                          checked={modalData.tracksProduction !== false && modalData.tracksProduction !== 0}
                           onChange={e => setModalData({...modalData, tracksProduction: e.target.checked})}
                         />
                         <label htmlFor="tracksProduction" className="text-sm font-bold text-gray-700 dark:text-gray-300 transition-colors">{t('track_production')}</label>

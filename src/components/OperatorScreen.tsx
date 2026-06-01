@@ -1043,7 +1043,7 @@ export default function OperatorScreen() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).map((line) => {
+              {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).map((line) => {
                 const isBusy = line.status !== 'IDLE' && line.currentOperatorId !== user?.id;
                 const operatorName = users.find(u => u.id === line.currentOperatorId)?.name;
 
@@ -1183,7 +1183,7 @@ export default function OperatorScreen() {
                     size="lg"
                     className="w-full max-w-sm h-16 shadow-lg shadow-rose-500/20"
                     onClick={handleStartDowntime}
-                    disabled={activeLine?.isActive === false}
+                    disabled={activeLine?.isActive === false || activeLine?.isActive === 0}
                   >
                     <Square size={20} fill="currentColor" className="mr-2" /> DÉCLARER UN ARRÊT
                   </Button>

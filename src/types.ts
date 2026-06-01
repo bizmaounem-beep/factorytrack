@@ -22,8 +22,8 @@ export interface Line {
   currentProgrammeId?: string;
   currentOperatorId?: string;
   activeDowntimeId?: string;
-  tracksProduction: boolean;
-  isActive?: boolean;
+  tracksProduction: boolean | number;
+  isActive?: boolean | number;
 }
 
 export interface Programme {
