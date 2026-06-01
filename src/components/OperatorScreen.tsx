@@ -1246,56 +1246,60 @@ export default function OperatorScreen() {
                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 italic underline decoration-blue-500 underline-offset-4">Article Actuel</p>
                        <h4 className="text-2xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase mb-4">{activeProgramme.name}</h4>
                        
-                       <div className="grid grid-cols-2 gap-4">
-                          <div className="bg-slate-50 dark:bg-gray-800 p-4 rounded-2xl border border-slate-100">
-                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Palettes</p>
-                             <p className="text-3xl font-black text-blue-600 tabular-nums">{activeProgramme.producedPallets || 0}</p>
-                          </div>
-                          <div className="bg-slate-50 dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 opacity-40">
-                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Objectif</p>
-                             <p className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">-</p>
-                          </div>
-                       </div>
+                       {activeLine?.tracksProduction !== false && activeLine?.tracksProduction !== 0 && (
+                         <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-slate-50 dark:bg-gray-800 p-4 rounded-2xl border border-slate-100">
+                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Palettes</p>
+                               <p className="text-3xl font-black text-blue-600 tabular-nums">{activeProgramme.producedPallets || 0}</p>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 opacity-40">
+                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Objectif</p>
+                               <p className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">-</p>
+                            </div>
+                         </div>
+                       )}
                     </div>
 
-                    {activeLine?.status !== 'RUNNING' ? (
-                      <div className="p-6 space-y-4">
-                       <div className="flex items-center gap-2">
-                          <Button variant="outline" size="lg" className="h-16 w-16 rounded-2xl border-2" onClick={() => setPalletInput(Math.max(1, parseInt(palletInput) - 1).toString())}>
-                            <Minus size={24} />
-                          </Button>
-                          <div className="flex-1 h-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-slate-100 flex items-center justify-center font-mono">
-                             <input type="number" className="w-full bg-transparent border-none text-2xl font-black text-center outline-none text-slate-900 dark:text-white" value={palletInput} onChange={e => setPalletInput(e.target.value)} />
-                          </div>
-                          <Button variant="outline" size="lg" className="h-16 w-16 rounded-2xl border-2" onClick={() => setPalletInput((parseInt(palletInput) + 1).toString())}>
-                            <Plus size={24} />
-                          </Button>
-                       </div>
-                       <Button variant="primary" size="lg" className="w-full h-16 shadow-xl shadow-blue-500/20" onClick={async () => {
-                          const count = parseInt(palletInput);
-                          if(isNaN(count) || count <= 0 || !activeProgramme || !user) return;
-                          await localApi.addDoc('production_logs', {
-                            programmeId: activeProgramme.id,
-                            operatorId: user.id,
-                            machineId: activeLine?.machineId,
-                            lineId: activeLine?.id,
-                            shiftId: currentShiftId,
-                            count,
-                            timestamp: new Date().toISOString()
-                          });
-                          await localApi.updateDoc('programmes', activeProgramme.id, { producedPallets: { _inc: count } });
-                          setPalletInput('1');
-                       }}>VALIDER SAISIE</Button>
-                    </div>
-                     ) : (
-                       <div className="p-6 bg-slate-50 dark:bg-slate-900/40 text-center flex flex-col items-center justify-center min-h-[160px] border-b border-slate-100 dark:border-gray-800">
-                         <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-3">
-                           <Activity size={20} className="animate-pulse" />
+                    {activeLine?.tracksProduction !== false && activeLine?.tracksProduction !== 0 && (
+                      activeLine?.status !== 'RUNNING' ? (
+                        <div className="p-6 space-y-4">
+                         <div className="flex items-center gap-2">
+                            <Button variant="outline" size="lg" className="h-16 w-16 rounded-2xl border-2" onClick={() => setPalletInput(Math.max(1, parseInt(palletInput) - 1).toString())}>
+                              <Minus size={24} />
+                            </Button>
+                            <div className="flex-1 h-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-slate-100 flex items-center justify-center font-mono">
+                               <input type="number" className="w-full bg-transparent border-none text-2xl font-black text-center outline-none text-slate-900 dark:text-white" value={palletInput} onChange={e => setPalletInput(e.target.value)} />
+                            </div>
+                            <Button variant="outline" size="lg" className="h-16 w-16 rounded-2xl border-2" onClick={() => setPalletInput((parseInt(palletInput) + 1).toString())}>
+                              <Plus size={24} />
+                            </Button>
                          </div>
-                         <p className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider mb-1">Production en cours</p>
-                         <p className="text-[10px] text-slate-400 dark:text-gray-500 max-w-[200px] leading-normal font-bold">L'ajout manuel de palettes est désactivé pendant que l'enregistrement automatique est en cours.</p>
-                       </div>
-                     )}
+                         <Button variant="primary" size="lg" className="w-full h-16 shadow-xl shadow-blue-500/20" onClick={async () => {
+                            const count = parseInt(palletInput);
+                            if(isNaN(count) || count <= 0 || !activeProgramme || !user) return;
+                            await localApi.addDoc('production_logs', {
+                              programmeId: activeProgramme.id,
+                              operatorId: user.id,
+                              machineId: activeLine?.machineId,
+                              lineId: activeLine?.id,
+                              shiftId: currentShiftId,
+                              count,
+                              timestamp: new Date().toISOString()
+                            });
+                            await localApi.updateDoc('programmes', activeProgramme.id, { producedPallets: { _inc: count } });
+                            setPalletInput('1');
+                         }}>VALIDER SAISIE</Button>
+                      </div>
+                       ) : (
+                         <div className="p-6 bg-slate-50 dark:bg-slate-900/40 text-center flex flex-col items-center justify-center min-h-[160px] border-b border-slate-100 dark:border-gray-800">
+                           <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-3">
+                             <Activity size={20} className="animate-pulse" />
+                           </div>
+                           <p className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider mb-1">Production en cours</p>
+                           <p className="text-[10px] text-slate-400 dark:text-gray-500 max-w-[200px] leading-normal font-bold">L'ajout manuel de palettes est désactivé pendant que l'enregistrement automatique est en cours.</p>
+                         </div>
+                       )
+                    )}
 
                     <div className="p-3 flex gap-2">
                        <Button variant="ghost" size="sm" className="flex-1 text-[8px] tracking-widest uppercase italic" onClick={() => { if(window.confirm("Clôturer ?")) handleAddPallets(0); }}>FIN MISSION</Button>
