@@ -23,7 +23,7 @@ export const Button: React.FC<ButtonProps> = ({
     success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-500/10 active:scale-95",
     ghost: "bg-transparent hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 active:scale-95",
     outline: "bg-transparent border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 text-slate-700 dark:text-gray-300 active:scale-95",
-    scada: "bg-slate-900 text-white dark:bg-black border border-slate-700 dark:border-gray-800 hover:bg-slate-800 font-mono tracking-tighter shadow-lg active:scale-[0.98]"
+    scada: "bg-slate-100 text-slate-900 dark:bg-black dark:text-white border border-slate-300 dark:border-gray-800 hover:bg-slate-200 dark:hover:bg-slate-900 font-mono tracking-tighter shadow-md active:scale-[0.98]"
   };
 
   const sizes = {

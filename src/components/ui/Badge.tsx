@@ -21,7 +21,7 @@ export const Badge: React.FC<BadgeProps> = ({
     error: "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400 border-rose-100 dark:border-rose-900/30",
     info: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-100 dark:border-blue-900/30",
     outline: "bg-transparent border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400",
-    scada: "bg-slate-900 text-white dark:bg-black border-slate-700 dark:border-gray-800 font-mono tracking-tighter"
+    scada: "bg-slate-100 text-slate-800 dark:bg-black dark:text-white border-slate-300 dark:border-gray-800 font-mono tracking-tighter"
   };
 
   const sizes = {

@@ -21,7 +21,7 @@ export const Card: React.FC<CardProps> = ({
     flat: "bg-gray-50/50 dark:bg-gray-800/50 border border-transparent",
     outline: "bg-transparent border border-slate-200 dark:border-gray-800",
     glass: "bg-white/70 dark:bg-gray-900/70 backdrop-blur-md border border-white/20 dark:border-gray-800/20",
-    scada: "bg-slate-900 dark:bg-black border-l-4 border-l-blue-600 border-y border-r border-slate-800 dark:border-gray-800 shadow-[2px_2px_10px_rgba(0,0,0,0.1)]"
+    scada: "bg-white dark:bg-black border-l-4 border-l-blue-600 border-y border-r border-slate-200 dark:border-gray-800 shadow-[2px_2px_10px_rgba(0,0,0,0.05)] dark:shadow-[2px_2px_10px_rgba(0,0,0,0.2)]"
   };
 
   const paddings = {

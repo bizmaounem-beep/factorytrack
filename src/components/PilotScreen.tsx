@@ -1120,24 +1120,24 @@ export default function PilotScreen() {
         </div>
         
         {activeTab === 'monitor' && selectedMachineId && (
-          <div className="flex flex-col gap-4 bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 mb-4 shadow-xl dark:shadow-none">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl dark:shadow-none border-4 border-white dark:border-gray-800">
-                  <LayoutGrid size={32} />
+          <div className="flex flex-col gap-3 bg-white dark:bg-gray-900 p-3 sm:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 mb-4 shadow-md dark:shadow-none transition-colors">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md dark:shadow-none border border-slate-100/15 dark:border-gray-800">
+                  <LayoutGrid size={20} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-widest rounded-full border border-blue-100 dark:border-blue-900/50">SCADA LIVE V4.0</span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="px-1.5 py-0.2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-widest rounded-full border border-blue-100 dark:border-blue-900/50">SCADA LIVE V4.0</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-none uppercase italic">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight leading-none uppercase italic">
                       {machines.find(m => m.id === selectedMachineId)?.name}
                     </h2>
                     <button 
                       onClick={() => handleMachineSelect('')}
-                      className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase hover:underline leading-none mt-1 focus:outline-none"
+                      className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase hover:underline leading-none mt-0.5 focus:outline-none"
                     >
                       ({t('change')})
                     </button>
@@ -1145,26 +1145,26 @@ export default function PilotScreen() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
-                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">Efficience</p>
-                    <p className="text-lg font-black font-mono text-blue-600 dark:text-blue-400 leading-none tabular-nums">{analytics.availability.toFixed(1)}%</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto">
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 font-sans">Efficience</p>
+                    <p className="text-sm font-black font-mono text-blue-600 dark:text-blue-400 leading-none tabular-nums">{analytics.availability.toFixed(1)}%</p>
                  </div>
-                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">Lignes Actives</p>
-                    <p className="text-lg font-black font-mono text-gray-800 dark:text-gray-200 leading-none tabular-nums">
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 font-sans">Lignes Actives</p>
+                    <p className="text-sm font-black font-mono text-gray-800 dark:text-gray-200 leading-none tabular-nums">
                       {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length}
                     </p>
                  </div>
-                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">En Arrêt</p>
-                    <p className="text-lg font-black font-mono text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 font-sans">En Arrêt</p>
+                    <p className="text-sm font-black font-mono text-rose-600 dark:text-rose-400 leading-none tabular-nums">
                       {lines.filter(l => l.machineId === selectedMachineId && l.status === 'STOPPED' && l.isActive !== false).length}
                     </p>
                  </div>
-                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">Prod Total</p>
-                    <p className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{analytics.totalPallets}</p>
+                 <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 font-sans">Prod Total</p>
+                    <p className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{analytics.totalPallets}</p>
                  </div>
               </div>
 
@@ -1172,25 +1172,25 @@ export default function PilotScreen() {
                 {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
                   <button 
                     onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 dark:shadow-none hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
                   >
-                    <Play size={20} fill="currentColor" />
+                    <Play size={14} fill="currentColor" />
                     REDÉMARRAGE MACHINE
                   </button>
                 ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).some(l => l.status === 'RUNNING') ? (
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-100 dark:shadow-none hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in focus:outline-none"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in focus:outline-none"
                   >
-                    <Activity size={20} className="animate-pulse" />
+                    <Activity size={14} className="animate-pulse" />
                     ARRÊT D'URGENCE GLOBAL
                   </button>
                 ) : (
                   <button 
                     onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 dark:shadow-none hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
                   >
-                    <Play size={20} fill="currentColor" />
+                    <Play size={14} fill="currentColor" />
                     REPRISE DE LA MACHINE
                   </button>
                 )}
@@ -1383,22 +1383,22 @@ export default function PilotScreen() {
           {selectedMachineId && (
             <motion.div 
               variants={item}
-              className="bg-slate-900 text-white rounded-[2rem] p-6 border-4 border-slate-800 shadow-3xl dark:shadow-none relative overflow-hidden mb-6"
+              className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white rounded-[2rem] p-6 border-4 border-gray-100 dark:border-slate-800 shadow-3xl dark:shadow-none relative overflow-hidden mb-6"
             >
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
               <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
                 <div className="space-y-2 max-w-sm w-full">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-400 text-[9px] font-black uppercase tracking-widest">
+                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
                     <Activity size={10} className="animate-pulse" /> Indicateurs OEE / TRG
                   </div>
-                  <h3 className="text-xl font-black italic uppercase tracking-tighter">Analyse Globale de Rendement</h3>
-                  <p className="text-[10px] text-slate-400 leading-relaxed uppercase">
+                  <h3 className="text-xl font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Analyse Globale de Rendement</h3>
+                  <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-relaxed uppercase">
                     Calculé en temps réel selon les normes industrielles : Disponibilité x Performance x Qualité.
                   </p>
                 </div>
 
                 {/* Gauges row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full flex-1 max-w-2xl">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full flex-1 max-w-2xl font-mono">
                   {(() => {
                     const activeLinesCount = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length;
                     const targetPallets = Math.max(1, activeLinesCount * 40);
@@ -1407,17 +1407,17 @@ export default function PilotScreen() {
                     const trgVal = (analytics.availability * perfRate * qualityRate) / 10000;
 
                     return [
-                      { label: "TRG (OEE)", val: `${trgVal.toFixed(1)}%`, desc: "Rendement Global", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-                      { label: "Disponibilité", val: `${analytics.availability.toFixed(1)}%`, desc: "Taux d'Uptime", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-                      { label: "Performance", val: `${perfRate.toFixed(1)}%`, desc: "Cadence Shift", color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-                      { label: "Qualité", val: `${qualityRate.toFixed(1)}%`, desc: "Conformité", color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+                      { label: "TRG (OEE)", val: `${trgVal.toFixed(1)}%`, desc: "Rendement Global", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+                      { label: "Disponibilité", val: `${analytics.availability.toFixed(1)}%`, desc: "Taux d'Uptime", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+                      { label: "Performance", val: `${perfRate.toFixed(1)}%`, desc: "Cadence Shift", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+                      { label: "Qualité", val: `${qualityRate.toFixed(1)}%`, desc: "Conformité", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
                     ].map((metric, i) => (
-                      <div key={i} className={cn("p-4 rounded-2xl border flex flex-col items-center text-center justify-center bg-slate-950/60", metric.border)}>
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">{metric.label}</span>
+                      <div key={i} className={cn("p-4 rounded-2xl border flex flex-col items-center text-center justify-center bg-gray-50/50 dark:bg-slate-950/60", metric.border)}>
+                        <span className="text-[8px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1 font-sans">{metric.label}</span>
                         <div className={cn("text-xl md:text-2xl font-black italic tracking-tighter tabular-nums", metric.color)}>
                           {metric.val}
                         </div>
-                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-1">{metric.desc}</span>
+                        <span className="text-[8px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-tight mt-1 font-sans">{metric.desc}</span>
                       </div>
                     ));
                   })()}
@@ -1593,14 +1593,14 @@ export default function PilotScreen() {
       ) : (
           <div className="p-2 sm:p-4 space-y-8">
             {/* SCADA Global Controls */}
-            <div className="bg-slate-900 dark:bg-black p-4 rounded-[2rem] border-4 border-slate-800 dark:border-gray-800 shadow-2xl dark:shadow-none flex flex-wrap items-center justify-between gap-4">
+            <div className="bg-white dark:bg-black p-4 rounded-[2rem] border-4 border-gray-100 dark:border-gray-800 shadow-2xl dark:shadow-none flex flex-wrap items-center justify-between gap-4 transition-colors">
                <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-rose-600 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-900/50 border-2 border-rose-400 animate-pulse">
                      <AlertTriangle className="text-white" size={24} />
                   </div>
                   <div>
-                    <h2 className="text-white font-black text-lg italic uppercase tracking-tighter leading-none">Console SCADA Directe</h2>
-                    <p className="text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Surveillance Temps Réel Active</p>
+                    <h2 className="text-gray-900 dark:text-white font-black text-lg italic uppercase tracking-tighter leading-none">Console SCADA Directe</h2>
+                    <p className="text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Surveillance Temps Réel Active</p>
                   </div>
                </div>
                
@@ -1739,15 +1739,15 @@ export default function PilotScreen() {
 
                             {/* Production Pulse */}
                             {line.tracksProduction !== false && (
-                              <div className="relative overflow-hidden bg-slate-900/5 dark:bg-gray-800/50 p-4 rounded-[1.5rem] border border-slate-100 dark:border-gray-800 flex justify-between items-end">
+                              <div className="relative overflow-hidden bg-slate-900/5 dark:bg-gray-800/20 p-2.5 px-3.5 rounded-xl border border-slate-100 dark:border-gray-800 flex justify-between items-center transition-colors">
                                 <div>
-                                  <span className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em]">Flux Production</span>
-                                  <p className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">
+                                  <span className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] leading-none block mb-0.5">Flux Production</span>
+                                  <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums leading-none">
                                     {prog?.producedPallets || 0}
-                                    <span className="ml-1 text-[10px] text-blue-600 dark:text-blue-400 uppercase">pal</span>
+                                    <span className="ml-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase">pal</span>
                                   </p>
                                 </div>
-                                <Activity className="text-blue-200 dark:text-blue-900/30 animate-pulse" size={40} />
+                                <Activity className="text-blue-200 dark:text-blue-900/30 animate-pulse shrink-0" size={24} />
                               </div>
                             )}
 

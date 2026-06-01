@@ -23,25 +23,31 @@
 
 @layer base {
   body {
-    /* Implement a dark mode low-glare default layout for factory floor eyes */
-    @apply font-sans bg-slate-950 text-slate-100 antialiased selection:bg-blue-500/20;
+    /* Implement a dark mode low-glare default layout for factory floor eyes, with responsive dynamic theme support */
+    @apply font-sans bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100 antialiased selection:bg-blue-500/20 transition-colors duration-300;
   }
 
-  /* Universal touch-target sizes (48x48px minimum) for bulky gloves and PPE ergonomics */
-  button, 
-  input[type="text"], 
-  input[type="number"], 
-  input[type="password"], 
-  select, 
-  .interactive-control {
+  /* Apply comfortable min heights to primary forms/buttons while preventing smaller icons/controls from stretching */
+  input[type="text"]:not(.p-1):not(.p-2), 
+  input[type="number"]:not(.p-1):not(.p-2), 
+  input[type="password"]:not(.p-1):not(.p-2), 
+  select:not(.p-1):not(.p-2) {
+    min-height: 42px;
+    box-sizing: border-box;
+  }
+
+  /* Key controls wear the ergonomic touch-target padding class for active industrial operators */
+  .touch-target {
     min-height: 48px;
     min-width: 48px;
-    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-slate-900 rounded-3xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.15)] border border-slate-800/80 transition-all duration-300;
+    @apply bg-white dark:bg-slate-900 rounded-3xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.15)] border border-gray-100 dark:border-slate-800/80 transition-all duration-300;
   }
 }
