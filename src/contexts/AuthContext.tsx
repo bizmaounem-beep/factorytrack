@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { loginLocal } from '../lib/localApi';
+import { safeStorage } from '../lib/safeStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -17,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check for persisted user session
-    const savedUser = localStorage.getItem('factory_user');
+    const savedUser = safeStorage.getItem('factory_user');
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
@@ -43,12 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // Save token separately for API auth headers
         if (foundUser.token) {
-          localStorage.setItem('factory_token', foundUser.token);
+          safeStorage.setItem('factory_token', foundUser.token);
         }
         // Save user without the token in the user state
         const { token, ...userWithoutToken } = foundUser;
         setUser(userWithoutToken);
-        localStorage.setItem('factory_user', JSON.stringify(userWithoutToken));
+        safeStorage.setItem('factory_user', JSON.stringify(userWithoutToken));
         return true;
       }
       return false;
@@ -60,8 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('factory_user');
-    localStorage.removeItem('factory_token');
+    safeStorage.removeItem('factory_user');
+    safeStorage.removeItem('factory_token');
   };
 
   return (

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, ChangeEvent } from 'react'
 import { localApi, API_BASE_URL } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
+import { safeStorage } from '../lib/safeStorage';
 import { useLanguage } from '../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1860,7 +1861,7 @@ export default function AdminPanel() {
                     </div>
                     <button 
                       onClick={() => {
-                        const token = localStorage.getItem('token');
+                        const token = safeStorage.getItem('token') || safeStorage.getItem('factory_token');
                         window.open(`/api/backup/download?token=${token}`, '_blank');
                       }}
                       className="w-full py-1.5 md:py-2.5 bg-green-600 text-white rounded-lg font-black shadow-lg shadow-green-50 dark:shadow-none active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 text-[8px] md:text-[9px] tracking-widest uppercase"

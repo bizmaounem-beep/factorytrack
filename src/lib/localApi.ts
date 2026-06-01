@@ -1,5 +1,6 @@
 // Local API helper to replace Firebase
 import { io } from 'socket.io-client';
+import { safeStorage } from './safeStorage';
 
 const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
@@ -15,7 +16,7 @@ export const API_BASE_URL = getApiBaseUrl();
 const API_BASE = `${API_BASE_URL}/api/db`;
 
 const getHeaders = (extraHeaders = {}) => {
-  const token = localStorage.getItem('factory_token');
+  const token = safeStorage.getItem('factory_token');
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -26,8 +27,8 @@ const getHeaders = (extraHeaders = {}) => {
 const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const res = await fetch(url, options);
   if (res.status === 401 && typeof window !== 'undefined') {
-    localStorage.removeItem('factory_token');
-    localStorage.removeItem('factory_user');
+    safeStorage.removeItem('factory_token');
+    safeStorage.removeItem('factory_user');
     window.location.reload();
   }
   return res;
@@ -219,7 +220,7 @@ export const loginLocal = async (username: string, password: string) => {
     }
     const data = await res.json();
     if (data.token) {
-      localStorage.setItem('factory_token', data.token);
+      safeStorage.setItem('factory_token', data.token);
     }
     return data;
   } catch (e) {
