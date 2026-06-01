@@ -6,13 +6,15 @@ interface CardProps {
   className?: string;
   variant?: 'default' | 'flat' | 'outline' | 'glass' | 'scada';
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
 }
 
 export const Card: React.FC<CardProps> = ({ 
   children, 
   className, 
   variant = 'default',
-  padding = 'md'
+  padding = 'md',
+  onClick
 }) => {
   const variants = {
     default: "bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 shadow-sm md:shadow-md",
@@ -30,12 +32,15 @@ export const Card: React.FC<CardProps> = ({
   };
 
   return (
-    <div className={cn(
-      "rounded-2xl md:rounded-3xl transition-all duration-300",
-      variants[variant],
-      paddings[padding],
-      className
-    )}>
+    <div 
+      className={cn(
+        "rounded-2xl md:rounded-3xl transition-all duration-300",
+        variants[variant],
+        paddings[padding],
+        className
+      )}
+      onClick={onClick}
+    >
       {children}
     </div>
   );

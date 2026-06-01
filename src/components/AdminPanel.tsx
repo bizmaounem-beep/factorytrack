@@ -642,7 +642,7 @@ export default function AdminPanel() {
 
         // Photos logic
         const images: string[] = [];
-        if (log.image_path) images.push(log.image_path);
+        if ((log as any).image_path) images.push((log as any).image_path);
         if (log.images) {
            try {
              const parsed = typeof log.images === 'string' ? JSON.parse(log.images) : log.images;
@@ -814,12 +814,12 @@ export default function AdminPanel() {
         staggerChildren: 0.01
       }
     }
-  };
+  } as const;
 
   const item = {
     hidden: { opacity: 0, y: 3 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" } }
-  };
+    show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" as const } }
+  } as const;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col md:flex-row transition-colors duration-300 font-sans" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -1701,7 +1701,7 @@ export default function AdminPanel() {
                                   <td className="px-2 md:px-6 py-2 md:py-3 italic text-gray-900 dark:text-gray-300">
                                     <div className="flex items-center gap-1.5">
                                       <div className="w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-[8px] font-black uppercase text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
-                                        {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
+                                        {users.find(u => u.id === log.operatorId)?.name?.charAt(0) || '—'}
                                       </div>
                                       <span className="font-black text-gray-600 dark:text-gray-400 truncate max-w-[80px] md:max-w-none">
                                         {users.find(u => u.id === log.operatorId)?.name || '—'}
@@ -1719,9 +1719,9 @@ export default function AdminPanel() {
                                   </td>
                                   <td className="px-2 md:px-6 py-2 md:py-3 text-right">
                                     <div className="flex justify-end gap-1 items-center">
-                                      {log.image_path && (
+                                      {(log as any).image_path && (
                                         <button 
-                                          onClick={() => setSelectedFullImage(log.image_path)}
+                                          onClick={() => setSelectedFullImage((log as any).image_path)}
                                           className="text-white bg-blue-500 dark:bg-blue-600 p-1 rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
                                           title="Voir la photo"
                                         >

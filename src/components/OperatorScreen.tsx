@@ -36,12 +36,36 @@ export default function OperatorScreen() {
     downtimeTypes, 
     programmes: availableProgrammes, 
     downtimeLogs,
-    shifts 
+    shifts,
+    loading: isDataLoading
   } = useData();
   
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(() => sessionStorage.getItem('op_selected_machine') || null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(() => sessionStorage.getItem('op_selected_line') || null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  if (!user) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4">
+        <div className="text-center">
+          <h2 className="text-xl font-black text-gray-950 dark:text-gray-50">INITIALISATION</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-semibold">Chargement de l'utilisateur...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isDataLoading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-center">
+          <h2 className="text-lg font-black text-gray-950 dark:text-gray-50 uppercase tracking-tight">Écran Opérateur</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Synchronisation des lignes en cours...</p>
+        </div>
+      </div>
+    );
+  }
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -1049,7 +1073,7 @@ export default function OperatorScreen() {
           size="md"
         >
           <StopPicker 
-            types={downtimeTypes}
+            types={downtimeTypes.map(t => ({ ...t, icon: t.icon || '⚠️' }))}
             selectedId={selectedStopType}
             onSelect={(id) => {
               if (categorizingLogId) handleCategorizeStop(id);
@@ -1117,7 +1141,7 @@ export default function OperatorScreen() {
                     size="lg"
                     className="w-full max-w-sm h-16 shadow-lg shadow-rose-500/20"
                     onClick={handleStartDowntime}
-                    disabled={activeLine?.isActive === 0}
+                    disabled={activeLine?.isActive === false}
                   >
                     <Square size={20} fill="currentColor" className="mr-2" /> DÉCLARER UN ARRÊT
                   </Button>
@@ -1497,7 +1521,7 @@ export default function OperatorScreen() {
 
                   <section className="space-y-2 md:space-y-3 p-3 md:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl md:rounded-2xl border border-blue-100 dark:border-blue-900/30">
                     <h4 className="text-[9px] md:text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                      <Activity size={10} md:size={12} />
+                      <Activity className="w-2.5 h-2.5 md:w-3 md:h-3" />
                       Avantage Industriel
                     </h4>
                     <p className="text-[11px] md:text-xs font-bold text-blue-800/80 dark:text-blue-200/80 leading-relaxed">

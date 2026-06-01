@@ -7,6 +7,7 @@ import AdminPanel from './components/AdminPanel';
 import { useEffect, useState } from 'react';
 import { Terminal, Download, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -55,13 +56,25 @@ export default function App() {
     const userRole = user.role ? user.role.toUpperCase() : '';
 
     if (userRole === 'ADMIN') {
-      return <AdminPanel />;
+      return (
+        <ErrorBoundary fallbackTitle="PANEL ADMIN">
+          <AdminPanel />
+        </ErrorBoundary>
+      );
     }
     if (userRole === 'OPERATOR') {
-      return <OperatorScreen />;
+      return (
+        <ErrorBoundary fallbackTitle="ÉCRAN OPÉRATEUR">
+          <OperatorScreen />
+        </ErrorBoundary>
+      );
     }
     if (userRole === 'PILOT') {
-      return <PilotScreen />;
+      return (
+        <ErrorBoundary fallbackTitle="ÉCRAN PILOTE">
+          <PilotScreen />
+        </ErrorBoundary>
+      );
     }
 
     return (

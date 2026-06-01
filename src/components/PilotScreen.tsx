@@ -39,7 +39,8 @@ import {
   Plus, 
   TrendingUp, 
   Box,
-  Image as ImageIcon 
+  Image as ImageIcon,
+  History as HistoryIcon
 } from 'lucide-react';
 import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import { getCurrentShiftId } from '../lib/shiftUtils';
@@ -58,7 +59,8 @@ export default function PilotScreen() {
     downtimeLogs: downLogs, 
     lines, 
     programmes,
-    shifts 
+    shifts,
+    loading: isDataLoading
   } = useData();
 
   const [historyLineFilter, setHistoryLineFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_line') || '');
@@ -70,6 +72,29 @@ export default function PilotScreen() {
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => sessionStorage.getItem('pilot_selected_machine') || '');
   const [globalTimer, setGlobalTimer] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  if (!user) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4">
+        <div className="text-center">
+          <h2 className="text-xl font-black text-gray-950 dark:text-gray-50">INITIALISATION</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-semibold">Chargement de l'utilisateur...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isDataLoading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-center">
+          <h2 className="text-lg font-black text-gray-950 dark:text-gray-50 uppercase tracking-tight">Écran Pilote</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Chargement du synoptique SCADA en temps réel...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Critical Alerts Logic
   const criticalAlerts = useMemo(() => {
@@ -848,12 +873,12 @@ export default function PilotScreen() {
         staggerChildren: 0.01
       }
     }
-  };
+  } as const;
 
   const item = {
     hidden: { opacity: 0, y: 3 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" } }
-  };
+    show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" as const } }
+  } as const;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-950" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
@@ -935,7 +960,7 @@ export default function PilotScreen() {
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                   { id: 'monitor', label: 'Surveillance', icon: Monitor },
-                  { id: 'history', label: 'Historique', icon: History }
+                  { id: 'history', label: 'Historique', icon: HistoryIcon }
                 ].map(nav => (
                   <Button
                     key={nav.id}
@@ -1022,7 +1047,7 @@ export default function PilotScreen() {
                   activeTab === 'history' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
                 )}
               >
-                <History size={14} />
+                <HistoryIcon size={14} />
                 {t('history')}
               </button>
             </div>
@@ -1395,7 +1420,7 @@ export default function PilotScreen() {
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase">
-                          {op.name.charAt(0)}
+                          {op.name?.charAt(0) || ''}
                         </div>
                         <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">{op.name}</span>
                       </div>
@@ -1566,7 +1591,7 @@ export default function PilotScreen() {
                       const down = activeDowntimes[line.id];
                       const downType = downtimeTypes.find(t => t.id === down?.typeId);
                       const isMachineLevel = down?.lineId === 'MACHINE_LEVEL';
-                      const isActive = line.isActive !== false && line.isActive !== 0;
+                      const isActive = line.isActive !== false;
 
                       return (
                         <motion.div 
@@ -1654,7 +1679,7 @@ export default function PilotScreen() {
                             </div>
 
                             {/* Production Pulse */}
-                            {line.tracksProduction !== 0 && (
+                            {line.tracksProduction !== false && (
                               <div className="relative overflow-hidden bg-slate-900/5 dark:bg-gray-800/50 p-4 rounded-[1.5rem] border border-slate-100 dark:border-gray-800 flex justify-between items-end">
                                 <div>
                                   <span className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em]">Flux Production</span>
@@ -1757,7 +1782,7 @@ export default function PilotScreen() {
         !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-300 dark:text-blue-500">
-             <History size={32} />
+             <HistoryIcon size={32} />
           </div>
           <div className="space-y-1">
             <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase italic">Aucune machine sélectionnée</h3>
@@ -1945,7 +1970,7 @@ export default function PilotScreen() {
                                 <td className="px-2 md:px-5 py-2 md:py-3 italic">
                                   <div className="flex items-center gap-1.5">
                                     <div className="w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
-                                      {users.find(u => u.id === log.operatorId)?.name.charAt(0) || '—'}
+                                      {users.find(u => u.id === log.operatorId)?.name?.charAt(0) || '—'}
                                     </div>
                                     <span className="font-black text-gray-600 dark:text-gray-400 truncate max-w-[80px] md:max-w-none">
                                       {users.find(u => u.id === log.operatorId)?.name || '—'}
@@ -1963,9 +1988,9 @@ export default function PilotScreen() {
                                 </td>
                                 <td className="px-2 md:px-5 py-2 md:py-3 text-right">
                                   <div className="flex justify-end gap-1 items-center">
-                                    {log.image_path && (
+                                    {(log as any).image_path && (
                                       <button 
-                                        onClick={() => setSelectedFullImage(log.image_path)}
+                                        onClick={() => setSelectedFullImage((log as any).image_path)}
                                         className="text-white bg-blue-500 p-1 rounded-lg hover:bg-blue-600 transition-colors"
                                         title="Voir la photo"
                                       >
@@ -2663,7 +2688,7 @@ export default function PilotScreen() {
         {[
           { tab: 'dashboard', icon: LayoutDashboard, label: 'Tableau' },
           { tab: 'monitor',   icon: Monitor,         label: 'Monitor' },
-          { tab: 'history',   icon: History,         label: 'Historique' },
+          { tab: 'history',   icon: HistoryIcon,     label: 'Historique' },
         ].map(({ tab, icon: Icon, label }) => (
           <button key={tab} onClick={() => setActiveTab(tab as any)}
             className={cn("flex-1 flex flex-col items-center gap-1 py-3 text-[9px] font-black uppercase tracking-wide transition-colors",
