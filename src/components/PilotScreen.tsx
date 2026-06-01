@@ -179,15 +179,32 @@ export default function PilotScreen() {
     
     const activeLines = lines.filter(l => l.isActive !== false && l.machineId === selectedMachineId);
     
-    // Calculate availability based on elapsed time in current shift
-    let shiftDurationSec = 8 * 3600; // Fallback to 8h if no shift is active
-    if (currentShift) {
-      const [sh, sm] = currentShift.startTime.split(':').map(Number);
-      const [eh, em] = currentShift.endTime.split(':').map(Number);
-      const startMin = sh * 60 + sm;
-      const endMin = eh * 60 + em;
-      const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
-      shiftDurationSec = durationMin * 60;
+    // Calculate availability based on elapsed time in current shift, removing hardcoded defaults
+    let shiftDurationSec = 0;
+    if (shifts && shifts.length > 0) {
+      if (currentShift) {
+        const [sh, sm] = currentShift.startTime.split(':').map(Number);
+        const [eh, em] = currentShift.endTime.split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        const endMin = eh * 60 + em;
+        const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+        shiftDurationSec = durationMin * 60;
+      } else {
+        // If between shifts, compute the average scheduled shift duration mathematically
+        const totalDurationMin = shifts.reduce((acc, s) => {
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          const [eh, em] = s.endTime.split(':').map(Number);
+          const startMin = sh * 60 + sm;
+          const endMin = eh * 60 + em;
+          const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+          return acc + durationMin;
+        }, 0);
+        shiftDurationSec = (totalDurationMin / shifts.length) * 60;
+      }
+    } else {
+      // If no shifts are in yet, dynamically measure the elapsed time today as the baseline
+      const elapsedTodaySec = Math.floor((today.getTime() - startOfDay(today).getTime()) / 1000);
+      shiftDurationSec = Math.max(3600, elapsedTodaySec);
     }
 
     const totalPossibleTime = activeLines.length * shiftDurationSec; 
@@ -1130,24 +1147,24 @@ export default function PilotScreen() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Efficience</p>
-                    <p className="text-lg font-black text-blue-600 dark:text-blue-400 leading-none tabular-nums">{analytics.availability.toFixed(1)}%</p>
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">Efficience</p>
+                    <p className="text-lg font-black font-mono text-blue-600 dark:text-blue-400 leading-none tabular-nums">{analytics.availability.toFixed(1)}%</p>
                  </div>
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Lignes Actives</p>
-                    <p className="text-lg font-black text-gray-800 dark:text-gray-200 leading-none tabular-nums">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">Lignes Actives</p>
+                    <p className="text-lg font-black font-mono text-gray-800 dark:text-gray-200 leading-none tabular-nums">
                       {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false).length}
                     </p>
                  </div>
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">En Arrêt</p>
-                    <p className="text-lg font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">En Arrêt</p>
+                    <p className="text-lg font-black font-mono text-rose-600 dark:text-rose-400 leading-none tabular-nums">
                       {lines.filter(l => l.machineId === selectedMachineId && l.status === 'STOPPED' && l.isActive !== false).length}
                     </p>
                  </div>
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-2 px-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Prod Total</p>
-                    <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{analytics.totalPallets}</p>
+                    <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 font-sans">Prod Total</p>
+                    <p className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{analytics.totalPallets}</p>
                  </div>
               </div>
 

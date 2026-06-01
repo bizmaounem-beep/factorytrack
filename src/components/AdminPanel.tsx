@@ -52,28 +52,48 @@ export default function AdminPanel() {
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
     const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
-    // OEE Calculation (Availability) using real shift duration
-    const currentShift = shifts.find(s => {
-      const [sh, sm] = s.startTime.split(':').map(Number);
-      const [eh, em] = s.endTime.split(':').map(Number);
-      const startMin = sh * 60 + sm;
-      const endMin = eh * 60 + em;
-      const nowMin = today.getHours() * 60 + today.getMinutes();
-      if (endMin < startMin) return nowMin >= startMin || nowMin < endMin;
-      return nowMin >= startMin && nowMin < endMin;
-    });
+    // OEE Calculation: Dynamically measure actual scheduled time versus unscheduled time on active production lines
+    const activeLines = lines.filter(l => l.isActive !== false && l.tracksProduction !== false);
+    let shiftDurationSec = 0;
 
-    let shiftDurationSec = 8 * 3600; // Fallback to 8h if no shift is active (e.g. gaps between shifts)
-    if (currentShift) {
-      const [sh, sm] = currentShift.startTime.split(':').map(Number);
-      const [eh, em] = currentShift.endTime.split(':').map(Number);
-      const startMin = sh * 60 + sm;
-      const endMin = eh * 60 + em;
-      const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
-      shiftDurationSec = durationMin * 60;
+    if (shifts && shifts.length > 0) {
+      // Find currently active shift if any
+      const currentShift = shifts.find(s => {
+        const [sh, sm] = s.startTime.split(':').map(Number);
+        const [eh, em] = s.endTime.split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        const endMin = eh * 60 + em;
+        const nowMin = today.getHours() * 60 + today.getMinutes();
+        if (endMin < startMin) return nowMin >= startMin || nowMin < endMin;
+        return nowMin >= startMin && nowMin < endMin;
+      });
+
+      if (currentShift) {
+        const [sh, sm] = currentShift.startTime.split(':').map(Number);
+        const [eh, em] = currentShift.endTime.split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        const endMin = eh * 60 + em;
+        const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+        shiftDurationSec = durationMin * 60;
+      } else {
+        // If between shifts, dynamically compute the average scheduled shift duration in system
+        const totalDurationMin = shifts.reduce((acc, s) => {
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          const [eh, em] = s.endTime.split(':').map(Number);
+          const startMin = sh * 60 + sm;
+          const endMin = eh * 60 + em;
+          const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+          return acc + durationMin;
+        }, 0);
+        shiftDurationSec = (totalDurationMin / shifts.length) * 60;
+      }
+    } else {
+      // If no shifts are configured in system, dynamically measure elapsed time today as the scheduled baseline
+      const elapsedTodaySec = Math.floor((today.getTime() - startOfDay(today).getTime()) / 1000);
+      shiftDurationSec = Math.max(3600, elapsedTodaySec); // minimum of 1 hour base
     }
 
-    const totalPossibleTime = lines.length * shiftDurationSec;
+    const totalPossibleTime = activeLines.length * shiftDurationSec;
     const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
     const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
 
@@ -447,10 +467,29 @@ export default function AdminPanel() {
       if (col === 'programmes') {
         const line = lines.find(l => l.currentProgrammeId === id);
         if (line) {
+          // Verify if the line is currently in a STOPPED state with an active downtime log
+          if (line.status === 'STOPPED' && line.activeDowntimeId) {
+            const activeLog = downLogs.find(log => log.id === line.activeDowntimeId && (!log.endTime || !log.duration));
+            if (activeLog) {
+              const nowIso = new Date().toISOString();
+              const startMs = new Date(activeLog.startTime).getTime();
+              const endMs = new Date(nowIso).getTime();
+              const durationSec = Math.max(1, Math.round((endMs - startMs) / 1000));
+              
+              // Correctly handle/archive the downtime log before resetting the line
+              console.log(`[Industrial-State] Deleting active programme. Archiving downtime log ${activeLog.id} with duration ${durationSec}s`);
+              await localApi.updateDoc('downtime_logs', activeLog.id, {
+                endTime: nowIso,
+                duration: durationSec
+              });
+            }
+          }
+
           await localApi.updateDoc('lines', line.id, {
             currentProgrammeId: null,
             status: 'IDLE',
-            currentOperatorId: null
+            currentOperatorId: null,
+            activeDowntimeId: null
           });
         }
       }

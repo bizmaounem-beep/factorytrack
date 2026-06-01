@@ -16,19 +16,7 @@ import crypto from 'crypto';
 
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
-
-// Generate dynamic safe fallback key at runtime so it's not guessed or static in production
-// But use a stable fallback key in development to avoid constant invalidation on file edits/restarts
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-
-let DYNAMIC_FALLBACK_SECRET = 'factorycloud_stable_fallback_secret_development_key_2026';
-if (process.env.NODE_ENV === 'production') {
-  if (!JWT_SECRET) {
-    console.warn('WARNING: JWT_SECRET environment variable is missing in production! Using a secure dynamic runtime fallback.');
-  }
-  DYNAMIC_FALLBACK_SECRET = crypto.randomBytes(64).toString('hex');
-}
-const ACTUAL_JWT_SECRET = JWT_SECRET || DYNAMIC_FALLBACK_SECRET;
 const DB_DIR = process.env.DB_DIR || path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DB_DIR, 'factory.db');
 const DB_BACKUP_PATH = path.join(DB_DIR, 'factory_backup.db');
@@ -41,6 +29,32 @@ if (!fs.existsSync(DB_DIR)) {
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Ultra-stable JWT persistence: if JWT_SECRET is not provided, read/write from disk to survive reboots
+let ACTUAL_JWT_SECRET = JWT_SECRET;
+if (!ACTUAL_JWT_SECRET) {
+  const SECRET_FILE_PATH = path.join(DB_DIR, 'jwt_secret.key');
+  if (fs.existsSync(SECRET_FILE_PATH)) {
+    try {
+      ACTUAL_JWT_SECRET = fs.readFileSync(SECRET_FILE_PATH, 'utf8').trim();
+      console.log('[Security] Loaded stable and persistent JWT secret key from disk.');
+    } catch (e) {
+      console.error('[Security] Failed to read cached JWT key file, falling back...', e);
+    }
+  }
+  
+  if (!ACTUAL_JWT_SECRET) {
+    // Generate secure high-entropy secret key and persist it
+    ACTUAL_JWT_SECRET = crypto.randomBytes(64).toString('hex');
+    try {
+      fs.writeFileSync(SECRET_FILE_PATH, ACTUAL_JWT_SECRET, 'utf8');
+      console.log(`[Security] Generated and persisted secure stable JWT fallback key to ${SECRET_FILE_PATH}`);
+    } catch (e) {
+      console.error('[Security] Failed to persist stable JWT key file, using static development key', e);
+      ACTUAL_JWT_SECRET = 'factorycloud_stable_fallback_secret_development_key_2026';
+    }
+  }
 }
 
 // Multer configuration
@@ -144,9 +158,88 @@ async function startServer() {
       }
     }
 
-    // Export immediately on start, then every 30 minutes
+    // Export immediately on start, then once-a-day (every 24 hours) to prevent blocking I/O
     exportBackupJSON();
-    setInterval(exportBackupJSON, 30 * 60 * 1000);
+    setInterval(exportBackupJSON, 24 * 60 * 60 * 1000);
+
+    // Storage Management: Delete uploaded Multer images from the /uploads directory associated with downtime logs older than 90 days
+    function cleanupOldUploads() {
+      try {
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        const dateLimit = ninetyDaysAgo.toISOString();
+
+        console.log(`[StorageCleanup] Scanning for uploaded images/media associated with downtime logs older than 90 days (${dateLimit})...`);
+
+        // Check if table exists
+        const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='downtime_logs'").get();
+        if (!tableCheck) return;
+
+        const logs = db.prepare('SELECT id, images, image_path FROM downtime_logs WHERE startTime < ?').all() as any[];
+        let deletedCount = 0;
+        let errorCount = 0;
+
+        for (const log of logs) {
+          const filesToCleanup = new Set<string>();
+          
+          if (log.images) {
+            try {
+              if (log.images.startsWith('[') && log.images.endsWith(']')) {
+                const parsed = JSON.parse(log.images);
+                if (Array.isArray(parsed)) {
+                  parsed.forEach((f: any) => {
+                    if (typeof f === 'string') filesToCleanup.add(path.basename(f));
+                  });
+                }
+              } else {
+                log.images.split(/[,;]/).forEach((f: string) => {
+                  if (f.trim()) filesToCleanup.add(path.basename(f.trim()));
+                });
+              }
+            } catch (e) {
+              log.images.split(/[,;]/).forEach((f: string) => {
+                if (f.trim()) filesToCleanup.add(path.basename(f.trim()));
+              });
+            }
+          }
+
+          if (log.image_path) {
+            log.image_path.split(/[,;]/).forEach((f: string) => {
+              if (f.trim()) filesToCleanup.add(path.basename(f.trim()));
+            });
+          }
+
+          for (const filename of filesToCleanup) {
+            if (!filename || filename === 'null' || filename === 'undefined') continue;
+            // Clean paths and query
+            const santizedName = filename.replace(/["'\[\]]/g, '').trim();
+            if (!santizedName) continue;
+            const fullPath = path.join(UPLOADS_DIR, santizedName);
+            if (fs.existsSync(fullPath)) {
+              try {
+                fs.unlinkSync(fullPath);
+                deletedCount++;
+              } catch (e) {
+                console.error(`[StorageCleanup] Failed to delete file ${fullPath}:`, e);
+                errorCount++;
+              }
+            }
+          }
+        }
+
+        if (deletedCount > 0 || errorCount > 0) {
+          console.log(`[StorageCleanup] Completed: ${deletedCount} files deleted, ${errorCount} errors.`);
+        } else {
+          console.log(`[StorageCleanup] Checked uploads: No files required purging.`);
+        }
+      } catch (err) {
+        console.error('[StorageCleanup] Error in cleanupOldUploads job:', err);
+      }
+    }
+
+    // Run cleanup once at startup, then once-a-day (every 24 hours)
+    cleanupOldUploads();
+    setInterval(cleanupOldUploads, 24 * 60 * 60 * 1000);
 
     db.pragma('journal_mode = WAL'); // Use WAL mode for better concurrency and write stability
     
@@ -668,6 +761,40 @@ async function startServer() {
       if (!db) throw new Error('Database not initialized');
       const { collection, id } = req.params;
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
+
+      // Cleanly transition any lines and downtime logs linked with deleted programmes
+      if (collection === 'programmes') {
+        const affectedLines = db.prepare('SELECT * FROM lines WHERE currentProgrammeId = ?').all(id) as any[];
+        
+        for (const line of affectedLines) {
+          // If the line is stopped/downtime log is open, stop the clock and archive
+          if (line.status === 'STOPPED' && line.activeDowntimeId) {
+            const activeLog = db.prepare('SELECT * FROM downtime_logs WHERE id = ? AND (endTime IS NULL OR duration IS NULL)').get(line.activeDowntimeId) as any;
+            if (activeLog) {
+              const nowIso = new Date().toISOString();
+              const startMs = new Date(activeLog.startTime).getTime();
+              const endMs = new Date(nowIso).getTime();
+              const durationSec = Math.max(1, Math.round((endMs - startMs) / 1000));
+              
+              console.log(`[Industrial-Logic] Programme ${id} deleted while line ${line.id} was STOPPED. Automatically closing and archiving downtime log ${activeLog.id} with duration ${durationSec}s.`);
+              
+              db.prepare('UPDATE downtime_logs SET endTime = ?, duration = ? WHERE id = ?').run(nowIso, durationSec, activeLog.id);
+            }
+          }
+          
+          // Reset line status back to IDLE
+          console.log(`[Industrial-Logic] Resetting line ${line.id} to IDLE state upon deletion of programme ${id}`);
+          db.prepare(`
+            UPDATE lines 
+            SET status = 'IDLE', activeDowntimeId = NULL, currentProgrammeId = NULL, currentOperatorId = NULL 
+            WHERE id = ?
+          `).run(line.id);
+        }
+
+        io.emit('db_change', { collection: 'lines' });
+        io.emit('db_change', { collection: 'downtime_logs' });
+      }
+
       db.prepare(`DELETE FROM ${collection} WHERE id = ?`).run(id);
       io.emit('db_change', { collection });
       res.json({ success: true });
