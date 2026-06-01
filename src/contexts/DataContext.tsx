@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { localApi } from '../lib/localApi';
+import { useAuth } from './AuthContext';
 import { 
   Machine, Line, Programme, User, DowntimeType, 
   ProductionLog, DowntimeLog, Shift 
@@ -20,6 +21,7 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -31,6 +33,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     // Single set of listeners for the whole app
     const unsubMachines = localApi.onSnapshot('machines', (data) => {
       setMachines(data);
@@ -54,7 +63,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       unsubProd();
       unsubDown();
     };
-  }, []);
+  }, [user]);
 
   const value = React.useMemo(() => ({
     machines,
