@@ -1258,7 +1258,8 @@ export default function OperatorScreen() {
                        </div>
                     </div>
 
-                    <div className="p-6 space-y-4">
+                    {activeLine?.status !== 'RUNNING' ? (
+                      <div className="p-6 space-y-4">
                        <div className="flex items-center gap-2">
                           <Button variant="outline" size="lg" className="h-16 w-16 rounded-2xl border-2" onClick={() => setPalletInput(Math.max(1, parseInt(palletInput) - 1).toString())}>
                             <Minus size={24} />
@@ -1286,6 +1287,15 @@ export default function OperatorScreen() {
                           setPalletInput('1');
                        }}>VALIDER SAISIE</Button>
                     </div>
+                     ) : (
+                       <div className="p-6 bg-slate-50 dark:bg-slate-900/40 text-center flex flex-col items-center justify-center min-h-[160px] border-b border-slate-100 dark:border-gray-800">
+                         <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-3">
+                           <Activity size={20} className="animate-pulse" />
+                         </div>
+                         <p className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider mb-1">Production en cours</p>
+                         <p className="text-[10px] text-slate-400 dark:text-gray-500 max-w-[200px] leading-normal font-bold">L'ajout manuel de palettes est désactivé pendant que l'enregistrement automatique est en cours.</p>
+                       </div>
+                     )}
 
                     <div className="p-3 flex gap-2">
                        <Button variant="ghost" size="sm" className="flex-1 text-[8px] tracking-widest uppercase italic" onClick={() => { if(window.confirm("Clôturer ?")) handleAddPallets(0); }}>FIN MISSION</Button>
@@ -1318,9 +1328,21 @@ export default function OperatorScreen() {
                                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">{format(parseISO(log.startTime), 'HH:mm')} • {formatDowntimeDisplay(getLogDurationSec(log))}</p>
                              </div>
                           </div>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => handleEditStopRequest(log)}><Edit size={14} /></Button>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400" onClick={() => handleDeleteStop(log.id)}><Trash2 size={14} /></Button>
+                          <div className="flex gap-2 items-center">
+                             <button 
+                               onClick={() => handleEditStopRequest(log)}
+                               className="h-8 w-8 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 transition-all border border-slate-200 dark:border-gray-700"
+                               title="Modifier l'arrêt"
+                             >
+                               <Edit size={14} />
+                             </button>
+                             <button 
+                               onClick={() => handleDeleteStop(log.id)}
+                               className="h-8 w-8 rounded-lg flex items-center justify-center bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 transition-all border border-rose-100 dark:border-rose-900/30"
+                               title="Supprimer l'arrêt"
+                             >
+                               <Trash2 size={14} />
+                             </button>
                           </div>
                        </div>
                      );
