@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { localApi } from '../lib/localApi';
+import { localApi, API_BASE_URL } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -699,7 +699,7 @@ export default function PilotScreen() {
     formData.append('photo', file, `media-${Date.now()}${extension}`);
   
     try {
-      const res = await fetch('/api/upload', {
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json'

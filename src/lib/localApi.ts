@@ -1,7 +1,18 @@
 // Local API helper to replace Firebase
 import { io } from 'socket.io-client';
 
-const API_BASE = '/api/db';
+const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+
+const getApiBaseUrl = () => {
+  if (typeof window === 'undefined') return 'http://localhost:3000';
+  if (window.location.hostname.endsWith('.run.app') || window.location.protocol === 'https:') {
+    return window.location.origin;
+  }
+  return `http://${window.location.hostname}:3000`;
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+const API_BASE = `${API_BASE_URL}/api/db`;
 
 const getHeaders = (extraHeaders = {}) => {
   const token = localStorage.getItem('factory_token');
@@ -12,7 +23,7 @@ const getHeaders = (extraHeaders = {}) => {
   };
 };
 
-const socket = io({
+const socket = io(API_BASE_URL, {
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
@@ -97,7 +108,7 @@ export const localApi = {
 
   async globalStop(machineId: string, data: any) {
     try {
-      const res = await fetch(`/api/machine/${machineId}/global-stop`, {
+      const res = await fetch(`${API_BASE_URL}/api/machine/${machineId}/global-stop`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(data)
@@ -112,7 +123,7 @@ export const localApi = {
 
   async globalResume(machineId: string) {
     try {
-      const res = await fetch(`/api/machine/${machineId}/global-resume`, {
+      const res = await fetch(`${API_BASE_URL}/api/machine/${machineId}/global-resume`, {
         method: 'POST',
         headers: getHeaders()
       });
@@ -178,7 +189,7 @@ export const localApi = {
 
 export const loginLocal = async (username: string, password: string) => {
   try {
-    const res = await fetch('/api/login', {
+    const res = await fetch(`${API_BASE_URL}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: username, pin: password })

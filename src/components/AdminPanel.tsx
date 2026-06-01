@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, ChangeEvent } from 'react';
-import { localApi } from '../lib/localApi';
+import { localApi, API_BASE_URL } from '../lib/localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -225,7 +225,7 @@ export default function AdminPanel() {
     formData.append('photo', validated, `admin-upload-${Date.now()}${ext}`);
 
     try {
-      const res = await fetch('/api/upload', {
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
         headers: { 'Accept': 'application/json' },
         body: formData
@@ -2099,7 +2099,7 @@ export default function AdminPanel() {
                               if (!file) return;
                               const formData = new FormData();
                               formData.append('photo', file);
-                              const res = await fetch('/api/upload', {
+                              const res = await fetch(`${API_BASE_URL}/api/upload`, {
                                 method: 'POST',
                                 body: formData
                               });
