@@ -23,6 +23,16 @@ const getHeaders = (extraHeaders = {}) => {
   };
 };
 
+const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const res = await fetch(url, options);
+  if (res.status === 401 && typeof window !== 'undefined') {
+    localStorage.removeItem('factory_token');
+    localStorage.removeItem('factory_user');
+    window.location.reload();
+  }
+  return res;
+};
+
 const socket = io(API_BASE_URL, {
   reconnection: true,
   reconnectionAttempts: Infinity,
@@ -39,7 +49,7 @@ socket.on('connect_error', (err) => {
 export const localApi = {
   async getCollection(collection: string) {
     try {
-      const res = await fetch(`${API_BASE}/${collection}`, {
+      const res = await fetchWithAuth(`${API_BASE}/${collection}`, {
         headers: getHeaders()
       });
       const contentType = res.headers.get('content-type');
@@ -58,7 +68,7 @@ export const localApi = {
 
   async addDoc(collection: string, data: any) {
     try {
-      const res = await fetch(`${API_BASE}/${collection}`, {
+      const res = await fetchWithAuth(`${API_BASE}/${collection}`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(data)
@@ -75,7 +85,7 @@ export const localApi = {
 
   async updateDoc(collection: string, id: string, data: any) {
     try {
-      const res = await fetch(`${API_BASE}/${collection}/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE}/${collection}/${id}`, {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify(data)
@@ -92,7 +102,7 @@ export const localApi = {
 
   async deleteDoc(collection: string, id: string) {
     try {
-      const res = await fetch(`${API_BASE}/${collection}/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE}/${collection}/${id}`, {
         method: 'DELETE',
         headers: getHeaders()
       });
@@ -108,7 +118,7 @@ export const localApi = {
 
   async globalStop(machineId: string, data: any) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/machine/${machineId}/global-stop`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/machine/${machineId}/global-stop`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(data)
@@ -123,7 +133,7 @@ export const localApi = {
 
   async globalResume(machineId: string) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/machine/${machineId}/global-resume`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/machine/${machineId}/global-resume`, {
         method: 'POST',
         headers: getHeaders()
       });
