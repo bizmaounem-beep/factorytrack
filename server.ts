@@ -295,7 +295,8 @@ async function startServer() {
       CREATE TABLE IF NOT EXISTS downtime_types (
         id TEXT PRIMARY KEY,
         name TEXT,
-        icon TEXT
+        icon TEXT,
+        applyToAll INTEGER DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS production_logs (
@@ -368,6 +369,19 @@ async function startServer() {
         console.error(`Migration failed for ${table}:`, err);
       }
     }
+
+    // Migration for downtime_types
+    try {
+      const pragma = db.prepare(`PRAGMA table_info(downtime_types)`).all() as any[];
+      const columns = pragma.map(p => p.name);
+      if (!columns.includes('applyToAll')) {
+        console.log(`Migration: Adding applyToAll column to downtime_types...`);
+        db.exec(`ALTER TABLE downtime_types ADD COLUMN applyToAll INTEGER DEFAULT 0;`);
+      }
+    } catch (err) {
+      console.error(`Migration failed for downtime_types:`, err);
+    }
+
     console.log('Database migrations completed.');
 
     // Seed default data if empty

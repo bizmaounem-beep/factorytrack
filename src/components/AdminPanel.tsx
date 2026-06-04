@@ -385,8 +385,11 @@ export default function AdminPanel() {
           finalData.duration = Math.max(0, Math.floor((end - start) / 1000));
         }
       }
-      if (modalType === 'downtime' && !finalData.icon) {
-        finalData.icon = '⚠️';
+      if (modalType === 'downtime') {
+        if (!finalData.icon) {
+          finalData.icon = '⚠️';
+        }
+        finalData.applyToAll = (modalData.applyToAll === true || modalData.applyToAll === 1) ? 1 : 0;
       }
       if (modalType === 'line') {
         const machineIdToUse = selectedMachineForLine || modalData.machineId;
@@ -716,10 +719,7 @@ export default function AdminPanel() {
         const images: string[] = [];
         if ((log as any).image_path) images.push((log as any).image_path);
         if (log.images) {
-           try {
-             const parsed = typeof log.images === 'string' ? JSON.parse(log.images) : log.images;
-             if (Array.isArray(parsed)) images.push(...parsed);
-           } catch (e) { console.error('Error parsing images log', e); }
+           images.push(...safeParseImages(log.images));
         }
 
         if (images.length > 0) {
@@ -1483,7 +1483,12 @@ export default function AdminPanel() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
                 {downtimeTypes.map(t => (
                   <div key={t.id} className="bg-white dark:bg-gray-900 p-2 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 text-center animate-in zoom-in-95 group relative hover:border-orange-200 dark:hover:border-orange-900 transition-all">
-                    <div className="text-2xl md:text-3xl mb-2 grayscale group-hover:grayscale-0 transition-all">{t.icon || '⚠️'}</div>
+                    {!!t.applyToAll && (
+                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-red-150 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-extrabold text-[7px] tracking-widest uppercase rounded">
+                        Global
+                      </span>
+                    )}
+                    <div className="text-2xl md:text-3xl mb-1 grayscale group-hover:grayscale-0 transition-all">{t.icon || '⚠️'}</div>
                     <p className="font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-700 dark:text-gray-300 leading-tight">{t.name}</p>
                     <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
                       {t.name.toUpperCase() !== 'AUTRE' && (
@@ -2330,6 +2335,18 @@ export default function AdminPanel() {
                     value={modalData.icon || ''}
                     onChange={e => setModalData({...modalData, icon: e.target.value})}
                   />
+                  <label className="flex items-center gap-3 p-3 md:p-4 bg-gray-50 dark:bg-gray-800 rounded-xl md:rounded-2xl border border-gray-100 dark:border-gray-700 cursor-pointer select-none">
+                    <input 
+                      type="checkbox"
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                      checked={!!modalData.applyToAll}
+                      onChange={e => setModalData({...modalData, applyToAll: e.target.checked ? 1 : 0})}
+                    />
+                    <div className="flex flex-col text-left">
+                      <span className="text-[10px] font-black uppercase text-slate-800 dark:text-white tracking-wider leading-none">Arrêt Global d'Usine</span>
+                      <span className="text-[9px] font-medium text-slate-400 dark:text-gray-500 mt-1">S'applique à toutes les machines (stoppe toutes les lignes en même temps).</span>
+                    </div>
+                  </label>
                 </>
               )}
             </div>

@@ -119,6 +119,25 @@ export default function OperatorScreen() {
   const [manualImagePreviews, setManualImagePreviews] = useState<string[]>([]);
   const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
 
+  const safeParseImages = (imagesVal: any): string[] => {
+    if (!imagesVal) return [];
+    if (Array.isArray(imagesVal)) return imagesVal;
+    if (typeof imagesVal === 'string') {
+      const trimmed = imagesVal.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return trimmed.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+
   // Session Persistence
   useEffect(() => {
     if (!user || selectedLineId || lines.length === 0) return;
@@ -155,7 +174,7 @@ export default function OperatorScreen() {
   useEffect(() => {
     if (categorizingLog) {
       setDowntimeDescription(categorizingLog.description || '');
-      const parsed = categorizingLog.images ? (typeof categorizingLog.images === 'string' ? JSON.parse(categorizingLog.images) : categorizingLog.images) : [];
+      const parsed = safeParseImages(categorizingLog.images);
       setSelectedImagePaths(parsed);
       setImagePreviews(parsed.map((img: string) => img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`));
     } else {
@@ -622,6 +641,7 @@ export default function OperatorScreen() {
     const nameUpper = selectedType?.name?.toUpperCase() || '';
     const isChangeProg = nameUpper === 'CHANGEMENT FORMAT' || nameUpper === 'CHANGEMENT DE FORMAT' || nameUpper.includes('FORMAT');
     const isOther = nameUpper === 'AUTRE';
+    const isApplyToAll = selectedType?.applyToAll === 1 || selectedType?.applyToAll === true;
 
     // If change format or other and not yet filled, just step through
     if ((isChangeProg && !selectedProgrammeForChange) || (isOther && !downtimeDescription.trim())) {
@@ -630,37 +650,61 @@ export default function OperatorScreen() {
     }
 
     try {
-      const machineLines = lines.filter(l => l.machineId === activeLine.machineId);
-      const windowMs = 2 * 60 * 1000; // 2 minutes
-      const now = new Date().getTime();
+      if (isApplyToAll) {
+        // --- PROPAGATION LOGIC FOR GLOBAL FACTORY-WIDE STOP ---
+        const logId = (await localApi.addDoc('downtime_logs', {
+          machineId: activeLine.machineId,
+          lineId: 'MACHINE_LEVEL', // Signifies global shutdown
+          typeId,
+          description: isChangeProg 
+            ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
+            : (downtimeDescription.trim() || undefined),
+          images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined,
+          operatorId: user.id,
+          shiftId: currentShiftId,
+          startTime: new Date().toISOString()
+        })).id;
 
-      const existingRecentDowntime = downtimeLogs.find(log => 
-        log.machineId === activeLine.machineId && 
-        log.typeId === typeId && 
-        !log.endTime && 
-        (now - new Date(log.startTime).getTime()) < windowMs
-      );
+        // Stop all active lines of all active machines in the entire factory!
+        const allActiveLines = lines.filter(l => l.isActive !== false && l.isActive !== 0);
+        for (const line of allActiveLines) {
+          await localApi.updateDoc('lines', line.id, {
+            status: 'STOPPED',
+            activeDowntimeId: logId
+          });
+        }
+      } else {
+        // --- PROPAGATION LOGIC FOR SINGLE MACHINE STOP ---
+        const machineLines = lines.filter(l => l.machineId === activeLine.machineId);
+        const windowMs = 2 * 60 * 1000; // 2 minutes
+        const now = new Date().getTime();
 
-      const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
-        machineId: activeLine.machineId,
-        lineId: activeLine.id,
-        typeId,
-        description: isChangeProg 
-          ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
-          : (downtimeDescription.trim() || undefined),
-        images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined,
-        operatorId: user.id,
-        shiftId: currentShiftId,
-        startTime: new Date().toISOString()
-      })).id;
+        const existingRecentDowntime = downtimeLogs.find(log => 
+          log.machineId === activeLine.machineId && 
+          log.typeId === typeId && 
+          !log.endTime && 
+          (now - new Date(log.startTime).getTime()) < windowMs
+        );
 
-      // --- PROPAGATION LOGIC ---
-      // Requirement: propagating the stop to all lines of the machine
-      for (const line of machineLines) {
-        await localApi.updateDoc('lines', line.id, {
-          status: 'STOPPED',
-          activeDowntimeId: logId
-        });
+        const logId = existingRecentDowntime ? existingRecentDowntime.id : (await localApi.addDoc('downtime_logs', {
+          machineId: activeLine.machineId,
+          lineId: activeLine.id,
+          typeId,
+          description: isChangeProg 
+            ? `Chang. vers: ${availableProgrammes.find(p => p.id === selectedProgrammeForChange)?.name}` 
+            : (downtimeDescription.trim() || undefined),
+          images: selectedImagePaths.length > 0 ? selectedImagePaths : undefined,
+          operatorId: user.id,
+          shiftId: currentShiftId,
+          startTime: new Date().toISOString()
+        })).id;
+
+        for (const line of machineLines) {
+          await localApi.updateDoc('lines', line.id, {
+            status: 'STOPPED',
+            activeDowntimeId: logId
+          });
+        }
       }
       
       setIsInitialSelection(false);
@@ -682,6 +726,9 @@ export default function OperatorScreen() {
     const startTime = new Date(activeDowntime.startTime).getTime();
     const duration = Math.floor((Date.now() - startTime) / 1000);
 
+    const activeDowntimeType = downtimeTypes.find(t => t.id === activeDowntime.typeId);
+    const wasApplyToAll = activeDowntimeType?.applyToAll === 1 || activeDowntimeType?.applyToAll === true;
+
     try {
       // Update log
       await localApi.updateDoc('downtime_logs', activeDowntime.id, {
@@ -689,11 +736,25 @@ export default function OperatorScreen() {
         duration
       });
 
-      // Update line
-      await localApi.updateDoc('lines', selectedLineId, {
-        activeDowntimeId: null,
-        status: 'RUNNING'
-      });
+      if (wasApplyToAll) {
+        // Resume all lines in the entire factory that point to this downtime log
+        const stoppedLines = lines.filter(l => l.activeDowntimeId === activeDowntime.id);
+        for (const line of stoppedLines) {
+          await localApi.updateDoc('lines', line.id, {
+            activeDowntimeId: null,
+            status: 'RUNNING'
+          });
+        }
+      } else {
+        // Update line (standard single machine stop - resume all lines for this machine with this downtime ID)
+        const machineLines = lines.filter(l => l.machineId === activeLine?.machineId && l.activeDowntimeId === activeDowntime.id);
+        for (const line of machineLines) {
+          await localApi.updateDoc('lines', line.id, {
+            activeDowntimeId: null,
+            status: 'RUNNING'
+          });
+        }
+      }
     } catch (error) {
       console.error('Error stopping downtime:', error);
     }
@@ -829,7 +890,7 @@ export default function OperatorScreen() {
 
   const handleEditStopRequest = (log: any) => {
     setEditingLogId(log.id);
-    const parsedImages = log.images ? (typeof log.images === 'string' ? JSON.parse(log.images) : log.images) : [];
+    const parsedImages = safeParseImages(log.images);
     setManualStopForm({
       typeId: log.typeId,
       startTime: format(parseISO(log.startTime), "yyyy-MM-dd'T'HH:mm"),

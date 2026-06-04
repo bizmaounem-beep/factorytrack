@@ -48,6 +48,7 @@ export interface DowntimeType {
   id: string;
   name: string;
   icon?: string;
+  applyToAll?: number | boolean;
 }
 
 export interface ProductionLog {
