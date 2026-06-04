@@ -456,9 +456,31 @@ export default function PilotScreen() {
     }
   };
 
+  const safeParseImages = (imagesVal: any): string[] => {
+    if (!imagesVal) return [];
+    if (Array.isArray(imagesVal)) return imagesVal;
+    if (typeof imagesVal === 'string') {
+      const trimmed = imagesVal.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return trimmed.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+
   const openEditModal = (type: 'prod' | 'down', log: any) => {
     setEditModalType(type);
-    setEditModalData({ ...log });
+    setEditModalData({
+      ...log,
+      images: log.images ? safeParseImages(log.images) : []
+    });
     setEditingLogId(log.id);
     setIsEditModalOpen(true);
   };
@@ -754,10 +776,13 @@ export default function PilotScreen() {
       if (res.ok && (data.path || data.success)) {
         const filePath = data.path || (data.url ? data.url.replace('/uploads/', '') : '');
         if (isEditModalOpen) {
-          setEditModalData(prev => ({
-            ...prev,
-            images: [...(prev.images || []), filePath]
-          }));
+          setEditModalData(prev => {
+            const currentImages = safeParseImages(prev.images);
+            return {
+              ...prev,
+              images: [...currentImages, filePath]
+            };
+          });
         } else {
           setSelectedImagePaths(prev => [...prev, filePath]);
           setImagePreviews(prev => [...prev, preview]);
@@ -2336,7 +2361,7 @@ export default function PilotScreen() {
 
                                   {down.images && (
                                     <div className="flex flex-wrap gap-1.5">
-                                      {(typeof down.images === 'string' ? JSON.parse(down.images) : down.images).map((img: string, i: number) => {
+                                      {safeParseImages(down.images).map((img: string, i: number) => {
                                         const isVid = img.toLowerCase().endsWith('.mp4') || img.toLowerCase().endsWith('.webm') || img.toLowerCase().endsWith('.mov');
                                         return (
                                           <button 
@@ -2615,7 +2640,7 @@ export default function PilotScreen() {
                                     )}
                                     {log.images && (
                                       <div className="flex -space-x-2">
-                                        {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => {
+                                        {safeParseImages(log.images).map((img, i) => {
                                           const isVid = img.toLowerCase().endsWith('.mp4') || img.toLowerCase().endsWith('.webm') || img.toLowerCase().endsWith('.mov');
                                           return (
                                             <button 
@@ -2754,21 +2779,29 @@ export default function PilotScreen() {
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Photos</label>
                     <div className="flex flex-wrap gap-2">
-                      {(editModalData.images || []).map((img: string, i: number) => (
-                        <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                          <img src={`/uploads/${img}`} className="w-full h-full object-cover" alt="Preview" />
-                          <button 
-                            onClick={() => {
-                              const newImages = [...editModalData.images];
-                              newImages.splice(i, 1);
-                              setEditModalData({...editModalData, images: newImages});
-                            }}
-                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      ))}
+                      {(editModalData.images || []).map((img: string, i: number) => {
+                        const src = img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`;
+                        const isVid = img.toLowerCase().endsWith('.mp4') || img.toLowerCase().endsWith('.webm') || img.toLowerCase().endsWith('.mov');
+                        return (
+                          <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                            {isVid ? (
+                              <video src={src} className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={src} className="w-full h-full object-cover" alt="Preview" />
+                            )}
+                            <button 
+                              onClick={() => {
+                                const newImages = [...editModalData.images];
+                                newImages.splice(i, 1);
+                                setEditModalData({...editModalData, images: newImages});
+                              }}
+                              className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        );
+                      })}
                       <button 
                         onClick={() => fileInputRef.current?.click()}
                         className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all focus:outline-none"

@@ -151,6 +151,20 @@ export default function OperatorScreen() {
     return () => clearInterval(interval);
   }, [activeDowntime]);
 
+  // Pre-seed categorizing log values (description and images)
+  useEffect(() => {
+    if (categorizingLog) {
+      setDowntimeDescription(categorizingLog.description || '');
+      const parsed = categorizingLog.images ? (typeof categorizingLog.images === 'string' ? JSON.parse(categorizingLog.images) : categorizingLog.images) : [];
+      setSelectedImagePaths(parsed);
+      setImagePreviews(parsed.map((img: string) => img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`));
+    } else {
+      setDowntimeDescription('');
+      setSelectedImagePaths([]);
+      setImagePreviews([]);
+    }
+  }, [categorizingLogId]);
+
   if (!user) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-4" id="operator-init-no-user">
@@ -800,6 +814,19 @@ export default function OperatorScreen() {
     }
   };
 
+  const handleAddManualStopClick = () => {
+    setEditingLogId(null);
+    setManualStopForm({
+      typeId: '',
+      startTime: format(new Date(Date.now() - 15 * 60000), "yyyy-MM-dd'T'HH:mm"),
+      endTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+      description: '',
+      images: []
+    });
+    setManualImagePreviews([]);
+    setShowManualStopModal(true);
+  };
+
   const handleEditStopRequest = (log: any) => {
     setEditingLogId(log.id);
     const parsedImages = log.images ? (typeof log.images === 'string' ? JSON.parse(log.images) : log.images) : [];
@@ -1124,27 +1151,7 @@ export default function OperatorScreen() {
               </div>
             </div>
 
-        <Modal 
-          isOpen={isInitialSelection || !!categorizingLogId}
-          onClose={() => {
-            if (isInitialSelection) setIsInitialSelection(false);
-            if (categorizingLogId) setDismissedLogId(categorizingLogId);
-          }}
-          title={isInitialSelection ? "QUALIFIER L'ARRÊT EN COURS" : "QUALIFIER L'ARRÊT TERMINÉ"}
-          size="md"
-        >
-          <StopPicker 
-            types={downtimeTypes.map(t => ({ ...t, icon: t.icon || '⚠️' }))}
-            selectedId={selectedStopType}
-            onSelect={(id) => {
-              if (categorizingLogId) handleCategorizeStop(id);
-              else handleConfirmStartDowntime(id);
-            }}
-            onTakeMedia={handleTakeStoreMedia}
-            imagePreviews={imagePreviews}
-            isUploading={isUploading}
-          />
-        </Modal>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* LEFT COLUMN: MAIN STATUS */}
@@ -1334,7 +1341,7 @@ export default function OperatorScreen() {
                     <History size={16} className="text-blue-600" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-white">Derniers Arrêts</span>
                   </div>
-                  <Button variant="outline" className="h-11 px-4 text-[10px] uppercase font-bold" onClick={() => setShowManualStopModal(true)}>+ MANUEL</Button>
+                  <Button variant="outline" className="h-11 px-4 text-[10px] uppercase font-bold" onClick={handleAddManualStopClick}>+ MANUEL</Button>
                </div>
                <div className="divide-y divide-slate-100 dark:divide-gray-800 max-h-[300px] overflow-y-auto">
                  {downtimeLogs

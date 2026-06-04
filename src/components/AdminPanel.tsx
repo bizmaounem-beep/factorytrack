@@ -19,6 +19,25 @@ import { saveAs } from 'file-saver';
 import { format, startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-fns';
 
 export default function AdminPanel() {
+  const safeParseImages = (imagesVal: any): string[] => {
+    if (!imagesVal) return [];
+    if (Array.isArray(imagesVal)) return imagesVal;
+    if (typeof imagesVal === 'string') {
+      const trimmed = imagesVal.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return trimmed.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+
   const { logout, user } = useAuth();
   const userRole = user && user.role ? user.role.toUpperCase() : '';
   const { t } = useLanguage();
@@ -1783,7 +1802,7 @@ export default function AdminPanel() {
                                       )}
                                       {log.images && (
                                         <div className="flex -space-x-2">
-                                          {(typeof log.images === 'string' ? JSON.parse(log.images) as string[] : log.images as string[]).map((img, i) => (
+                                          {safeParseImages(log.images).map((img, i) => (
                                             <button 
                                               key={i}
                                               onClick={() => setSelectedFullImage(img)}
@@ -2122,7 +2141,7 @@ export default function AdminPanel() {
                        )}
                        
                        {/* Multi-photos handling */}
-                       {(Array.isArray(modalData.images) ? modalData.images : (modalData.images ? JSON.parse(modalData.images) : [])).map((img: string, idx: number) => (
+                       {safeParseImages(modalData.images).map((img: string, idx: number) => (
                          <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 group">
                            <img 
                              src={img.startsWith('http') || img.startsWith('/') ? img : `/uploads/${img}`} 
@@ -2131,7 +2150,7 @@ export default function AdminPanel() {
                            />
                            <button 
                              onClick={() => {
-                               const imgs = Array.isArray(modalData.images) ? [...modalData.images] : JSON.parse(modalData.images || '[]');
+                               const imgs = [...safeParseImages(modalData.images)];
                                imgs.splice(idx, 1);
                                setModalData({...modalData, images: imgs});
                              }}
@@ -2159,7 +2178,7 @@ export default function AdminPanel() {
                               if (res.ok) {
                                 const data = await res.json();
                                 const filePath = data.path;
-                                const imgs = Array.isArray(modalData.images) ? [...modalData.images] : (modalData.images ? JSON.parse(modalData.images) : []);
+                                const imgs = [...safeParseImages(modalData.images)];
                                 imgs.push(filePath);
                                 setModalData({...modalData, images: imgs});
                               }
