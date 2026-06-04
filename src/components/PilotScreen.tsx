@@ -67,7 +67,11 @@ export default function PilotScreen() {
   const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_date') || '');
   const [historyEndDateFilter, setHistoryEndDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_end_date') || '');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('pilot_history_type') as any) || 'production');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'monitor' | 'history' | 'widgets'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'monitor' | 'history'>(() => {
+    const saved = sessionStorage.getItem('pilot_active_tab');
+    if (saved === 'widgets' || !saved) return 'dashboard';
+    return saved as any;
+  });
   const [widgetWidth, setWidgetWidth] = useState<number>(240);
   const [widgetHeight, setWidgetHeight] = useState<number>(220);
   const [widgetType, setWidgetType] = useState<'oee' | 'alarm' | 'production'>('oee');
@@ -1572,8 +1576,7 @@ export default function PilotScreen() {
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                   { id: 'monitor', label: 'Surveillance', icon: Monitor },
-                  { id: 'history', label: 'Historique', icon: HistoryIcon },
-                  { id: 'widgets', label: 'Android Widgets', icon: LayoutGrid }
+                  { id: 'history', label: 'Historique', icon: HistoryIcon }
                 ].map(nav => (
                   <Button
                     key={nav.id}
@@ -1662,16 +1665,6 @@ export default function PilotScreen() {
               >
                 <HistoryIcon size={14} />
                 {t('history')}
-              </button>
-              <button 
-                onClick={() => setActiveTab('widgets')}
-                className={cn(
-                  "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                  activeTab === 'widgets' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                )}
-              >
-                <LayoutGrid size={14} />
-                Widgets Spec
               </button>
             </div>
             <button 
@@ -2401,7 +2394,7 @@ export default function PilotScreen() {
             })}
           </div>
         )
-      ) : activeTab === 'history' ? (
+      ) : (
         !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-300 dark:text-blue-500">
@@ -2651,9 +2644,7 @@ export default function PilotScreen() {
             )}
           </div>
         </div>
-      )) : (
-        renderAndroidWidgetSizingLab()
-      )}
+      ))}
 
     {/* DELETE CONFIRMATION */}
       {confirmDelete && (
@@ -3313,7 +3304,6 @@ export default function PilotScreen() {
           { tab: 'dashboard', icon: LayoutDashboard, label: 'Tableau' },
           { tab: 'monitor',   icon: Monitor,         label: 'Monitor' },
           { tab: 'history',   icon: HistoryIcon,     label: 'Historique' },
-          { tab: 'widgets',   icon: LayoutGrid,      label: 'Widgets' },
         ].map(({ tab, icon: Icon, label }) => {
           const isActive = activeTab === tab;
           return (
