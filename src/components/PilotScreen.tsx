@@ -67,7 +67,13 @@ export default function PilotScreen() {
   const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_date') || '');
   const [historyEndDateFilter, setHistoryEndDateFilter] = useState<string>(() => sessionStorage.getItem('pilot_history_end_date') || '');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('pilot_history_type') as any) || 'production');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'monitor' | 'history'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'monitor' | 'history' | 'widgets'>(() => (sessionStorage.getItem('pilot_active_tab') as any) || 'dashboard');
+  const [widgetWidth, setWidgetWidth] = useState<number>(240);
+  const [widgetHeight, setWidgetHeight] = useState<number>(220);
+  const [widgetType, setWidgetType] = useState<'oee' | 'alarm' | 'production'>('oee');
+  const [widgetPlatform, setWidgetPlatform] = useState<'handheld' | 'tablet'>('handheld');
+  const [widgetFillBounds, setWidgetFillBounds] = useState<boolean>(true);
+  const [simulatedStopsAck, setSimulatedStopsAck] = useState<string[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => sessionStorage.getItem('pilot_selected_machine') || '');
   const [globalTimer, setGlobalTimer] = useState(Date.now());
@@ -604,8 +610,14 @@ export default function PilotScreen() {
     }
   };
 
-  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-  const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+  const ALLOWED_MIME_TYPES = [
+    'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+    'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg', 'video/3gpp', 'video/x-matroska', 'video/avi', 'video/msvideo', 'video/x-msvideo'
+  ];
+  const ALLOWED_EXTS = [
+    '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+    '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
+  ];
 
   const compressAndValidateFile = async (file: File | Blob, mimeType?: string): Promise<Blob | File | null> => {
     const type = mimeType || file.type;
@@ -613,12 +625,12 @@ export default function PilotScreen() {
     const ext = name ? name.substring(name.lastIndexOf('.')).toLowerCase() : '';
 
     if (!ALLOWED_MIME_TYPES.includes(type) && (!ext || !ALLOWED_EXTS.includes(ext))) {
-       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP et PDF.");
+       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP, PDF et Vidéos (MP4, MOV, WEBM, AVI).");
        return null;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-       alert("Le fichier est trop volumineux (max 10Mo).");
+    if (file.size > 100 * 1024 * 1024) {
+       alert("Le fichier est trop volumineux (max 100Mo).");
        return null;
     }
 
@@ -682,10 +694,10 @@ export default function PilotScreen() {
   const uploadFile = async (file: Blob | File, preview: string, mimeType?: string) => {
     setIsUploading(true);
     
-    const limit = 10 * 1024 * 1024; // Strict 10MB limit
+    const limit = 100 * 1024 * 1024; // Strict 100MB limit for video support
 
     if (file.size > limit) {
-      alert(`Le fichier est trop volumineux (max 10Mo).`);
+      alert(`Le fichier est trop volumineux (max 100Mo).`);
       setIsUploading(false);
       return;
     }
@@ -698,9 +710,22 @@ export default function PilotScreen() {
           return name.substring(name.lastIndexOf('.')).toLowerCase();
         }
       }
-      if (m.includes('image/png')) return '.png';
-      if (m.includes('image/webp')) return '.webp';
-      return '.jpg';
+      const mimeMap: Record<string, string> = {
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/webp': '.webp',
+        'application/pdf': '.pdf',
+        'video/mp4': '.mp4',
+        'video/quicktime': '.mov',
+        'video/webm': '.webm',
+        'video/ogg': '.ogg',
+        'video/3gpp': '.3gp',
+        'video/x-matroska': '.mkv',
+        'video/avi': '.avi',
+        'video/msvideo': '.avi',
+        'video/x-msvideo': '.avi'
+      };
+      return mimeMap[m] || '.jpg';
     };
     const extension = getExt(mimeType || file.type, file);
     formData.append('photo', file, `media-${Date.now()}${extension}`);
@@ -745,13 +770,12 @@ export default function PilotScreen() {
   };
 
   const handleTakeStoreMedia = async (type: 'photo' | 'video' | 'gallery') => {
-    if (type === 'video') {
-      alert("Les fichiers vidéo ne sont pas autorisés par les consignes de sécurité.");
-      return;
-    }
     if (type === 'gallery') {
-      mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
+      mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf,video/mp4,video/quicktime,video/webm,video/ogg,video/3gpp,video/x-matroska,video/avi');
       mediaInputRef.current?.removeAttribute('capture');
+    } else if (type === 'video') {
+      mediaInputRef.current?.setAttribute('accept', 'video/mp4,video/quicktime,video/webm,video/ogg,video/3gpp,video/x-matroska,video/avi');
+      mediaInputRef.current?.setAttribute('capture', 'environment');
     } else {
       mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp');
       mediaInputRef.current?.setAttribute('capture', 'environment');
@@ -939,6 +963,535 @@ export default function PilotScreen() {
     show: { opacity: 1, y: 0, transition: { duration: 0.12, ease: "easeOut" as const } }
   } as const;
 
+  const renderAndroidWidgetSizingLab = () => {
+    // Android specs constraints:
+    // colCount can be 2 cols (width < 240dp) or 4 cols (width >= 240dp)
+    // rowCount can be 1 row (height < 115), 2 rows (height >= 115 && < 185), 3 rows (height >= 185)
+    // We assume 1dp = 1px in our scaled canvas workspace for absolute precise standard correspondence!
+    const colCount = widgetWidth < 240 ? 2 : 4;
+    const rowCount = widgetHeight < 115 ? 1 : widgetHeight < 185 ? 2 : 3;
+    const gridSpecName = `${colCount}x${rowCount}`;
+
+    // Compute active guidelines boundaries according to the official Android table
+    // Handheld guidelines limits:
+    const minWidth = colCount === 2 ? 109 : 245;
+    const maxWidth = colCount === 2 ? 306 : 624;
+    const minHeight = rowCount === 1 ? 56 : rowCount === 2 ? 115 : 185;
+    const maxHeight = rowCount === 1 ? 130 : rowCount === 2 ? 276 : 422;
+
+    // We can show warnings in real-time if size is out of spec or if card is a perfect square (Not recommended by guide)
+    const isOutOfWidthSpec = widgetWidth < minWidth || widgetWidth > maxWidth;
+    const isOutOfHeightSpec = widgetHeight < minHeight || widgetHeight > maxHeight;
+    const isFixedSquare = widgetWidth === widgetHeight;
+
+    const activeOEEVal = analytics.availability;
+    const activePallets = analytics.totalPallets;
+    const activeDowntime = formatDowntimeDisplay(analytics.totalDowntimeSec);
+
+    return (
+      <div className="p-4 md:p-8 space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-12">
+        <div className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-6 rounded-[2rem] shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 space-y-2">
+            <span className="bg-blue-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-blue-400/30">Android Material Design Core</span>
+            <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase">Android Widgets Sizing & Resizing Lab</h2>
+            <p className="text-xs text-blue-200 uppercase tracking-wide max-w-2xl">
+              Prévisualisez, testez et cadrez vos indicateurs de production selon la directive Google Android Widgets. Ajustez dynamiquement les dimensions pour voir les points de rupture (breakpoints) adapter la structure de l'interface.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+          {/* CONTROL PANEL */}
+          <div className="xl:col-span-5 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-gray-500 mb-3">1. Sélectionner l'indicateur</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'oee', title: 'Calcul TRG / OEE', desc: 'Gauges et Performance' },
+                  { id: 'production', title: 'Production Shift', desc: 'Paliers et Volumes' },
+                  { id: 'alarm', title: 'Warnings & Alertes', desc: 'Temps d\'arrêt réels' }
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setWidgetType(item.id as any)}
+                    className={cn(
+                      "p-3 rounded-2xl border text-left transition-all h-20 flex flex-col justify-between",
+                      widgetType === item.id 
+                        ? "bg-slate-50 dark:bg-slate-900 border-2 border-blue-600 shadow-md scale-[1.02]" 
+                        : "border-slate-100 dark:border-gray-800 hover:bg-slate-50 dark:hover:bg-gray-800/40"
+                    )}
+                  >
+                    <span className="text-[10px] font-black uppercase text-slate-800 dark:text-gray-200 truncate leading-none">{item.title}</span>
+                    <span className="text-[8px] text-slate-400 leading-tight block truncate mt-1">{item.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-gray-500">2. Configuration des Dimensions</h3>
+                <span className="text-[9px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-black uppercase">Appareil: {widgetPlatform}</span>
+              </div>
+
+              {/* Preset buttons */}
+              <div className="space-y-2">
+                <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Gabarits Android officiels (en dp) :</p>
+                <div className="grid grid-cols-6 gap-1 text-[9px] font-mono font-bold">
+                  {[
+                    { label: '2x1', w: 180, h: 80 },
+                    { label: '2x2', w: 180, h: 180 },
+                    { label: '2x3', w: 180, h: 290 },
+                    { label: '4x1', w: 420, h: 80 },
+                    { label: '4x2', w: 420, h: 180 },
+                    { label: '4x3', w: 420, h: 290 }
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      onClick={() => {
+                        setWidgetWidth(preset.w);
+                        setWidgetHeight(preset.h);
+                      }}
+                      className={cn(
+                        "py-2 rounded-lg border text-center transition-all flex flex-col justify-center items-center shadow-sm",
+                        gridSpecName === preset.label 
+                          ? "bg-blue-600 text-white border-blue-600" 
+                          : "border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300"
+                      )}
+                    >
+                      <span className="text-[9.5px] font-black">{preset.label}</span>
+                      <span className="text-[6.5px] opacity-70 leading-none mt-0.5">{preset.w}x{preset.h}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Width slider */}
+              <div className="space-y-1">
+                <div className="flex justify-between font-mono text-[10px]">
+                  <span className="text-slate-500 dark:text-slate-400 font-bold uppercase">Largeur du Widget :</span>
+                  <span className="font-extrabold text-blue-600 dark:text-blue-400">{widgetWidth} dp</span>
+                </div>
+                <input
+                  type="range"
+                  min="100"
+                  max="600"
+                  value={widgetWidth}
+                  onChange={e => setWidgetWidth(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-100 dark:bg-gray-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[7.5px] font-semibold text-slate-400 uppercase">
+                  <span>Minimum (100dp)</span>
+                  <span>Grid Threshold: 240dp (Switch 2x / 4x)</span>
+                  <span>Maximum (600dp)</span>
+                </div>
+              </div>
+
+              {/* Height slider */}
+              <div className="space-y-1">
+                <div className="flex justify-between font-mono text-[10px]">
+                  <span className="text-slate-500 dark:text-slate-400 font-bold uppercase">Hauteur du Widget :</span>
+                  <span className="font-extrabold text-blue-600 dark:text-blue-400">{widgetHeight} dp</span>
+                </div>
+                <input
+                  type="range"
+                  min="50"
+                  max="440"
+                  value={widgetHeight}
+                  onChange={e => setWidgetHeight(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-100 dark:bg-gray-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[7.5px] font-semibold text-slate-400 uppercase">
+                  <span>Compact (50dp)</span>
+                  <span>Mid (180dp)</span>
+                  <span>Detailed (440dp)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Android spec compliance check DO / DONT */}
+            <div className="bg-slate-50 dark:bg-gray-800/40 p-4 rounded-2xl border border-slate-100 dark:border-gray-800 space-y-3">
+              <div className="flex justify-between items-center">
+                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">Norme de conformité Google Widget</h4>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[7.5px] font-black text-green-600 uppercase">Analyzed</span>
+                </div>
+              </div>
+
+              {/* Fill the bounds selector */}
+              <div className="flex items-center justify-between p-2.5 bg-white dark:bg-gray-900 rounded-xl border border-slate-100 dark:border-gray-800 shadow-sm">
+                <div className="space-y-0.5 text-left">
+                  <p className="text-[9.5px] font-black text-slate-800 dark:text-slate-200 uppercase">DO: Étirer d'un bord à l'autre</p>
+                  <p className="text-[8px] text-slate-400 uppercase leading-none">Remplir les limites sans marges personnalisées.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWidgetFillBounds(!widgetFillBounds)}
+                  className={cn(
+                    "w-12 h-6 rounded-full p-0.5 transition-colors focus:outline-none relative",
+                    widgetFillBounds ? "bg-green-600" : "bg-gray-300 dark:bg-gray-700"
+                  )}
+                >
+                  <div className={cn(
+                    "w-5 h-5 bg-white rounded-full shadow-md transition-all",
+                    widgetFillBounds ? "ml-6" : "ml-0"
+                  )} />
+                </button>
+              </div>
+
+              {/* Diagnostic Box messages */}
+              <div className="text-[9px] font-mono divide-y divide-slate-100 dark:divide-gray-800 text-slate-600 dark:text-gray-400 text-left bg-white dark:bg-gray-900 rounded-xl border border-slate-100 dark:border-gray-800 overflow-hidden shadow-sm">
+                <div className="p-2 flex items-center gap-1.5">
+                  <span className="text-green-500 font-extrabold">✓</span> <span>Grid Target estimée : <strong>{gridSpecName}</strong> ({widgetWidth}dp x {widgetHeight}dp)</span>
+                </div>
+                <div className="p-2">
+                  <span>Limites Android Pixel : Min. {minWidth}dp / Max. {maxWidth}dp</span>
+                </div>
+                {widgetFillBounds ? (
+                  <div className="p-2 text-green-600 dark:text-green-400 bg-green-500/5 flex items-center gap-1.5 font-bold">
+                    <span className="text-xs">✓</span> <span>Bordures étirées (Stretching Active). Pas de marge blanche.</span>
+                  </div>
+                ) : (
+                  <div className="p-2 text-rose-500 bg-rose-500/5 flex items-center gap-1.5 font-bold animate-pulse">
+                    <span className="text-xs">⚠</span> <span>DÉCONSEILLÉ : Les marges externes brisent l'alignement de l'écran d'accueil Android !</span>
+                  </div>
+                )}
+                {isFixedSquare && (
+                  <div className="p-2 text-amber-600 dark:text-amber-400 bg-amber-500/5 flex items-center gap-1.5 font-extrabold">
+                    <span className="text-xs">⚠</span> <span>DÉCONSEILLÉ : Les formats carrés rigides s'adaptent moins bien que les rectangles flexibles.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Breakpoint analysis */}
+            <div className="space-y-2 text-left">
+              <h4 className="text-[11px] font-black uppercase text-slate-800 dark:text-gray-300">Règles de Breakpoints actives :</h4>
+              <div className="grid grid-cols-2 gap-2 text-[8px] font-mono">
+                <div className={cn("p-2 rounded-xl border", widgetHeight < 100 ? "bg-blue-50/70 border-blue-200 text-blue-700 font-bold" : "bg-gray-50/50 border-gray-100 text-slate-400")}>
+                  H &lt; 100dp : Compact Row Layout
+                </div>
+                <div className={cn("p-2 rounded-xl border", widgetWidth >= 200 ? "bg-blue-50/70 border-blue-200 text-blue-700 font-bold" : "bg-gray-50/50 border-gray-100 text-slate-400")}>
+                  W &ge; 200dp : Submetrics badge visible
+                </div>
+                <div className={cn("p-2 rounded-xl border", widgetHeight >= 180 ? "bg-blue-50/70 border-blue-200 text-blue-700 font-bold" : "bg-gray-50/50 border-gray-100 text-slate-400")}>
+                  H &ge; 180dp : Detailed gauges displayed
+                </div>
+                <div className={cn("p-2 rounded-xl border", widgetWidth >= 245 ? "bg-blue-50/70 border-blue-200 text-blue-700 font-bold" : "bg-gray-50/50 border-gray-100 text-slate-400")}>
+                  W &ge; 245dp : Horizontal grid stack
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SIMULATED DEVICE WORKSPACE */}
+          <div className="xl:col-span-7 flex flex-col items-center justify-center space-y-4">
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest italic leading-none">Aperçu interactif : Google Pixel Home Screen</p>
+            
+            {/* PHONE CASE */}
+            <div className="w-full max-w-lg bg-slate-950 rounded-[3rem] border-[12px] border-slate-900 shadow-2xl relative overflow-hidden aspect-[9/16] max-h-[720px] flex flex-col">
+              {/* Camera punch hole */}
+              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-black rounded-full z-40 border border-slate-800" />
+              
+              {/* Speaker pill */}
+              <div className="absolute top-1 left-1/2 -translate-x-1/2 w-16 h-1 bg-slate-800 rounded-full z-40" />
+
+              {/* Phone screen content (dynamic background wallpaper) */}
+              <div className="flex-1 bg-gradient-to-b from-[#1C162E] via-[#2F2148] to-[#120D21] p-4 flex flex-col justify-between relative text-white">
+                
+                {/* 1. Status Bar */}
+                <div className="flex justify-between items-center text-[9px] font-black tracking-widest opacity-80 z-20 px-2 font-mono mt-1">
+                  <span>17:26</span>
+                  <div className="flex items-center gap-1.5 text-[7.5px]">
+                    <span>5G</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+
+                {/* Grid Overlay representing home launcher rows/cols */}
+                <div className="absolute inset-x-0 top-16 bottom-20 grid grid-cols-4 grid-rows-6 gap-2 p-2 pointer-events-none z-0 opacity-10">
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <div key={i} className="border border-dashed border-white rounded-lg" />
+                  ))}
+                </div>
+
+                {/* 2. Interactive Widget Workspace Area */}
+                <div className="flex-1 flex items-center justify-center relative z-10 px-2">
+                  <div 
+                    style={{ 
+                      width: `${widgetWidth}px`, 
+                      height: `${widgetHeight}px`,
+                      padding: widgetFillBounds ? '0px' : '16px' 
+                    }}
+                    className={cn(
+                      "transition-all duration-150 flex items-center justify-center relative",
+                      !widgetFillBounds && "bg-transparent border border-rose-500/45 rounded-[2rem]"
+                    )}
+                  >
+                    {!widgetFillBounds && (
+                      <div className="absolute inset-0 border-2 border-dashed border-rose-500/30 rounded-[2.5rem] pointer-events-none flex items-start justify-center">
+                        <span className="bg-rose-500 text-white text-[7px] px-1.5 py-0.5 rounded uppercase -translate-y-2 font-black">Margin Warning</span>
+                      </div>
+                    )}
+                    
+                    {/* THE RESIZABLE ANDROID INDEPENDENT WIDGET */}
+                    <div 
+                      className={cn(
+                        "w-full h-full bg-slate-900/90 dark:bg-black/85 backdrop-blur-md rounded-[2.2rem] border border-slate-800 flex flex-col justify-between overflow-hidden shadow-2xl relative select-none",
+                        isOutOfWidthSpec || isOutOfHeightSpec ? "ring-2 ring-amber-500/50" : "ring-1 ring-white/10"
+                      )}
+                    >
+                      {/* Active Grid Indicator on Widget surface */}
+                      <div className="absolute top-2.5 right-3.5 bg-slate-800/85 rounded-full px-1.5 py-0.5 text-[6.5px] font-black uppercase text-slate-400 tracking-wider z-20">
+                        {gridSpecName}
+                      </div>
+
+                      {/* Content depending on Widget Type */}
+
+                      {widgetType === 'oee' && (
+                        <div className="p-3.5 h-full flex flex-col justify-between text-left">
+                          {/* Widget Title (Breakpoint check: h >= 100) */}
+                          {widgetHeight >= 90 && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="w-5 h-5 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-500/20">
+                                <TrendingUp size={11} strokeWidth={2.5} />
+                              </div>
+                              <div className="leading-none text-left">
+                                <span className="text-[7.5px] font-black text-slate-300 uppercase tracking-widest leading-none">OEE Intel</span>
+                                {widgetWidth >= 160 && (
+                                  <p className="text-[5.5px] text-slate-500 uppercase font-black leading-none mt-0.5">Automatisme</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* MAIN RENDER BLOCK */}
+                          <div className={cn(
+                            "flex-1 flex gap-3 items-center w-full",
+                            widgetHeight < 100 ? "flex-row justify-between p-1" : "flex-col justify-center"
+                          )}>
+                            
+                            {/* Visual representation of OEE Progress */}
+                            <div className="flex items-center gap-2">
+                              <div className={cn(
+                                "rounded-full flex items-center justify-center relative bg-slate-800 border border-slate-700/80 shrink-0",
+                                widgetHeight < 100 ? "w-8 h-8" : "w-16 h-16 md:w-20 md:h-20"
+                              )}>
+                                <span className={cn(
+                                  "font-black tracking-tight text-blue-400 italic",
+                                  widgetHeight < 100 ? "text-[9px]" : "text-base md:text-xl"
+                                )}>
+                                  {activeOEEVal.toFixed(1)}%
+                                </span>
+                                {/* Mini Ring */}
+                                <svg className="absolute inset-0 w-full h-full -rotate-90">
+                                  <circle cx="50%" cy="50%" r="42%" stroke="#2563EB" strokeWidth={widgetHeight < 100 ? "2" : "4"} fill="none" strokeDasharray="100 100" strokeDashoffset={100 - activeOEEVal} />
+                                </svg>
+                              </div>
+                              
+                              {widgetHeight < 100 && (
+                                <div className="leading-none text-left">
+                                  <span className="text-[6px] uppercase font-bold text-slate-400 block">Rendement</span>
+                                  <span className="text-[8px] font-black text-white">SHIFT {currentShift?.name || 'A'}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Supplementary content (Breakpoint rule: h >= 160) */}
+                            {widgetHeight >= 115 && widgetWidth >= 160 && (
+                              <div className="text-center">
+                                <span className="bg-slate-800 text-slate-400 text-[6.5px] px-1.5 py-0.5 rounded-full uppercase font-black tracking-widest border border-slate-700">
+                                  Shift {currentShift?.name || 'A'} • Live
+                                </span>
+                                <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Objectif: 90%</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Grid layout of sub-components displayed if huge */}
+                          {widgetHeight >= 180 && (
+                            <div className={cn(
+                              "grid gap-1 border-t border-slate-800/80 pt-2 shrink-0",
+                              widgetWidth >= 245 ? "grid-cols-3" : "grid-cols-1"
+                            )}>
+                              <div className="bg-slate-950 p-1 rounded-lg text-center border border-slate-800/40">
+                                <span className="text-[5.5px] uppercase text-slate-500 block leading-none">Dispo</span>
+                                <span className="text-[8px] font-mono font-black text-blue-400">{activeOEEVal.toFixed(1)}%</span>
+                              </div>
+                              <div className="bg-slate-950 p-1 rounded-lg text-center border border-slate-800/40">
+                                <span className="text-[5.5px] uppercase text-slate-500 block leading-none">Perf</span>
+                                <span className="text-[8px] font-mono font-black text-amber-500">92.4%</span>
+                              </div>
+                              <div className="bg-slate-950 p-1 rounded-lg text-center border border-slate-800/40">
+                                <span className="text-[5.5px] uppercase text-slate-500 block leading-none">Qualité</span>
+                                <span className="text-[8px] font-mono font-black text-emerald-400">99.8%</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {widgetType === 'production' && (
+                        <div className="p-3.5 h-full flex flex-col justify-between text-left">
+                          {widgetHeight >= 85 && (
+                            <div className="flex justify-between items-center shrink-0">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-5 h-5 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0 animate-pulse">
+                                  <Box size={11} strokeWidth={2.5} />
+                                </div>
+                                <span className="text-[7.5px] font-black text-slate-300 uppercase tracking-widest leading-none">Volumes</span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className={cn(
+                            "flex items-center w-full",
+                            widgetHeight < 100 ? "flex-row justify-between h-full p-1" : "flex-col justify-center flex-1"
+                          )}>
+                            <div className="text-left w-full">
+                              <span className="text-[6.5px] uppercase text-slate-500 block leading-none mb-0.5">Palettes Produites</span>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[20px] md:text-[28px] font-black text-emerald-400 italic leading-none">{activePallets}</span>
+                                {widgetWidth >= 160 && (
+                                  <span className="text-[9px] font-bold text-slate-500 mt-1 uppercase italic font-mono">/ 200 Planifié</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Linear Progress bar */}
+                            {widgetHeight >= 110 && (
+                              <div className="w-full mt-2.5 bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50 shrink-0">
+                                <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (activePallets / 200) * 100)}%` }} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Large screen layout showing grid breakdown */}
+                          {widgetHeight >= 180 && (
+                            <div className="border-t border-slate-800/80 pt-2 space-y-1.5 text-left text-[8px] font-mono shrink-0">
+                              <span className="text-[6px] tracking-wider text-slate-500 block uppercase font-bold text-slate-400">Détail par ligne :</span>
+                              <div className="bg-slate-950 p-2 rounded-xl space-y-1 border border-slate-800/50">
+                                <div className="flex justify-between">
+                                  <span>Ligne Nord 1 :</span>
+                                  <span className="text-emerald-400 font-extrabold">{Math.floor(activePallets * 0.45)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Ligne Nord 2 :</span>
+                                  <span className="text-emerald-400 font-extrabold">{Math.floor(activePallets * 0.35)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Ligne Emballage :</span>
+                                  <span className="text-emerald-400 font-extrabold">{Math.floor(activePallets * 0.2)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {widgetType === 'alarm' && (
+                        <div className="p-3.5 h-full flex flex-col justify-between text-left">
+                          {widgetHeight >= 85 && (
+                            <div className="flex justify-between items-center shrink-0">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-5 h-5 rounded-lg bg-rose-600 flex items-center justify-center text-white shrink-0 antialiased animate-pulse">
+                                  <AlertTriangle size={11} strokeWidth={2.5} />
+                                </div>
+                                <span className="text-[7.5px] font-black text-rose-400 uppercase tracking-widest leading-none">Alerte Système</span>
+                              </div>
+                              <span className="font-mono text-[7px] text-pink-500 animate-pulse font-extrabold">LIVE CRITICAL</span>
+                            </div>
+                          )}
+
+                          {/* Mid structure */}
+                          <div className={cn(
+                            "text-left w-full",
+                            widgetHeight < 100 ? "flex flex-row justify-between items-center h-full p-1" : "flex-1 flex flex-col justify-center mt-2"
+                          )}>
+                            <div className="space-y-0.5">
+                              <span className="text-[6.5px] font-extrabold bg-rose-950 border border-rose-900/40 text-rose-400 px-1.5 py-0.5 rounded uppercase leading-none">Arrêt Ligne 3</span>
+                              <p className="text-[10px] font-black text-rose-100 mt-1 uppercase leading-snug truncate">Bourrage Machine principale</p>
+                              {widgetWidth >= 180 && widgetHeight >= 110 && (
+                                <p className="text-[7.5px] font-mono text-slate-400 mt-1">Durée : <span className="text-rose-500 font-extrabold">{activeDowntime}</span></p>
+                              )}
+                            </div>
+
+                            {/* Simulated Interaction (Interactive android touch target size button) */}
+                            {widgetHeight >= 110 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (simulatedStopsAck.includes('cellule')) {
+                                    setSimulatedStopsAck(simulatedStopsAck.filter(x => x !== 'cellule'));
+                                  } else {
+                                    setSimulatedStopsAck([...simulatedStopsAck, 'cellule']);
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full mt-2 h-11 rounded-2xl flex items-center justify-center font-bold uppercase transition-all tracking-wider text-[8px] border shrink-0 outline-none select-none",
+                                  simulatedStopsAck.includes('cellule') 
+                                    ? "bg-slate-800 text-slate-400 border-slate-700" 
+                                    : "bg-rose-600 text-white border-rose-500 hover:bg-rose-500 shadow-md active:scale-95 shadow-rose-900/30"
+                                )}
+                              >
+                                {simulatedStopsAck.includes('cellule') ? "ARRÊT ACQUITTE" : "ACQUITTER L'ALERTE"}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Large Detailed Alerts feed (Breakpoint rule: h >= 180) */}
+                          {widgetHeight >= 180 && (
+                            <div className="border-t border-slate-800/80 pt-2 space-y-1 text-left text-[8px] font-mono shrink-0">
+                              <span className="text-[6.5px] text-slate-500 block uppercase font-black">Historique Recents :</span>
+                              <div className="divide-y divide-slate-800/40 bg-slate-950 rounded-xl overflow-hidden p-1 border border-slate-800/40">
+                                <div className="p-1.5 flex justify-between items-center text-rose-400">
+                                  <span>🚨 Bourrage Carton L2</span>
+                                  <span>Résolu</span>
+                                </div>
+                                <div className="p-1.5 flex justify-between items-center text-slate-400">
+                                  <span>ℹ Shift Chg</span>
+                                  <span>14:00</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Widget home bottom indicator bar */}
+                      {widgetHeight >= 80 && (
+                        <div className="bg-slate-950/80 px-4 py-1.5 border-t border-slate-800/80 flex justify-between items-center text-[6px] font-mono text-slate-500 shrink-0">
+                          <span>Mise à jour: Temps réel</span>
+                          <span>Pilot Widget SDK v3</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Pixel Home Dock (App shortcuts representing clean Android launcher look) */}
+                <div className="flex flex-col gap-3 items-center z-20 shrink-0 mb-1">
+                  <div className="flex justify-around items-center w-full px-4 mb-1">
+                    {['🌐', '📞', '💬', '📷', '🛠️'].map((app, i) => (
+                      <div key={i} className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-base hover:scale-110 transition-transform cursor-pointer">
+                        {app}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Dynamic swipe pill slider */}
+                  <div className="w-24 h-1 bg-white/40 rounded-full" />
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-gray-950" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
       {/* MOBILE HEADER */}
@@ -1019,7 +1572,8 @@ export default function PilotScreen() {
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                   { id: 'monitor', label: 'Surveillance', icon: Monitor },
-                  { id: 'history', label: 'Historique', icon: HistoryIcon }
+                  { id: 'history', label: 'Historique', icon: HistoryIcon },
+                  { id: 'widgets', label: 'Android Widgets', icon: LayoutGrid }
                 ].map(nav => (
                   <Button
                     key={nav.id}
@@ -1108,6 +1662,16 @@ export default function PilotScreen() {
               >
                 <HistoryIcon size={14} />
                 {t('history')}
+              </button>
+              <button 
+                onClick={() => setActiveTab('widgets')}
+                className={cn(
+                  "flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                  activeTab === 'widgets' ? "bg-blue-600 text-white shadow-lg dark:shadow-none" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                )}
+              >
+                <LayoutGrid size={14} />
+                Widgets Spec
               </button>
             </div>
             <button 
@@ -1837,7 +2401,7 @@ export default function PilotScreen() {
             })}
           </div>
         )
-      ) : (
+      ) : activeTab === 'history' ? (
         !selectedMachineId ? (
         <div className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-300 dark:text-blue-500">
@@ -2087,8 +2651,9 @@ export default function PilotScreen() {
             )}
           </div>
         </div>
-      )
-    )}
+      )) : (
+        renderAndroidWidgetSizingLab()
+      )}
 
     {/* DELETE CONFIRMATION */}
       {confirmDelete && (
@@ -2742,20 +3307,34 @@ export default function PilotScreen() {
           </motion.div>
         )}
       </AnimatePresence>
-      <nav className="fixed bottom-0 left-0 right-0 sm:hidden bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-50" 
+      <nav className="fixed bottom-0 left-0 right-0 sm:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-50 px-2" 
            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {[
           { tab: 'dashboard', icon: LayoutDashboard, label: 'Tableau' },
           { tab: 'monitor',   icon: Monitor,         label: 'Monitor' },
           { tab: 'history',   icon: HistoryIcon,     label: 'Historique' },
-        ].map(({ tab, icon: Icon, label }) => (
-          <button key={tab} onClick={() => setActiveTab(tab as any)}
-            className={cn("flex-1 flex flex-col items-center gap-1 py-3 text-[9px] font-black uppercase tracking-wide transition-colors",
-              activeTab === tab ? "text-blue-600" : "text-gray-400")}>
-            <Icon size={22} strokeWidth={activeTab === tab ? 2.5 : 1.5} />
-            {label}
-          </button>
-        ))}
+          { tab: 'widgets',   icon: LayoutGrid,      label: 'Widgets' },
+        ].map(({ tab, icon: Icon, label }) => {
+          const isActive = activeTab === tab;
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab as any)}
+              className={cn("flex-1 flex flex-col items-center justify-center py-2 text-[9px] font-black uppercase tracking-wider transition-colors h-16 relative",
+                isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500")}
+            >
+              <div className="relative flex items-center justify-center py-1 px-5 rounded-full transition-all">
+                {isActive && (
+                  <motion.div 
+                    layoutId="activeTabPill"
+                    className="absolute inset-0 bg-blue-50 dark:bg-blue-950/50 rounded-full -z-10"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} className="relative z-10" />
+              </div>
+              <span className="mt-1 transition-all text-[8px] font-black tracking-wide">{label}</span>
+            </button>
+          );
+        })}
       </nav>
       <input 
         type="file" 

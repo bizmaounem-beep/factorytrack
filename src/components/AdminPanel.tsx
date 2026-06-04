@@ -158,8 +158,14 @@ export default function AdminPanel() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-  const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+  const ALLOWED_MIME_TYPES = [
+    'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+    'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg', 'video/3gpp', 'video/x-matroska', 'video/avi', 'video/msvideo', 'video/x-msvideo'
+  ];
+  const ALLOWED_EXTS = [
+    '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+    '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
+  ];
 
   const compressAndValidateFile = async (file: File): Promise<Blob | File | null> => {
     const type = file.type;
@@ -167,12 +173,12 @@ export default function AdminPanel() {
     const ext = name ? name.substring(name.lastIndexOf('.')).toLowerCase() : '';
 
     if (!ALLOWED_MIME_TYPES.includes(type) && (!ext || !ALLOWED_EXTS.includes(ext))) {
-       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP et PDF.");
+       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP, PDF et Vidéos (MP4, MOV, WEBM, AVI).");
        return null;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-       alert("Le fichier est trop volumineux (max 10Mo).");
+    if (file.size > 100 * 1024 * 1024) {
+       alert("Le fichier est trop volumineux (max 100Mo).");
        return null;
     }
 

@@ -27,10 +27,10 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizes = {
-    sm: "h-8 px-3 text-[10px]",
+    sm: "h-9 px-4 text-[10px]", // Increased slightly for better mobile touch density
     md: "h-11 px-6 text-[12px] md:h-12 md:px-8 md:text-sm",
     lg: "h-14 px-10 text-sm md:text-base md:h-16",
-    icon: "h-10 w-10 p-0 md:h-12 md:w-12 transition-all"
+    icon: "h-12 w-12 p-0 transition-all flex items-center justify-center" // Matches Android 48dp minimum touch target spec
   };
 
   return (

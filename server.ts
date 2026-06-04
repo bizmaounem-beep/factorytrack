@@ -74,20 +74,30 @@ const ALLOWED_MIME_TYPES = [
   'image/jpeg', 
   'image/png', 
   'image/webp', 
-  'application/pdf'
+  'application/pdf',
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+  'video/ogg',
+  'video/3gpp',
+  'video/x-matroska',
+  'video/avi',
+  'video/msvideo',
+  'video/x-msvideo'
 ];
 
 const ALLOWED_EXTENSIONS = [
-  '.jpg', '.jpeg', '.png', '.webp', '.pdf'
+  '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+  '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
 ];
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // Safe 10MB limit for mobiles and SCADA attachments
+  limits: { fileSize: 100 * 1024 * 1024 }, // Safe 100MB limit for mobiles, video captures, and SCADA attachments
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype) || !ALLOWED_EXTENSIONS.includes(ext)) {
-      cb(new Error('Format de fichier non autorisé. Uniquement Images (JPG/PNG/WEBP) et PDF de max 10MB.'));
+      cb(new Error('Format de fichier non autorisé. Uniquement Images (JPG/PNG/WEBP), PDF et Vidéos (MP4/MOV/WEBM/AVI) de max 100MB.'));
     } else {
       cb(null, true);
     }
@@ -555,17 +565,26 @@ async function startServer() {
     try {
       const { name, pin } = req.body;
       if (!name || !pin) return res.status(400).json({ error: 'Utilisateur et PIN requis' });
-      const user = db.prepare('SELECT * FROM users WHERE name = ?').get(sanitizeValue(name)) as any;
-      if (user) {
-        const isValid = await bcrypt.compare(String(pin), user.pin);
-        if (isValid) {
-          const { pin: _hash, ...safeUser } = user;
-          const token = jwt.sign({ id: safeUser.id, role: safeUser.role }, ACTUAL_JWT_SECRET, { expiresIn: '12h' });
-          return res.json({ ...safeUser, token });
+      
+      // Case-insensitive user lookup for general ease of use
+      const user = db.prepare('SELECT * FROM users WHERE LOWER(name) = LOWER(?)').get(sanitizeValue(name)) as any;
+      if (user && typeof user.pin === 'string') {
+        try {
+          const isValid = await bcrypt.compare(String(pin), user.pin);
+          if (isValid) {
+            const { pin: _hash, ...safeUser } = user;
+            const token = jwt.sign({ id: safeUser.id, role: safeUser.role }, ACTUAL_JWT_SECRET, { expiresIn: '12h' });
+            return res.json({ ...safeUser, token });
+          }
+        } catch (bcryptError) {
+          console.error('[Login Bcrypt Compare Error] Failed to compare PIN hash:', bcryptError);
         }
       }
       res.status(401).json({ error: 'Identifiants invalides' });
-    } catch (e) { res.status(500).json({ error: 'Erreur interne' }); }
+    } catch (e) {
+      console.error('[Login API Error]', e);
+      res.status(500).json({ error: 'Erreur interne' });
+    }
   });
 
   // Apply Auth Middleware to all subsequent routes
@@ -704,7 +723,19 @@ async function startServer() {
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const data = { ...req.body };
       if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
-      if (collection === 'users' && data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+      
+      if (collection === 'users') {
+        if (data.name) {
+          const existing = db.prepare('SELECT id FROM users WHERE LOWER(name) = LOWER(?)').get(sanitizeValue(data.name));
+          if (existing) {
+            return res.status(400).json({ error: 'Un utilisateur avec ce nom existe déjà' });
+          }
+        }
+        if (data.pin) {
+          data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+        }
+      }
+      
       const logCollections = ['production_logs', 'downtime_logs', 'programmes'];
       if (logCollections.includes(collection) && !data.shiftId) data.shiftId = getServerShiftId();
       const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
@@ -731,7 +762,19 @@ async function startServer() {
       const { collection, id } = req.params;
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const data = { ...req.body };
-      if (collection === 'users' && data.pin) data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+      
+      if (collection === 'users') {
+        if (data.name) {
+          const existing = db.prepare('SELECT id FROM users WHERE LOWER(name) = LOWER(?) AND id != ?').get(sanitizeValue(data.name), id);
+          if (existing) {
+            return res.status(400).json({ error: 'Un utilisateur avec ce nom existe déjà' });
+          }
+        }
+        if (data.pin) {
+          data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
+        }
+      }
+      
       const pragma = db.prepare(`PRAGMA table_info(${collection})`).all() as any[];
       const validColumns = pragma.map(p => p.name).filter(c => c !== 'id');
       const values: any[] = [];

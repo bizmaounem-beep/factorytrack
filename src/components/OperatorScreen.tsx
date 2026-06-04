@@ -383,8 +383,14 @@ export default function OperatorScreen() {
     }
   };
 
-  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-  const ALLOWED_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+  const ALLOWED_MIME_TYPES = [
+    'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+    'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg', 'video/3gpp', 'video/x-matroska', 'video/avi', 'video/msvideo', 'video/x-msvideo'
+  ];
+  const ALLOWED_EXTS = [
+    '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+    '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
+  ];
 
   const compressAndValidateFile = async (file: File | Blob, mimeType?: string): Promise<Blob | File | null> => {
     const type = mimeType || file.type;
@@ -392,12 +398,12 @@ export default function OperatorScreen() {
     const ext = name ? name.substring(name.lastIndexOf('.')).toLowerCase() : '';
 
     if (!ALLOWED_MIME_TYPES.includes(type) && (!ext || !ALLOWED_EXTS.includes(ext))) {
-       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP et PDF.");
+       alert("Format de fichier non autorisé. Uniquement JPG, PNG, WEBP, PDF et Vidéos (MP4, MOV, WEBM, AVI).");
        return null;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-       alert("Le fichier est trop volumineux (max 10Mo).");
+    if (file.size > 100 * 1024 * 1024) {
+       alert("Le fichier est trop volumineux (max 100Mo).");
        return null;
     }
 
@@ -459,11 +465,6 @@ export default function OperatorScreen() {
   };
 
   const handleTakeStoreMedia = async (type: 'photo' | 'video' | 'gallery') => {
-    if (type === 'video') {
-      alert("Les fichiers vidéo ne sont pas autorisés par les consignes de sécurité.");
-      return;
-    }
-
     if (Capacitor.isNativePlatform()) {
       if (type === 'photo') {
         try {
@@ -480,22 +481,29 @@ export default function OperatorScreen() {
             const blob = await response.blob();
             const validated = await compressAndValidateFile(blob, 'image/jpeg');
             if (validated) {
-              uploadFile(validated, image.webPath, false, 'image/jpeg');
+              uploadFile(validated, image.webPath, showManualStopModal, 'image/jpeg');
             }
           }
         } catch (e) {
           console.error('Erreur caméra:', e);
         }
+      } else if (type === 'video') {
+        mediaInputRef.current?.setAttribute('accept', 'video/mp4,video/quicktime,video/webm,video/ogg,video/3gpp,video/x-matroska,video/avi');
+        mediaInputRef.current?.setAttribute('capture', 'environment');
+        mediaInputRef.current?.click();
       } else {
         // Gallery
-        mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
+        mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf,video/mp4,video/quicktime,video/webm,video/ogg,video/3gpp,video/x-matroska,video/avi');
         mediaInputRef.current?.removeAttribute('capture');
         mediaInputRef.current?.click();
       }
     } else {
       if (type === 'gallery') {
-        mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
+        mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf,video/mp4,video/quicktime,video/webm,video/ogg,video/3gpp,video/x-matroska,video/avi');
         mediaInputRef.current?.removeAttribute('capture');
+      } else if (type === 'video') {
+        mediaInputRef.current?.setAttribute('accept', 'video/mp4,video/quicktime,video/webm,video/ogg,video/3gpp,video/x-matroska,video/avi');
+        mediaInputRef.current?.setAttribute('capture', 'environment');
       } else {
         mediaInputRef.current?.setAttribute('accept', 'image/jpeg,image/png,image/webp');
         mediaInputRef.current?.setAttribute('capture', 'environment');
@@ -511,7 +519,7 @@ export default function OperatorScreen() {
         const validated = await compressAndValidateFile(file, file.type);
         if (validated) {
           const preview = URL.createObjectURL(validated as Blob);
-          uploadFile(validated, preview, false, (validated as any).type);
+          uploadFile(validated, preview, showManualStopModal, (validated as any).type);
         }
       }
     }
@@ -520,10 +528,10 @@ export default function OperatorScreen() {
   const uploadFile = async (file: Blob | File, preview: string, isManual: boolean = false, mimeType?: string) => {
     setIsUploading(true);
     
-    const limit = 10 * 1024 * 1024; // Strict 10MB limit
+    const limit = 100 * 1024 * 1024; // Strict 100MB limit for video support
 
     if (file.size > limit) {
-      alert(`Le fichier est trop volumineux (max 10Mo).`);
+      alert(`Le fichier est trop volumineux (max 100Mo).`);
       setIsUploading(false);
       return;
     }
@@ -537,7 +545,16 @@ export default function OperatorScreen() {
         'image/jpeg': '.jpg',
         'image/png': '.png',
         'image/webp': '.webp',
-        'application/pdf': '.pdf'
+        'application/pdf': '.pdf',
+        'video/mp4': '.mp4',
+        'video/quicktime': '.mov',
+        'video/webm': '.webm',
+        'video/ogg': '.ogg',
+        'video/3gpp': '.3gp',
+        'video/x-matroska': '.mkv',
+        'video/avi': '.avi',
+        'video/msvideo': '.avi',
+        'video/x-msvideo': '.avi'
       };
       return mimeMap[m] || '.jpg';
     };
@@ -885,7 +902,7 @@ export default function OperatorScreen() {
             <button onClick={() => {
               if (selectedLineId) handleGoBackFromLine();
               else setSelectedMachineId(null);
-            }} className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-full transition-colors text-slate-500 dark:text-gray-400">
+            }} className="w-12 h-12 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-gray-800 rounded-full transition-colors text-slate-500 dark:text-gray-400">
               <ArrowLeft size={24} />
             </button>
             <span className="text-[15px] font-black uppercase tracking-widest italic tracking-tighter">{machines.find(m => m.id === selectedMachineId)?.name}</span>
@@ -1094,10 +1111,12 @@ export default function OperatorScreen() {
             <div className="flex items-center justify-between mb-4">
               <button 
                 onClick={handleGoBackFromLine}
-                className="flex items-center gap-1.5 text-slate-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group px-1"
+                className="flex items-center gap-3 text-slate-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
               >
-                <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-                <span className="text-[8px] font-black uppercase tracking-[0.15em] italic">{t('back_to_selection')}</span>
+                <div className="w-12 h-12 rounded-full border border-slate-200 dark:border-gray-800 flex items-center justify-center bg-white dark:bg-gray-900 shadow-sm group-hover:border-blue-500 transition-colors">
+                  <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.15em] italic">{t('back_to_selection')}</span>
               </button>
               
               <div className="flex items-center gap-2">
@@ -1302,8 +1321,8 @@ export default function OperatorScreen() {
                     )}
 
                     <div className="p-3 flex gap-2">
-                       <Button variant="ghost" size="sm" className="flex-1 text-[8px] tracking-widest uppercase italic" onClick={() => { if(window.confirm("Clôturer ?")) handleAddPallets(0); }}>FIN MISSION</Button>
-                       <Button variant="ghost" size="sm" className="flex-1 text-[8px] tracking-widest uppercase italic text-rose-500" onClick={() => setShowStopConfirmation(true)}>STOP LIGNE</Button>
+                       <Button variant="secondary" className="flex-1 h-12 text-[10px] tracking-widest uppercase italic font-bold" onClick={() => { if(window.confirm("Clôturer ?")) handleAddPallets(0); }}>FIN MISSION</Button>
+                       <Button variant="danger" className="flex-1 h-12 text-[10px] tracking-widest uppercase italic font-bold shadow-lg shadow-rose-500/20" onClick={() => setShowStopConfirmation(true)}>STOP LIGNE</Button>
                     </div>
                  </div>
                )}
@@ -1315,7 +1334,7 @@ export default function OperatorScreen() {
                     <History size={16} className="text-blue-600" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-white">Derniers Arrêts</span>
                   </div>
-                  <Button variant="outline" size="sm" className="h-7 text-[8px] uppercase" onClick={() => setShowManualStopModal(true)}>+ MANUEL</Button>
+                  <Button variant="outline" className="h-11 px-4 text-[10px] uppercase font-bold" onClick={() => setShowManualStopModal(true)}>+ MANUEL</Button>
                </div>
                <div className="divide-y divide-slate-100 dark:divide-gray-800 max-h-[300px] overflow-y-auto">
                  {downtimeLogs
@@ -1335,17 +1354,17 @@ export default function OperatorScreen() {
                           <div className="flex gap-2 items-center">
                              <button 
                                onClick={() => handleEditStopRequest(log)}
-                               className="h-8 w-8 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 transition-all border border-slate-200 dark:border-gray-700"
+                               className="h-12 w-12 rounded-xl flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 transition-all border border-slate-200 dark:border-gray-700"
                                title="Modifier l'arrêt"
                              >
-                               <Edit size={14} />
+                               <Edit size={18} />
                              </button>
                              <button 
                                onClick={() => handleDeleteStop(log.id)}
-                               className="h-8 w-8 rounded-lg flex items-center justify-center bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 transition-all border border-rose-100 dark:border-rose-900/30"
+                               className="h-12 w-12 rounded-xl flex items-center justify-center bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 transition-all border border-rose-100 dark:border-rose-900/30"
                                title="Supprimer l'arrêt"
                              >
-                               <Trash2 size={14} />
+                               <Trash2 size={18} />
                              </button>
                           </div>
                        </div>

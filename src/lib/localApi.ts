@@ -75,11 +75,19 @@ export const localApi = {
         body: JSON.stringify(data)
       });
       if (!res.ok) {
-        throw new Error('Échec de l\'enregistrement');
+        let errMsg = 'Échec de l\'enregistrement';
+        try {
+          const body = await res.json();
+          if (body && body.error) errMsg = body.error;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
       return res.json();
     } catch (e) {
       console.error('API Error:', e);
+      if (e instanceof Error && e.message !== 'Failed to fetch' && e.message !== 'TypeError: Failed to fetch') {
+        throw e;
+      }
       throw new Error('Erreur de connexion');
     }
   },
@@ -92,11 +100,19 @@ export const localApi = {
         body: JSON.stringify(data)
       });
       if (!res.ok) {
-        throw new Error('Échec de la mise à jour');
+        let errMsg = 'Échec de la mise à jour';
+        try {
+          const body = await res.json();
+          if (body && body.error) errMsg = body.error;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
       return res.json();
     } catch (e) {
       console.error('API Error:', e);
+      if (e instanceof Error && e.message !== 'Failed to fetch' && e.message !== 'TypeError: Failed to fetch') {
+        throw e;
+      }
       throw new Error('Erreur de connexion');
     }
   },
@@ -108,11 +124,19 @@ export const localApi = {
         headers: getHeaders()
       });
       if (!res.ok) {
-        throw new Error('Échec de la suppression');
+        let errMsg = 'Échec de la suppression';
+        try {
+          const body = await res.json();
+          if (body && body.error) errMsg = body.error;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
       return res.json();
     } catch (e) {
       console.error('API Error:', e);
+      if (e instanceof Error && e.message !== 'Failed to fetch' && e.message !== 'TypeError: Failed to fetch') {
+        throw e;
+      }
       throw new Error('Erreur de connexion');
     }
   },
