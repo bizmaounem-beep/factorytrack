@@ -141,9 +141,17 @@ export default function PilotScreen() {
     }
   }, [selectedMachine]);
 
-  const isProdRunning = localIsProdRunning;
-  const prodStartTime = localProdStartTime;
-  const prodEndTime = localProdEndTime;
+  const isProdRunning = selectedMachine 
+    ? (selectedMachine.isProdRunning === true || Number(selectedMachine.isProdRunning) === 1 || String(selectedMachine.isProdRunning) === '1' || String(selectedMachine.isProdRunning) === 'true')
+    : localIsProdRunning;
+
+  const prodStartTime = selectedMachine
+    ? (selectedMachine.prodStartTime || '06:00')
+    : localProdStartTime;
+
+  const prodEndTime = selectedMachine
+    ? (selectedMachine.prodEndTime || '14:00')
+    : localProdEndTime;
 
   const handleProdStartChange = async (val: string) => {
     setLocalProdStartTime(val);
@@ -348,6 +356,10 @@ export default function PilotScreen() {
   // Sync state changes across tabs/components
   useEffect(() => {
     const handleStorageChange = () => {
+      if (selectedMachine) {
+        // If a machine is selected, do NOT override its state with general unscoped localStorage!
+        return;
+      }
       setLocalProdStartTime(localStorage.getItem('prod_start_time') || (currentShift ? currentShift.startTime : '06:00'));
       setLocalProdEndTime(localStorage.getItem('prod_end_time') || (currentShift ? currentShift.endTime : '14:00'));
       setLocalIsProdRunning(localStorage.getItem('prod_is_running') === 'true');
@@ -356,7 +368,7 @@ export default function PilotScreen() {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [currentShift]);
+  }, [selectedMachine, currentShift]);
 
   const analytics = useMemo(() => {
     const today = new Date();
