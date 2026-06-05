@@ -57,23 +57,65 @@ export default function AdminPanel() {
   const sortedDownLogs = useMemo(() => [...downLogs].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()), [downLogs]);
 
   // Analytics Calculations
+  const [dashboardMachineId, setDashboardMachineId] = useState<string>(() => sessionStorage.getItem('admin_dashboard_machine') || '');
+  const [prodStartTimeStr, setProdStartTimeStr] = useState<string>(() => {
+    const saved = sessionStorage.getItem('admin_dashboard_prod_start');
+    if (saved) return saved;
+    const d = new Date();
+    d.setHours(8, 0, 0, 0);
+    return format(d, "yyyy-MM-dd'T'HH:mm");
+  });
+
+  const [prodEndTimeStr, setProdEndTimeStr] = useState<string>(() => {
+    const saved = sessionStorage.getItem('admin_dashboard_prod_end');
+    if (saved) return saved;
+    const d = new Date();
+    d.setHours(16, 0, 0, 0);
+    return format(d, "yyyy-MM-dd'T'HH:mm");
+  });
+
+  const handleProdStartChange = (val: string) => {
+    setProdStartTimeStr(val);
+    sessionStorage.setItem('admin_dashboard_prod_start', val);
+  };
+
+  const handleProdEndChange = (val: string) => {
+    setProdEndTimeStr(val);
+    sessionStorage.setItem('admin_dashboard_prod_end', val);
+  };
+
+  useEffect(() => {
+    sessionStorage.setItem('admin_dashboard_machine', dashboardMachineId);
+  }, [dashboardMachineId]);
+
   const analytics = useMemo(() => {
     const today = new Date();
     const start = startOfDay(today);
     const end = endOfDay(today);
 
-    const todayProd = prodLogs.filter(l => isWithinInterval(parseISO(logDate(l.timestamp)), { start, end }));
-    const todayDown = downLogs.filter(l => isWithinInterval(parseISO(logDate(l.startTime)), { start, end }));
-
     function logDate(iso: string) {
       return iso.includes('T') ? iso : new Date(iso).toISOString();
     }
+
+    const todayProd = prodLogs.filter(l => {
+      const matchMachine = !dashboardMachineId || l.machineId === dashboardMachineId;
+      return matchMachine && isWithinInterval(parseISO(logDate(l.timestamp)), { start, end });
+    });
+
+    const todayDown = downLogs.filter(l => {
+      const matchMachine = !dashboardMachineId || l.machineId === dashboardMachineId;
+      return matchMachine && isWithinInterval(parseISO(logDate(l.startTime)), { start, end });
+    });
 
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
     const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
     // OEE Calculation: Dynamically measure actual scheduled time versus unscheduled time on active production lines
-    const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.tracksProduction !== false && l.tracksProduction !== 0);
+    const activeLines = lines.filter(l => 
+      l.isActive !== false && l.isActive !== 0 && 
+      l.tracksProduction !== false && l.tracksProduction !== 0 &&
+      (!dashboardMachineId || l.machineId === dashboardMachineId)
+    );
     let shiftDurationSec = 0;
 
     if (shifts && shifts.length > 0) {
@@ -120,10 +162,10 @@ export default function AdminPanel() {
     // Shift Performance
     const shiftPerf = shifts.map(s => {
       const pallets = prodLogs
-        .filter(l => l.shiftId === s.id && isWithinInterval(parseISO(logDate(l.timestamp)), { start, end }))
+        .filter(l => l.shiftId === s.id && (!dashboardMachineId || l.machineId === dashboardMachineId) && isWithinInterval(parseISO(logDate(l.timestamp)), { start, end }))
         .reduce((acc, l) => acc + l.count, 0);
       const downtime = downLogs
-        .filter(l => l.shiftId === s.id && isWithinInterval(parseISO(logDate(l.startTime)), { start, end }))
+        .filter(l => l.shiftId === s.id && (!dashboardMachineId || l.machineId === dashboardMachineId) && isWithinInterval(parseISO(logDate(l.startTime)), { start, end }))
         .reduce((acc, l) => acc + getLogDurationSec(l), 0);
       
       return {
@@ -133,13 +175,99 @@ export default function AdminPanel() {
       };
     });
 
+    // Frequent Stops Aggregation (like in PilotScreen)
+    const stopStats: Record<string, { count: number, totalTime: number }> = {};
+    todayDown.forEach(log => {
+      if (!stopStats[log.typeId]) {
+        stopStats[log.typeId] = { count: 0, totalTime: 0 };
+      }
+      stopStats[log.typeId].count += 1;
+      stopStats[log.typeId].totalTime += getLogDurationSec(log);
+    });
+
+    const frequentStops = Object.entries(stopStats)
+      .map(([typeId, stats]) => ({
+        typeId,
+        typeName: downtimeTypes.find(t => t.id === typeId)?.name || 'Inconnu',
+        icon: downtimeTypes.find(t => t.id === typeId)?.icon || '⚠️',
+        ...stats
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Operator performance (like in PilotScreen but filtered by machine)
+    const teamPerformance = users
+      .filter(u => u.role && u.role.toUpperCase() === 'OPERATOR')
+      .map(u => {
+        const pallets = todayProd
+          .filter(l => l.operatorId === u.id)
+          .reduce((acc, l) => acc + l.count, 0);
+        const downtime = todayDown
+          .filter(l => l.operatorId === u.id)
+          .reduce((acc, l) => acc + getLogDurationSec(l), 0);
+        
+        return {
+          id: u.id,
+          name: u.name,
+          pallets,
+          downtime: Math.round(downtime / 60)
+        };
+      })
+      .filter(p => p.pallets > 0 || p.downtime > 0)
+      .sort((a, b) => b.pallets - a.pallets);
+
     return {
       totalPallets,
       totalDowntimeSec,
       availability,
-      shiftPerf
+      shiftPerf,
+      frequentStops,
+      teamPerformance
     };
-  }, [prodLogs, downLogs, lines, shifts, downtimeTypes]);
+  }, [prodLogs, downLogs, lines, shifts, downtimeTypes, users, dashboardMachineId]);
+
+  const mtbfMttrData = useMemo(() => {
+    const prodStart = new Date(prodStartTimeStr).getTime();
+    const prodEnd = new Date(prodEndTimeStr).getTime();
+    
+    // Total production duration (T_prod) in seconds
+    const totalProdSec = Math.max(0, (prodEnd - prodStart) / 1000);
+    
+    // Filter downtime logs for matching machines that start within specified interval
+    const matchingDownLogs = downLogs.filter(log => {
+      const matchMachine = !dashboardMachineId || log.machineId === dashboardMachineId;
+      if (!matchMachine) return false;
+      const logStart = new Date(log.startTime).getTime();
+      return logStart >= prodStart && logStart <= prodEnd;
+    });
+    
+    const numFailures = matchingDownLogs.length;
+    
+    // Calculate total downtime duration in seconds within this specified period
+    const totalDowntimeSec = matchingDownLogs.reduce((acc, log) => {
+      const logStart = new Date(log.startTime).getTime();
+      const logEnd = log.endTime ? new Date(log.endTime).getTime() : Math.min(Date.now(), prodEnd);
+      const durationMs = Math.max(0, logEnd - logStart);
+      return acc + durationMs / 1000;
+    }, 0);
+    
+    const totalUptimeSec = Math.max(0, totalProdSec - totalDowntimeSec);
+    
+    // MTTR (Mean Time To Repair) = Total Downtime / Number of failures
+    const mttrSec = numFailures > 0 ? (totalDowntimeSec / numFailures) : 0;
+    
+    // MTBF (Mean Time Between Failures) = Total Uptime / Number of Failures
+    const mtbfSec = numFailures > 0 ? (totalUptimeSec / numFailures) : totalUptimeSec;
+    
+    return {
+      totalProdSec,
+      numFailures,
+      totalDowntimeSec,
+      totalUptimeSec,
+      mttrSec,
+      mtbfSec
+    };
+  }, [prodStartTimeStr, prodEndTimeStr, downLogs, dashboardMachineId]);
 
   const COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6', '#EC4899', '#6366F1', '#14B8A6'];
 
@@ -1026,15 +1154,39 @@ export default function AdminPanel() {
           
           {activeTab === 'dashboard' && (
             <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300">
-              <div className="flex justify-between items-center px-1">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 px-1">
                 <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">ADMIN PORTAL</span>
+                    {dashboardMachineId ? (
+                      <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest font-mono">
+                        {machines.find(m => m.id === dashboardMachineId)?.name}
+                      </span>
+                    ) : (
+                      <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest font-mono">
+                        Toutes les Machines
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">
-                    {t('dashboard')} <span className="text-blue-600 uppercase text-[10px] md:text-xs tracking-widest ml-1">Analytical</span>
+                    {t('dashboard')} <span className="text-blue-600 dark:text-blue-400 uppercase text-[10px] md:text-xs tracking-widest ml-1">Supervisor Intelligence</span>
                   </h2>
-                  <p className="text-[8px] md:text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mt-1 italic">Dernières 24 heures • Mise à jour en temps réel</p>
+                  <p className="text-[8px] md:text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mt-1 italic">
+                    Performance globale de l'usine • Mise à jour en temps réel
+                  </p>
                 </div>
-                <div className="text-right flex flex-col items-end">
-                  <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-950 px-2 py-1 rounded-full border border-green-100 dark:border-green-900/30">
+                <div className="flex items-center gap-3 w-full sm:w-auto shrink-0 select-none">
+                  <div className="relative w-full sm:w-64">
+                    <select 
+                      value={dashboardMachineId}
+                      onChange={e => setDashboardMachineId(e.target.value)}
+                      className="w-full p-2 bg-white dark:bg-gray-900 rounded-xl font-bold border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-700 dark:text-gray-300 cursor-pointer text-xs uppercase"
+                    >
+                      <option value="">Toutes les machines</option>
+                      {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="hidden md:flex items-center gap-1.5 bg-green-50 dark:bg-green-950 px-2 py-1 rounded-full border border-green-100 dark:border-green-900/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                     <p className="text-[8px] md:text-[10px] font-black text-green-700 dark:text-green-400 uppercase tracking-tight">{t('connected')}</p>
                   </div>
@@ -1049,15 +1201,43 @@ export default function AdminPanel() {
                 className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4"
               >
                  {[
-                   { label: 'Efficacité (OEE)', val: `${analytics.availability.toFixed(1)}%`, sub: 'Disponibilité Lignes', icon: TrendingUp, color: 'blue', trend: '+2.1%' },
-                   { label: 'Total Palettes', val: analytics.totalPallets, sub: 'Aujourd\'hui', icon: Box, color: 'green', trend: '+12' },
-                   { label: 'Temps d\'Arrêt', val: formatDowntimeDisplay(analytics.totalDowntimeSec), sub: 'Minutes Perdues', icon: Timer, color: 'orange', trend: '-5%' },
-                   { label: 'Arrets Actifs', val: lines.filter(l => !!l.activeDowntimeId).length, sub: 'Incidents en cours', icon: AlertTriangle, color: 'red', trend: 'Critical' },
+                   { 
+                     label: 'MTBF Global', 
+                     val: mtbfMttrData.mtbfSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mtbfSec) : '—', 
+                     sub: 'Temps moyen bon fonct.', 
+                     icon: TrendingUp, 
+                     color: 'blue', 
+                     trend: `${mtbfMttrData.numFailures} Arrêt(s)` 
+                   },
+                   { 
+                     label: 'Total Palettes', 
+                     val: analytics.totalPallets, 
+                     sub: 'Production filtre actif', 
+                     icon: Box, 
+                     color: 'green', 
+                     trend: `OEE: ${analytics.availability.toFixed(1)}%` 
+                   },
+                   { 
+                     label: 'MTTR Global', 
+                     val: mtbfMttrData.mttrSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mttrSec) : '0 min', 
+                     sub: 'Temps moyen réparation', 
+                     icon: Timer, 
+                     color: 'orange', 
+                     trend: 'Moyen' 
+                   },
+                   { 
+                     label: 'Alertes Actives', 
+                     val: lines.filter(l => (!dashboardMachineId || l.machineId === dashboardMachineId) && !!l.activeDowntimeId).length, 
+                     sub: 'Lignes arrêtées', 
+                     icon: AlertTriangle, 
+                     color: 'red', 
+                     trend: 'Live' 
+                   },
                  ].map(stat => (
                    <motion.div 
                     variants={item}
                     key={stat.label} 
-                    className="bg-white dark:bg-gray-900 p-2 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden"
+                    className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-2.5 md:p-4 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden shadow-sm dark:shadow-none"
                    >
                      <div className={cn(
                        "absolute -right-2 -top-2 w-16 h-16 opacity-5 transition-transform group-hover:scale-150 rotate-12",
@@ -1078,50 +1258,181 @@ export default function AdminPanel() {
                        </div>
                        <span className={cn(
                          "text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded italic",
-                         stat.color === 'blue' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
-                         stat.color === 'green' ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
-                         stat.color === 'orange' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                         stat.color === 'blue' ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" :
+                         stat.color === 'green' ? "bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400" :
+                         stat.color === 'orange' ? "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400" : "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
                        )}>
                          {stat.trend}
                        </span>
                      </div>
                      <div>
                        <p className="text-[7px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
-                       <p className="text-sm md:text-2xl font-black text-gray-900 dark:text-white leading-none mt-1 tabular-nums">{stat.val}</p>
+                       <p className="text-sm md:text-2xl font-black text-slate-900 dark:text-white leading-none mt-1 tabular-nums">{stat.val}</p>
                        <p className="text-[7px] md:text-[9px] font-bold text-slate-400 dark:text-gray-500 mt-1">{stat.sub}</p>
                      </div>
                    </motion.div>
                  ))}
               </motion.div>
 
-              {/* BOTTOM ROW: SHIFT PERF & LIVE MONITOR */}
+              {/* MTBF AND MTTR DEEP-DIVE & PRODUCTION INTERVAL CONTROLS */}
+              <motion.div 
+                variants={item}
+                className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white rounded-[2rem] p-4 md:p-6 border-4 border-gray-100 dark:border-slate-800 shadow-3xl dark:shadow-none relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
+                  
+                  {/* Production Period Inputs */}
+                  <div className="lg:col-span-5 space-y-4">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
+                        <Timer size={10} className="animate-pulse" /> Durée de Production
+                      </div>
+                      <h3 className="text-lg font-black italic uppercase tracking-tighter text-gray-900 dark:text-white mt-1">Période de Production</h3>
+                      <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-normal uppercase">
+                        Définissez l'intervalle de fonctionnement pour le calcul du MTBF & MTTR.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Début Production</label>
+                        <input 
+                          type="datetime-local"
+                          value={prodStartTimeStr}
+                          onChange={(e) => handleProdStartChange(e.target.value)}
+                          className="w-full p-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fin Production</label>
+                        <input 
+                          type="datetime-local"
+                          value={prodEndTimeStr}
+                          onChange={(e) => handleProdEndChange(e.target.value)}
+                          className="w-full p-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-blue-50/50 dark:bg-slate-950/40 rounded-xl border border-blue-500/10 text-[10px] font-mono leading-none tracking-tight flex items-center justify-between text-gray-600 dark:text-slate-400">
+                      <span className="uppercase font-bold">Durée Définie :</span>
+                      <span className="font-extrabold text-blue-600 dark:text-blue-400">
+                        {mtbfMttrData.totalProdSec > 0 
+                          ? formatDowntimeDisplay(mtbfMttrData.totalProdSec) 
+                          : "Fin inférieure au début ⚠️"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* MTBF / MTTR Indicators */}
+                  <div className="lg:col-span-7 flex flex-col justify-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono w-full">
+                      
+                      {/* MTBF CARD */}
+                      <div className="p-5 rounded-[1.5rem] border border-blue-500/10 dark:border-blue-500/20 bg-gray-50/50 dark:bg-slate-950/60 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl pointer-events-none transition-transform group-hover:scale-150" />
+                        <span className="text-[9px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1 font-sans">MTBF</span>
+                        <div className="text-3xl font-black italic tracking-tighter text-blue-600 dark:text-blue-400">
+                          {mtbfMttrData.mtbfSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mtbfSec) : "—"}
+                        </div>
+                        <span className="text-[8px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-tight mt-2 block font-sans">Mean Time Between Failures</span>
+                        <p className="text-[7px] text-gray-400 dark:text-gray-505 leading-normal mt-1 uppercase font-sans">
+                          Temps moyen de bon fonctionnement entre deux arrêts ({mtbfMttrData.numFailures} arrêt(s) détecté(s)).
+                        </p>
+                      </div>
+
+                      {/* MTTR CARD */}
+                      <div className="p-5 rounded-[1.5rem] border border-orange-500/10 dark:border-orange-500/20 bg-gray-50/50 dark:bg-slate-950/60 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl pointer-events-none transition-transform group-hover:scale-150" />
+                        <span className="text-[9px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1 font-sans font-black">MTTR</span>
+                        <div className="text-3xl font-black italic tracking-tighter text-orange-600 dark:text-orange-400">
+                          {mtbfMttrData.mttrSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mttrSec) : "0 min"}
+                        </div>
+                        <span className="text-[8px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-tight mt-2 block font-sans font-black">Mean Time To Repair</span>
+                        <p className="text-[7px] text-gray-400 dark:text-gray-505 leading-normal mt-1 uppercase font-sans">
+                          Temps moyen de réparation après panne ({mtbfMttrData.numFailures} arrêt(s) de {formatDowntimeDisplay(mtbfMttrData.totalDowntimeSec)}).
+                        </p>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+              </motion.div>
+
+              {/* THREE-COLUMN ROW: FREQUENT STOPS, SHIFT PERFORMANCE, OPERATOR LEADERBOARD */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                
+                {/* FREQUENT STOPS */}
+                <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 flex flex-col shadow-sm dark:shadow-none">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-orange-500" /> Arrêts Fréquents (Filtre)
+                    </h3>
+                    <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">Top 5 récurrents</span>
+                  </div>
+                  
+                  <div className="space-y-2 flex-1">
+                    {analytics.frequentStops.length > 0 ? (
+                      analytics.frequentStops.map((stop) => (
+                        <div key={stop.typeId} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-850/50 rounded-xl border border-gray-100 dark:border-gray-750 hover:border-orange-200 dark:hover:border-orange-850 transition-all group">
+                          <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-800 flex items-center justify-center text-sm shadow-sm border border-gray-100 dark:border-gray-700 group-hover:scale-110 transition-transform">
+                            {stop.icon}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center mb-1">
+                               <span className="text-[10px] font-black text-gray-800 dark:text-gray-200 uppercase tracking-tight">{stop.typeName}</span>
+                               <span className="text-[10px] font-black text-orange-600 dark:text-orange-400 italic font-mono">{stop.count} fois</span>
+                            </div>
+                            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                               <div 
+                                 className="h-full bg-orange-500 rounded-full" 
+                                 style={{ width: `${(stop.count / (analytics.frequentStops[0]?.count || 1)) * 100}%` }} 
+                               />
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center py-8 text-center bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                        <CheckCircle2 size={24} className="text-green-300 dark:text-green-900/50 mb-2" />
+                        <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Aucun arrêt enregistré</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
                 {/* SHIFT PERFORMANCE */}
-                <motion.div variants={item} className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 lg:col-span-1">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <TrendingUp size={16} className="text-green-500" /> Performance Équipes
-                  </h3>
+                <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 flex flex-col shadow-sm dark:shadow-none">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+                      <TrendingUp size={16} className="text-emerald-500" /> Performance Équipes
+                    </h3>
+                    <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">Aujourd'hui</span>
+                  </div>
+                  
                   <div className="space-y-3">
                     {analytics.shiftPerf.map(s => (
-                      <div key={s.name} className="p-3 bg-gray-50 dark:bg-gray-950 rounded-xl border border-gray-100 dark:border-gray-800 group hover:bg-white dark:hover:bg-gray-800 transition-all">
+                      <div key={s.name} className="p-3 bg-gray-50 dark:bg-gray-850/50 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-blue-100 dark:hover:border-blue-900/30 transition-all group">
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">{s.name}</span>
-                          <span className="text-[9px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded italic">#{analytics.shiftPerf.indexOf(s) + 1}</span>
+                          <span className="text-[9px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded italic font-mono">#{analytics.shiftPerf.indexOf(s) + 1}</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
                            <div>
                               <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase">Production</p>
-                              <p className="text-xs font-black text-gray-800 dark:text-gray-200">{s.pallets} <span className="opacity-50">Pal.</span></p>
+                              <p className="text-xs font-black text-gray-800 dark:text-gray-200">{s.pallets} <span className="opacity-50 text-[9px]">Pal.</span></p>
                            </div>
                            <div className="text-right">
-                              <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase">Arrets</p>
-                              <p className="text-xs font-black text-red-600 dark:text-red-400">{s.downtime} <span className="opacity-50">min</span></p>
+                              <p className="text-[7px] font-black text-gray-400 dark:text-gray-505 uppercase">Arrets</p>
+                              <p className="text-xs font-black text-red-600 dark:text-red-400">{s.downtime} <span className="opacity-50 text-[9px]">min</span></p>
                            </div>
                         </div>
-                        <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                            <div 
-                            className="h-full bg-blue-600 rounded-full" 
-                            style={{ width: `${Math.min(100, (s.pallets / (analytics.totalPallets || 1)) * 100)}%` }} 
+                             className="h-full bg-blue-600 rounded-full" 
+                             style={{ width: `${Math.min(100, (s.pallets / (analytics.totalPallets || 1)) * 100)}%` }} 
                            />
                         </div>
                       </div>
@@ -1129,73 +1440,118 @@ export default function AdminPanel() {
                   </div>
                 </motion.div>
 
-                {/* LIVE MONITOR (REFRACHED VERSION) */}
-                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden lg:col-span-2">
-                   <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-950/50">
-                     <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
-                        <Activity size={16} className="text-green-500 animate-pulse" /> {t('live_monitor')}
-                     </h3>
-                     <div className="flex gap-2">
-                        <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Running</span></div>
-                        <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Stopped</span></div>
-                     </div>
-                   </div>
-                   <div className="p-4 space-y-6 max-h-[500px] overflow-y-auto">
-                     {machines.map(mach => {
-                        const machLines = lines.filter(l => l.machineId === mach.id && l.status !== 'IDLE');
-                        if (machLines.length === 0) return null;
-                        return (
-                          <div key={mach.id} className="space-y-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
-                              <h4 className="text-[11px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 italic">{mach.name}</h4>
+                {/* TEAM PERFORMANCE (OPERATORS) */}
+                <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 flex flex-col shadow-sm dark:shadow-none">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+                      <Users size={16} className="text-blue-500" /> Performance Opérateurs
+                    </h3>
+                    <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">Leaderboard</span>
+                  </div>
+                  
+                  <div className="space-y-2 flex-1 max-h-[300px] overflow-y-auto pr-1">
+                    {analytics.teamPerformance.length > 0 ? (
+                      analytics.teamPerformance.map(op => (
+                        <div key={op.id} className="p-2.5 bg-gray-50 dark:bg-gray-850/50 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 transition-all flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-blue-600 text-white font-black text-[10px] flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-none">
+                              {op.name.substring(0, 2).toUpperCase()}
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {machLines.map(l => {
-                                 const prog = programmes.find(p => p.id === l.currentProgrammeId);
-                                 const op = users.find(u => u.id === l.currentOperatorId);
-                                 const isActive = l.isActive !== false && l.isActive !== 0;
-                                 return (
-                                   <div 
-                                     key={l.id} 
-                                     className={cn(
-                                       "p-3.5 rounded-2xl border transition-all flex flex-col justify-between bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 shadow-sm dark:shadow-none hover:border-blue-200 dark:hover:border-blue-800",
-                                       !isActive && "opacity-40 grayscale bg-gray-50 dark:bg-gray-950"
-                                     )}
-                                   >
-                                     <div className="flex justify-between items-start mb-2.5">
-                                       <div>
-                                         <p className="font-black text-xs text-gray-900 dark:text-white leading-none uppercase italic">{l.name}</p>
-                                         <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase mt-1">Machine: {mach.name}</p>
-                                       </div>
-                                       <span className={cn(
-                                         "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight border",
-                                         !isActive ? "bg-slate-200 text-slate-600 border-slate-300 dark:bg-gray-850 dark:text-gray-400 dark:border-gray-700" :
-                                         l.status === 'RUNNING' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50" :
-                                         l.status === 'STOPPED' ? "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50" : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
-                                       )}>
-                                         {!isActive ? 'Shutdown' : l.status === 'RUNNING' ? 'Running' : 'Stopped'}
-                                       </span>
-                                     </div>
-                                     <div className="grid grid-cols-2 gap-2 text-xs border-t border-gray-50 dark:border-gray-800/50 pt-2.5">
-                                       <div>
-                                         <span className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-0.5">Palettes</span>
-                                         <span className="font-extrabold text-blue-600 dark:text-blue-400 font-mono text-sm leading-none">{prog?.producedPallets || 0}</span>
-                                       </div>
-                                       <div className="text-right">
-                                         <span className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-0.5">Opérateur</span>
-                                         <span className="font-extrabold text-gray-800 dark:text-gray-200 uppercase text-[9px] truncate max-w-[90px] block justify-self-end">{(op?.name || 'Vidé').split(' ')[0]}</span>
-                                       </div>
-                                     </div>
-                                   </div>
-                                 );
-                              })}
+                            <div>
+                              <p className="font-extrabold text-[10px] text-gray-900 dark:text-white uppercase tracking-tight leading-none mb-1">{op.name}</p>
+                              <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter italic">Opérateur Qualifié</p>
                             </div>
                           </div>
-                        );
-                     })}
+                          
+                          <div className="flex items-center gap-4 text-right">
+                            <div className="font-mono">
+                              <span className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase block leading-none">Palettes</span>
+                              <span className="font-extrabold text-blue-600 dark:text-blue-400 text-xs">{op.pallets}</span>
+                            </div>
+                            <div className="font-mono leading-none">
+                              <span className="text-[7px] font-black text-gray-400 dark:text-gray-505 uppercase block leading-none">Arrêts</span>
+                              <span className="font-extrabold text-red-600 dark:text-red-400 text-xs">{op.downtime}m</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center py-8 text-center bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                        <Users size={20} className="text-gray-300 dark:text-gray-700 mb-1" />
+                        <p className="text-[9px] font-black text-gray-400 dark:text-gray-505 uppercase tracking-widest">Aucune activité detectée</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
+              </div>
+
+              {/* LIVE MONITOR GRID */}
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden col-span-3">
+                 <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-950/50">
+                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+                      <Activity size={16} className="text-green-500 animate-pulse" /> {t('live_monitor')}
+                   </h3>
+                   <div className="flex gap-2">
+                      <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Running</span></div>
+                      <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Stopped</span></div>
                    </div>
-                </div>
+                 </div>
+                 <div className="p-4 space-y-6 max-h-[500px] overflow-y-auto">
+                   {machines.filter(m => !dashboardMachineId || m.id === dashboardMachineId).map(mach => {
+                      const machLines = lines.filter(l => l.machineId === mach.id && l.status !== 'IDLE');
+                      if (machLines.length === 0) return null;
+                      return (
+                        <div key={mach.id} className="space-y-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
+                            <h4 className="text-[11px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 italic">{mach.name}</h4>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {machLines.map(l => {
+                               const prog = programmes.find(p => p.id === l.currentProgrammeId);
+                               const op = users.find(u => u.id === l.currentOperatorId);
+                               const isActive = l.isActive !== false && l.isActive !== 0;
+                               return (
+                                 <div 
+                                   key={l.id} 
+                                   className={cn(
+                                     "p-3.5 rounded-2xl border transition-all flex flex-col justify-between bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 shadow-sm dark:shadow-none hover:border-blue-200 dark:hover:border-blue-800",
+                                     !isActive && "opacity-40 grayscale bg-gray-50 dark:bg-gray-950"
+                                   )}
+                                 >
+                                   <div className="flex justify-between items-start mb-2.5">
+                                     <div>
+                                        <p className="font-black text-xs text-gray-900 dark:text-white leading-none uppercase italic">{l.name}</p>
+                                        <p className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase mt-1">Machine: {mach.name}</p>
+                                     </div>
+                                     <span className={cn(
+                                       "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight border",
+                                       !isActive ? "bg-slate-200 text-slate-600 border-slate-300 dark:bg-gray-850 dark:text-gray-400 dark:border-gray-700" :
+                                       l.status === 'RUNNING' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50" :
+                                       l.status === 'STOPPED' ? "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50" : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                                     )}>
+                                       {!isActive ? 'Shutdown' : l.status === 'RUNNING' ? 'Running' : 'Stopped'}
+                                     </span>
+                                   </div>
+                                   <div className="grid grid-cols-2 gap-2 text-xs border-t border-gray-50 dark:border-gray-800/50 pt-2.5">
+                                     <div>
+                                       <span className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-0.5">Palettes</span>
+                                       <span className="font-extrabold text-blue-600 dark:text-blue-400 font-mono text-sm leading-none">{prog?.producedPallets || 0}</span>
+                                     </div>
+                                     <div className="text-right">
+                                       <span className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-0.5">Opérateur</span>
+                                       <span className="font-extrabold text-gray-800 dark:text-gray-200 uppercase text-[9px] truncate max-w-[90px] block justify-self-end">{(op?.name || 'Vidé').split(' ')[0]}</span>
+                                     </div>
+                                   </div>
+                                 </div>
+                               );
+                            })}
+                          </div>
+                        </div>
+                      );
+                   })}
+                 </div>
               </div>
             </div>
           )}
