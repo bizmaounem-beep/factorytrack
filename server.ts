@@ -265,7 +265,10 @@ async function startServer() {
       CREATE TABLE IF NOT EXISTS machines (
         id TEXT PRIMARY KEY,
         name TEXT,
-        currentPilotId TEXT
+        currentPilotId TEXT,
+        isProdRunning INTEGER DEFAULT 0,
+        prodStartTime TEXT,
+        prodEndTime TEXT
       );
 
       CREATE TABLE IF NOT EXISTS lines (
@@ -277,7 +280,10 @@ async function startServer() {
         currentOperatorId TEXT,
         activeDowntimeId TEXT,
         tracksProduction INTEGER DEFAULT 1,
-        isActive INTEGER DEFAULT 1
+        isActive INTEGER DEFAULT 1,
+        progressionStartTime TEXT,
+        progressionEndTime TEXT,
+        lastProgressionDurationSec INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS programmes (
@@ -335,13 +341,13 @@ async function startServer() {
 
     // Migrations for existing databases
     console.log('Running database migrations...');
-    const logTables = ['production_logs', 'downtime_logs', 'programmes', 'lines'];
+    const logTables = ['production_logs', 'downtime_logs', 'programmes', 'lines', 'machines'];
     for (const table of logTables) {
       try {
         const pragma = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
         const columns = pragma.map(p => p.name);
         
-        if (!columns.includes('shiftId')) {
+        if (table !== 'machines' && !columns.includes('shiftId')) {
           console.log(`Migration: Adding shiftId column to ${table}...`);
           db.exec(`ALTER TABLE ${table} ADD COLUMN shiftId TEXT;`);
         }
@@ -364,6 +370,36 @@ async function startServer() {
         if (table === 'lines' && !columns.includes('isActive')) {
           console.log(`Migration: Adding isActive column to lines...`);
           db.exec(`ALTER TABLE lines ADD COLUMN isActive INTEGER DEFAULT 1;`);
+        }
+
+        if (table === 'lines') {
+          if (!columns.includes('progressionStartTime')) {
+            console.log(`Migration: Adding progressionStartTime column to lines...`);
+            db.exec(`ALTER TABLE lines ADD COLUMN progressionStartTime TEXT;`);
+          }
+          if (!columns.includes('progressionEndTime')) {
+            console.log(`Migration: Adding progressionEndTime column to lines...`);
+            db.exec(`ALTER TABLE lines ADD COLUMN progressionEndTime TEXT;`);
+          }
+          if (!columns.includes('lastProgressionDurationSec')) {
+            console.log(`Migration: Adding lastProgressionDurationSec column to lines...`);
+            db.exec(`ALTER TABLE lines ADD COLUMN lastProgressionDurationSec INTEGER;`);
+          }
+        }
+
+        if (table === 'machines') {
+          if (!columns.includes('isProdRunning')) {
+            console.log(`Migration: Adding isProdRunning column to machines...`);
+            db.exec(`ALTER TABLE machines ADD COLUMN isProdRunning INTEGER DEFAULT 0;`);
+          }
+          if (!columns.includes('prodStartTime')) {
+            console.log(`Migration: Adding prodStartTime column to machines...`);
+            db.exec(`ALTER TABLE machines ADD COLUMN prodStartTime TEXT;`);
+          }
+          if (!columns.includes('prodEndTime')) {
+            console.log(`Migration: Adding prodEndTime column to machines...`);
+            db.exec(`ALTER TABLE machines ADD COLUMN prodEndTime TEXT;`);
+          }
         }
       } catch (err) {
         console.error(`Migration failed for ${table}:`, err);
