@@ -76,6 +76,7 @@ export default function OperatorScreen() {
   }, [selectedLineId]);
   
   const [timer, setTimer] = useState(0);
+  const [progressionTimer, setProgressionTimer] = useState(0);
   const [isPostProduction, setIsPostProduction] = useState(false);
   const [isInitialSelection, setIsInitialSelection] = useState(false);
   const [selectedStopType, setSelectedStopType] = useState<string | null>(null);
@@ -93,6 +94,8 @@ export default function OperatorScreen() {
   const appVersion = 'v1.1-responsive-scada';
 
   const activeLine = lines.find(l => l.id === selectedLineId) || null;
+  const selectedMachine = machines.find(m => m.id === selectedMachineId) || null;
+  const isMachineProdRunning = selectedMachine?.isProdRunning === true || selectedMachine?.isProdRunning === 1;
   const activeProgramme = activeLine ? availableProgrammes.find(p => p.id === activeLine.currentProgrammeId) || null : null;
   const activeDowntime = activeLine?.activeDowntimeId ? downtimeLogs.find(d => d.id === activeLine.activeDowntimeId) || null : null;
 
@@ -169,6 +172,20 @@ export default function OperatorScreen() {
     }
     return () => clearInterval(interval);
   }, [activeDowntime]);
+
+  // Timer logic for active line production duration
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (activeLine?.status === 'RUNNING' && activeLine?.progressionStartTime) {
+      interval = setInterval(() => {
+        const start = new Date(activeLine.progressionStartTime).getTime();
+        setProgressionTimer(Math.floor((Date.now() - start) / 1000));
+      }, 1000);
+    } else {
+      setProgressionTimer(0);
+    }
+    return () => clearInterval(interval);
+  }, [activeLine?.status, activeLine?.progressionStartTime]);
 
   // Pre-seed categorizing log values (description and images)
   useEffect(() => {
@@ -289,7 +306,8 @@ export default function OperatorScreen() {
     try {
       await localApi.updateDoc('lines', selectedLineId, {
         status: 'RUNNING',
-        currentOperatorId: user?.id
+        currentOperatorId: user?.id,
+        progressionStartTime: new Date().toISOString()
       });
       setIsPostProduction(false);
     } catch (e) {
@@ -322,8 +340,19 @@ export default function OperatorScreen() {
         });
       }
 
+      // Calculate automatic duration of production
+      const startTimeStr = activeLine?.progressionStartTime;
+      let finalDurationSec = 0;
+      if (startTimeStr) {
+        const start = new Date(startTimeStr).getTime();
+        const end = new Date().getTime();
+        finalDurationSec = Math.max(0, Math.floor((end - start) / 1000));
+      }
+
       await localApi.updateDoc('lines', selectedLineId, {
         status: 'IDLE',
+        progressionEndTime: new Date().toISOString(),
+        lastProgressionDurationSec: finalDurationSec
       });
       setIsPostProduction(true);
       setPalletInput('0');
@@ -1265,43 +1294,85 @@ export default function OperatorScreen() {
                     </div>
                   </div>
                 ) : (
-                  <Button 
-                    variant="danger" 
-                    size="lg"
-                    className="w-full max-w-sm h-16 shadow-lg shadow-rose-500/20"
-                    onClick={handleStartDowntime}
-                    disabled={activeLine?.isActive === false || activeLine?.isActive === 0}
-                  >
-                    <Square size={20} fill="currentColor" className="mr-2" /> DÉCLARER UN ARRÊT
-                  </Button>
+                  <div className="flex flex-col items-center w-full animate-in fade-in duration-300">
+                    {activeLine?.status === 'RUNNING' && (
+                      <div className="w-full max-w-sm bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-5 mb-6 text-center">
+                         <div className="flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 mb-1">
+                           <Timer size={14} className="animate-spin-slow" />
+                           <span className="text-[9px] font-black uppercase tracking-widest leading-none">Temps De Production Continu</span>
+                         </div>
+                         <p className="text-4xl font-black tracking-tighter tabular-nums text-emerald-600 dark:text-emerald-450 leading-none my-1">
+                           {formatDowntimeDisplay(progressionTimer)}
+                         </p>
+                         <p className="text-[8px] font-bold text-slate-400 dark:text-gray-500 uppercase mt-1 leading-none">Calculé Automatiquement</p>
+                      </div>
+                    )}
+                    <Button 
+                      variant="danger" 
+                      size="lg"
+                      className="w-full max-w-sm h-16 shadow-lg shadow-rose-500/20"
+                      onClick={handleStartDowntime}
+                      disabled={activeLine?.isActive === false || activeLine?.isActive === 0}
+                    >
+                      <Square size={20} fill="currentColor" className="mr-2" /> DÉCLARER UN ARRÊT
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>
 
             {activeLine?.status === 'IDLE' && (
-              <div className="text-center p-8 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-[2rem] border border-emerald-100 dark:border-emerald-900/30">
-                 <Button 
-                   variant="success" 
-                   size="lg" 
-                   className="w-full h-16 shadow-xl"
-                   onClick={handleStartProduction}
-                 >
-                   <Play size={20} fill="currentColor" className="mr-2" /> DÉMARRER LA PRODUCTION
-                 </Button>
+              <div className="space-y-4">
+                 {activeLine?.lastProgressionDurationSec ? (
+                   <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/35 rounded-3xl p-5 text-center">
+                     <p className="text-[8px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mb-1 leading-none">Dernière Durée De Production De La Ligne</p>
+                     <p className="text-xl font-black text-slate-800 dark:text-white leading-none my-1">
+                       {formatDowntimeDisplay(activeLine.lastProgressionDurationSec)}
+                     </p>
+                     <p className="text-[7.5px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Calculée lors de la dernière progression</p>
+                   </div>
+                 ) : null}
+
+                 {!isMachineProdRunning ? (
+                   <div className="text-center p-6 bg-rose-50/50 dark:bg-rose-950/20 rounded-[2rem] border border-rose-100 dark:border-rose-900/35 space-y-3">
+                      <div className="text-rose-500 flex justify-center">
+                         <AlertCircle size={28} className="animate-pulse" />
+                      </div>
+                      <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">⚠️ Production de la machine à l'arrêt</p>
+                      <p className="text-[9px] font-black text-slate-500 dark:text-gray-400 leading-normal max-w-sm mx-auto uppercase">
+                         La ligne ne peut pas être démarrée tant que le pilote n'a pas activé la production depuis son écran de surveillance.
+                      </p>
+                   </div>
+                 ) : (
+                   <div className="text-center p-8 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-[2rem] border border-emerald-100 dark:border-emerald-900/30">
+                      <Button 
+                        variant="success" 
+                        size="lg" 
+                        className="w-full h-16 shadow-xl text-[10px] tracking-wider uppercase font-black animate-in fade-in zoom-in duration-300"
+                        onClick={handleStartProduction}
+                        disabled={!activeProgramme}
+                      >
+                        <Play size={18} fill="currentColor" className="mr-2 animate-pulse" /> DECLARER LIGNE EN PROGRESSION
+                      </Button>
+                      {!activeProgramme && (
+                        <p className="text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider mt-2.5">Veuillez charger un programme (mission active) pour commencer.</p>
+                      )}
+                   </div>
+                 )}
               </div>
             )}
           </div>
 
           {/* RIGHT COLUMN: MISSION & LOGS */}
           <div className="lg:col-span-5 space-y-6">
-            <Modal isOpen={showStopConfirmation} onClose={() => setShowStopConfirmation(false)} title="CLÔTURER LA PRODUCTION" size="sm">
+            <Modal isOpen={showStopConfirmation} onClose={() => setShowStopConfirmation(false)} title="CLÔTURER LA PROGRESSION" size="sm">
               <div className="p-2 space-y-6 text-center">
                  <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 rounded-full flex items-center justify-center mx-auto text-rose-500 border border-rose-100 dark:border-rose-900/30">
                    <AlertCircle size={32} />
                  </div>
-                 <p className="text-xs font-bold text-slate-500 dark:text-gray-400">Voulez-vous vraiment arrêter la production sur cette ligne ?</p>
+                 <p className="text-xs font-bold text-slate-500 dark:text-gray-400">Voulez-vous vraiment clôre ou finir la progression sur cette ligne ?</p>
                  <div className="flex flex-col gap-2">
-                   <Button variant="danger" size="lg" className="w-full" onClick={() => { handleStopProduction(); setShowStopConfirmation(false); }}>OUI, ARRÊTER</Button>
+                   <Button variant="danger" size="lg" className="w-full" onClick={() => { handleStopProduction(); setShowStopConfirmation(false); }}>OUI, PROGRESSION TERMINÉE</Button>
                    <Button variant="ghost" size="sm" onClick={() => setShowStopConfirmation(false)}>ANNULER</Button>
                  </div>
               </div>
@@ -1390,7 +1461,7 @@ export default function OperatorScreen() {
 
                     <div className="p-3 flex gap-2">
                        <Button variant="secondary" className="flex-1 h-12 text-[10px] tracking-widest uppercase italic font-bold" onClick={() => { if(window.confirm("Clôturer ?")) handleAddPallets(0); }}>FIN MISSION</Button>
-                       <Button variant="danger" className="flex-1 h-12 text-[10px] tracking-widest uppercase italic font-bold shadow-lg shadow-rose-500/20" onClick={() => setShowStopConfirmation(true)}>STOP LIGNE</Button>
+                       <Button variant="danger" className="flex-1 h-12 text-[10px] tracking-widest uppercase italic font-bold shadow-lg shadow-rose-500/20" onClick={() => setShowStopConfirmation(true)}>PROGRESSION FINIE</Button>
                     </div>
                  </div>
                )}

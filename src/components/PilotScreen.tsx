@@ -39,6 +39,7 @@ import {
   Plus, 
   TrendingUp, 
   Box,
+  Clock,
   Image as ImageIcon,
   History as HistoryIcon
 } from 'lucide-react';
@@ -82,6 +83,172 @@ export default function PilotScreen() {
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => sessionStorage.getItem('pilot_selected_machine') || '');
   const [globalTimer, setGlobalTimer] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [panelsOrder, setPanelsOrder] = useState<string[]>(() => {
+    const saved = localStorage.getItem('pilot_panels_order');
+    return saved ? JSON.parse(saved) : ['timeline_heatmap', 'kpis', 'production_hours', 'frequent_team_stops', 'live_stops'];
+  });
+  const [hiddenPanels, setHiddenPanels] = useState<string[]>(() => {
+    const saved = localStorage.getItem('pilot_hidden_panels');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isRestructuring, setIsRestructuring] = useState<boolean>(false);
+
+  const handleMovePanel = (index: number, direction: 'up' | 'down') => {
+    const newOrder = [...panelsOrder];
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= newOrder.length) return;
+    const temp = newOrder[index];
+    newOrder[index] = newOrder[targetIdx];
+    newOrder[targetIdx] = temp;
+    setPanelsOrder(newOrder);
+    localStorage.setItem('pilot_panels_order', JSON.stringify(newOrder));
+  };
+
+  const handleTogglePanelVisibility = (panelId: string) => {
+    const newHidden = hiddenPanels.includes(panelId)
+      ? hiddenPanels.filter(id => id !== panelId)
+      : [...hiddenPanels, panelId];
+    setHiddenPanels(newHidden);
+    localStorage.setItem('pilot_hidden_panels', JSON.stringify(newHidden));
+  };
+
+  const handleResetLayout = () => {
+    const defaultOrder = ['timeline_heatmap', 'kpis', 'production_hours', 'frequent_team_stops', 'live_stops'];
+    setPanelsOrder(defaultOrder);
+    setHiddenPanels([]);
+    localStorage.setItem('pilot_panels_order', JSON.stringify(defaultOrder));
+    localStorage.setItem('pilot_hidden_panels', JSON.stringify([]));
+  };
+
+  const selectedMachine = machines.find(m => m.id === selectedMachineId);
+
+  const [localProdStartTime, setLocalProdStartTime] = useState<string>('06:00');
+  const [localProdEndTime, setLocalProdEndTime] = useState<string>('14:00');
+  const [localIsProdRunning, setLocalIsProdRunning] = useState<boolean>(false);
+
+  // Sync state reactively with selectedMachine
+  useEffect(() => {
+    if (selectedMachine) {
+      const dbIsRunning = selectedMachine.isProdRunning === true || selectedMachine.isProdRunning === 1;
+      setLocalIsProdRunning(dbIsRunning);
+      if (selectedMachine.prodStartTime) setLocalProdStartTime(selectedMachine.prodStartTime);
+      if (selectedMachine.prodEndTime) setLocalProdEndTime(selectedMachine.prodEndTime);
+    } else {
+      setLocalIsProdRunning(localStorage.getItem('prod_is_running') === 'true');
+      setLocalProdStartTime(localStorage.getItem('prod_start_time') || '06:00');
+      setLocalProdEndTime(localStorage.getItem('prod_end_time') || '14:00');
+    }
+  }, [selectedMachine]);
+
+  const isProdRunning = localIsProdRunning;
+  const prodStartTime = localProdStartTime;
+  const prodEndTime = localProdEndTime;
+
+  const handleProdStartChange = async (val: string) => {
+    setLocalProdStartTime(val);
+    localStorage.setItem('prod_start_time', val);
+    if (selectedMachineId) {
+      try {
+        await localApi.updateDoc('machines', selectedMachineId, {
+          prodStartTime: val
+        });
+      } catch (e) {
+        console.error("Error updating production start time:", e);
+      }
+    }
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleProdEndChange = async (val: string) => {
+    setLocalProdEndTime(val);
+    localStorage.setItem('prod_end_time', val);
+    if (selectedMachineId) {
+      try {
+        await localApi.updateDoc('machines', selectedMachineId, {
+          prodEndTime: val
+        });
+      } catch (e) {
+        console.error("Error updating production end time:", e);
+      }
+    }
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleStartProduction = async () => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    
+    setLocalProdStartTime(timeStr);
+    localStorage.setItem('prod_start_time', timeStr);
+    
+    setLocalIsProdRunning(true);
+    localStorage.setItem('prod_is_running', 'true');
+    
+    if (selectedMachineId) {
+      try {
+        await localApi.updateDoc('machines', selectedMachineId, {
+          isProdRunning: true,
+          prodStartTime: timeStr,
+          prodEndTime: null
+        });
+      } catch (e) {
+        console.error("Error starting production in DB:", e);
+      }
+    }
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleStopProduction = async () => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    
+    setLocalProdEndTime(timeStr);
+    localStorage.setItem('prod_end_time', timeStr);
+    
+    setLocalIsProdRunning(false);
+    localStorage.setItem('prod_is_running', 'false');
+    
+    if (selectedMachineId) {
+      try {
+        await localApi.updateDoc('machines', selectedMachineId, {
+          isProdRunning: false,
+          prodEndTime: timeStr
+        });
+      } catch (e) {
+        console.error("Error stopping production in DB:", e);
+      }
+    }
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleResetToShiftTimes = async () => {
+    localStorage.removeItem('prod_start_time');
+    localStorage.removeItem('prod_end_time');
+    localStorage.removeItem('prod_is_running');
+    setLocalIsProdRunning(false);
+    
+    const defaultStart = currentShift ? currentShift.startTime : '06:00';
+    const defaultEnd = currentShift ? currentShift.endTime : '14:00';
+    
+    setLocalProdStartTime(defaultStart);
+    setLocalProdEndTime(defaultEnd);
+
+    if (selectedMachineId) {
+      try {
+        await localApi.updateDoc('machines', selectedMachineId, {
+          isProdRunning: false,
+          prodStartTime: defaultStart,
+          prodEndTime: defaultEnd
+        });
+      } catch (e) {
+        console.error("Error resetting production times in DB:", e);
+      }
+    }
+    window.dispatchEvent(new Event('storage'));
+  };
 
   // Show a manual session reset button if connection is slow/stuck
   const [showReset, setShowReset] = useState(false);
@@ -164,6 +331,33 @@ export default function PilotScreen() {
   const currentShiftId = useMemo(() => getCurrentShiftId(shifts), [shifts]);
   const currentShift = useMemo(() => shifts.find(s => s.id === currentShiftId), [shifts, currentShiftId]);
 
+  // Sync with current shift times on load or shift switch
+  useEffect(() => {
+    if (currentShift) {
+      const storedStart = localStorage.getItem('prod_start_time');
+      const storedEnd = localStorage.getItem('prod_end_time');
+      if (!storedStart) {
+        setLocalProdStartTime(currentShift.startTime);
+      }
+      if (!storedEnd) {
+        setLocalProdEndTime(currentShift.endTime);
+      }
+    }
+  }, [currentShift]);
+
+  // Sync state changes across tabs/components
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setLocalProdStartTime(localStorage.getItem('prod_start_time') || (currentShift ? currentShift.startTime : '06:00'));
+      setLocalProdEndTime(localStorage.getItem('prod_end_time') || (currentShift ? currentShift.endTime : '14:00'));
+      setLocalIsProdRunning(localStorage.getItem('prod_is_running') === 'true');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [currentShift]);
+
   const analytics = useMemo(() => {
     const today = new Date();
     const start = startOfDay(today);
@@ -181,45 +375,36 @@ export default function PilotScreen() {
 
     const todayDown = downLogs.filter(l => 
       l.shiftId === currentShiftId && 
+      (!selectedMachineId || l.machineId === selectedMachineId) &&
       isWithinInterval(parseISO(logDate(l.startTime)), { start, end })
     );
 
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
     const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
-    const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.machineId === selectedMachineId);
-    
-    // Calculate availability based on elapsed time in current shift, removing hardcoded defaults
-    let shiftDurationSec = 0;
-    if (shifts && shifts.length > 0) {
-      if (currentShift) {
-        const [sh, sm] = currentShift.startTime.split(':').map(Number);
-        const [eh, em] = currentShift.endTime.split(':').map(Number);
-        const startMin = sh * 60 + sm;
-        const endMin = eh * 60 + em;
-        const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
-        shiftDurationSec = durationMin * 60;
-      } else {
-        // If between shifts, compute the average scheduled shift duration mathematically
-        const totalDurationMin = shifts.reduce((acc, s) => {
-          const [sh, sm] = s.startTime.split(':').map(Number);
-          const [eh, em] = s.endTime.split(':').map(Number);
-          const startMin = sh * 60 + sm;
-          const endMin = eh * 60 + em;
-          const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
-          return acc + durationMin;
-        }, 0);
-        shiftDurationSec = (totalDurationMin / shifts.length) * 60;
-      }
-    } else {
-      // If no shifts are in yet, dynamically measure the elapsed time today as the baseline
-      const elapsedTodaySec = Math.floor((today.getTime() - startOfDay(today).getTime()) / 1000);
-      shiftDurationSec = Math.max(3600, elapsedTodaySec);
+    // Parse production start and end times to calculate the total scheduled seconds
+    let actualEndTime = prodEndTime;
+    const isRunning = localStorage.getItem('prod_is_running') === 'true';
+    if (isRunning) {
+      const now = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      actualEndTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     }
 
-    const totalPossibleTime = activeLines.length * shiftDurationSec; 
-    const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
-    const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
+    const [sh, sm] = prodStartTime.split(':').map(Number);
+    const [eh, em] = actualEndTime.split(':').map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+    const durationSec = durationMin * 60;
+
+    const failuresCount = todayDown.length;
+    const uptimeSec = Math.max(0, durationSec - totalDowntimeSec);
+
+    // MTBF = Uptime / Failures (if failures > 0), else Uptime
+    const mtbfSec = failuresCount > 0 ? uptimeSec / failuresCount : durationSec;
+    // MTTR = Total Downtime / Failures (if failures > 0), else 0
+    const mttrSec = failuresCount > 0 ? totalDowntimeSec / failuresCount : 0;
 
     // Frequent Stops Aggregation
     const stopStats: Record<string, { count: number, totalTime: number }> = {};
@@ -261,14 +446,21 @@ export default function PilotScreen() {
       .filter(p => p.pallets > 0 || p.downtime > 0)
       .sort((a, b) => b.pallets - a.pallets);
 
+    const totalPossibleTime = durationSec;
+    const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
+
     return {
       totalPallets,
       totalDowntimeSec,
       availability,
+      failuresCount,
+      durationSec,
+      mtbfSec,
+      mttrSec,
       frequentStops,
       teamPerformance
     };
-  }, [prodLogs, downLogs, lines, currentShiftId, downtimeTypes, users, selectedMachineId]);
+  }, [prodLogs, downLogs, lines, currentShiftId, downtimeTypes, users, selectedMachineId, prodStartTime, prodEndTime, globalTimer]);
 
   useEffect(() => {
     sessionStorage.setItem('pilot_active_tab', activeTab);
@@ -1860,34 +2052,17 @@ export default function PilotScreen() {
               className="w-full p-1.5 bg-gray-50/50 rounded-lg font-black border border-gray-100 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-gray-700 text-[9px] appearance-none"
             >
               <option value="">SÉLECTIONNER MACHINE...</option>
-              {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name.toUpperCase()}</option>)}
-            </select>
-           )}
-        </div>
+               {availableMachines.map(m => <option key={m.id} value={m.id}>{m.name.toUpperCase()}</option>)}
+             </select>
+            )}
+         </div>
       )}
 
       {activeTab === 'dashboard' ? (
         <div className="p-2 sm:p-4 md:p-8 space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
-          {/* Timeline - NEW SCADA ELEMENT */}
-          <DowntimeTimeline 
-            lines={lines.filter(l => l.machineId === selectedMachineId)} 
-            events={downLogs.filter(log => log.machineId === selectedMachineId).map(log => ({
-              ...log,
-              typeName: downtimeTypes.find(t => t.id === log.typeId)?.name || 'Arrêt non qualifié',
-              duration: getLogDurationSec(log)
-            }))}
-            className="mb-8"
-          />
-
-          {selectedMachineId && (
-            <DowntimeHeatmap 
-              lines={lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0)}
-              downtimeLogs={downLogs.filter(log => log.machineId === selectedMachineId)}
-              className="mb-8 border border-neutral-100 dark:border-neutral-800"
-            />
-          )}
-
-          <div className="flex justify-between items-end px-1">
+          
+          {/* DASHBOARD HEADER & LAYOUT CONTROLLER */}
+          <div className="flex justify-between items-end px-1 border-b border-gray-100 dark:border-slate-800 pb-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">{currentShift?.name || 'Shift Actif'}</span>
@@ -1895,274 +2070,468 @@ export default function PilotScreen() {
                   <span className="bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">{machines.find(m => m.id === selectedMachineId)?.name}</span>
                 )}
               </div>
-              <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none">
-                {t('dashboard')} <span className="text-blue-600 dark:text-blue-400 uppercase text-[10px] md:text-xs tracking-widest ml-1">Pilot Intelligence</span>
+              <h2 className="text-base md:text-xl font-black tracking-tighter text-gray-900 dark:text-white leading-none flex items-center gap-2">
+                {t('dashboard')} <span className="text-blue-600 dark:text-blue-400 uppercase text-[10px] md:text-xs tracking-widest ml-1 font-black">Pilot Intelligence</span>
               </h2>
               <p className="text-[8px] md:text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mt-1 italic">Stats de l'équipe • Direct {currentShift?.name}</p>
             </div>
-            <div className="text-right flex flex-col items-end">
-              <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-full border border-blue-100 dark:border-blue-900/50 mb-1">
+            
+            <div className="text-right flex flex-col md:flex-row items-end md:items-center gap-2">
+              <button
+                onClick={() => setIsRestructuring(!isRestructuring)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md",
+                  isRestructuring
+                    ? "bg-amber-500 hover:bg-amber-600 border-amber-400 text-white animate-pulse"
+                    : "bg-slate-100 dark:bg-slate-800 hover:bg-blue-600 hover:text-white border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                )}
+              >
+                <LayoutDashboard size={12} />
+                {isRestructuring ? "Fermer Restructuration" : "Organiser l'Écran"}
+              </button>
+              
+              <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-full border border-blue-100 dark:border-blue-900/50 mb-1 md:mb-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                 <p className="text-[8px] md:text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-tight">Analyse Active</p>
               </div>
             </div>
           </div>
 
-          {/* KPI CARDS */}
-          <motion.div 
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4"
-          >
-             {[
-               { label: 'OEE Shift', val: `${analytics.availability.toFixed(1)}%`, sub: 'Dispo. de votre équipe', icon: TrendingUp, color: 'blue', trend: '+2.1%' },
-               { label: 'Palettes Équipe', val: analytics.totalPallets, sub: 'Sur ce shift', icon: Box, color: 'green', trend: '+12' },
-               { label: 'Temps d\'Arrêt', val: formatDowntimeDisplay(analytics.totalDowntimeSec), sub: 'Total Shift', icon: Timer, color: 'orange', trend: '-5%' },
-               { label: 'Alertes Actives', val: lines.filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId).length, sub: 'Sur votre machine', icon: AlertTriangle, color: 'red', trend: 'Live' },
-             ].map(stat => (
-               <motion.div 
-                variants={item}
-                key={stat.label} 
-                className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-2 md:p-4 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden shadow-sm dark:shadow-none"
-               >
-                 <div className={cn(
-                   "absolute -right-2 -top-2 w-16 h-16 opacity-5 transition-transform group-hover:scale-150 rotate-12",
-                   stat.color === 'blue' ? "text-blue-600" :
-                   stat.color === 'green' ? "text-green-600" :
-                   stat.color === 'orange' ? "text-orange-600" : "text-red-600"
-                 )}>
-                   <stat.icon className="w-full h-full" />
-                 </div>
-                 <div className="flex justify-between items-start">
-                   <div className={cn(
-                     "w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-white/20 shrink-0",
-                     stat.color === 'blue' ? "bg-blue-600 text-white shadow-blue-200" :
-                     stat.color === 'green' ? "bg-green-600 text-white shadow-green-200" :
-                     stat.color === 'orange' ? "bg-orange-600 text-white shadow-orange-200" : "bg-red-600 text-white shadow-red-200"
-                   )}>
-                     <stat.icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
-                   </div>
-                   <span className={cn(
-                     "text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded italic",
-                     stat.color === 'blue' ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" :
-                     stat.color === 'green' ? "bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400" :
-                     stat.color === 'orange' ? "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400" : "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                   )}>
-                     {stat.trend}
-                   </span>
-                 </div>
-                 <div>
-                   <p className="text-[7px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
-                   <p className="text-sm md:text-2xl font-black text-slate-900 dark:text-white leading-none mt-1 tabular-nums">{stat.val}</p>
-                   <p className="text-[7px] md:text-[9px] font-bold text-slate-400 dark:text-gray-500 mt-1">{stat.sub}</p>
-                 </div>
-               </motion.div>
-             ))}
-          </motion.div>
-
-          {/* SCADA OEE METRIC DEEP-DIVE (BENTO BOX) */}
-          {selectedMachineId && (
+          {/* RESTRUCTURING DESKTOP CONTROL HUD */}
+          {isRestructuring && (
             <motion.div 
-              variants={item}
-              className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white rounded-[2rem] p-6 border-4 border-gray-100 dark:border-slate-800 shadow-3xl dark:shadow-none relative overflow-hidden mb-6"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-6 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl text-white shadow-xl flex flex-col md:flex-row gap-6 justify-between items-center border border-blue-500/30"
             >
-              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-              <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
-                <div className="space-y-2 max-w-sm w-full">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
-                    <Activity size={10} className="animate-pulse" /> Indicateurs OEE / TRG
-                  </div>
-                  <h3 className="text-xl font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Analyse Globale de Rendement</h3>
-                  <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-relaxed uppercase">
-                    Calculé en temps réel selon les normes industrielles : Disponibilité x Performance x Qualité.
-                  </p>
-                </div>
-
-                {/* Gauges row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full flex-1 max-w-2xl font-mono">
-                  {(() => {
-                    const activeLinesCount = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).length;
-                    const targetPallets = Math.max(1, activeLinesCount * 40);
-                    const perfRate = Math.min(100, Math.max(70, (analytics.totalPallets / targetPallets) * 100));
-                    const qualityRate = 99.2;
-                    const trgVal = (analytics.availability * perfRate * qualityRate) / 10000;
-
-                    return [
-                      { label: "TRG (OEE)", val: `${trgVal.toFixed(1)}%`, desc: "Rendement Global", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-                      { label: "Disponibilité", val: `${analytics.availability.toFixed(1)}%`, desc: "Taux d'Uptime", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-                      { label: "Performance", val: `${perfRate.toFixed(1)}%`, desc: "Cadence Shift", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-                      { label: "Qualité", val: `${qualityRate.toFixed(1)}%`, desc: "Conformité", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
-                    ].map((metric, i) => (
-                      <div key={i} className={cn("p-4 rounded-2xl border flex flex-col items-center text-center justify-center bg-gray-50/50 dark:bg-slate-950/60", metric.border)}>
-                        <span className="text-[8px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1 font-sans">{metric.label}</span>
-                        <div className={cn("text-xl md:text-2xl font-black italic tracking-tighter tabular-nums", metric.color)}>
-                          {metric.val}
-                        </div>
-                        <span className="text-[8px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-tight mt-1 font-sans">{metric.desc}</span>
-                      </div>
-                    ));
-                  })()}
-                </div>
+              <div className="space-y-1 text-center md:text-left flex-1">
+                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-[8px] font-black uppercase tracking-wider">
+                   Organisateur de Cockpit
+                 </div>
+                 <h3 className="text-lg font-black tracking-tighter uppercase italic leading-none my-1">Mode Restructuration Activé</h3>
+                 <p className="text-xs text-blue-100 uppercase font-bold leading-normal">
+                   Utilisez les flèches <span className="underline">Montée (↑) / Descente (↓)</span> ou le bouton <span className="underline">Masquer (👁️)</span> sur chaque bloc pour configurer votre écran. Vos préférences sont persistées.
+                 </p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <button 
+                  onClick={handleResetLayout} 
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-[10px] uppercase font-black tracking-widest rounded-xl transition-all cursor-pointer border border-white/10"
+                >
+                  Valeurs par Défaut
+                </button>
+                <button 
+                  onClick={() => setIsRestructuring(false)} 
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] uppercase font-black tracking-widest rounded-xl transition-all cursor-pointer shadow-lg"
+                >
+                  Valider la Structure
+                </button>
               </div>
             </motion.div>
           )}
 
-          {/* BOTTOM ROW: FREQUENT STOPS & TEAM PERFORMANCE */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* RENDER DYNAMIC COCKPIT BLOCKS IN SEQUENCE */}
+          {panelsOrder.map((panelId, index) => {
+            const isHidden = hiddenPanels.includes(panelId);
             
-            {/* FREQUENT STOPS */}
-            <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 flex flex-col shadow-sm dark:shadow-none">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-orange-500" /> Arrêts Fréquents (Shift)
-                </h3>
-                <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">Top 5 récurrents</span>
-              </div>
-              
-              <div className="space-y-2 flex-1">
-                {analytics.frequentStops.length > 0 ? (
-                  analytics.frequentStops.map((stop, idx) => (
-                    <div key={stop.typeId} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 group hover:border-orange-200 dark:hover:border-orange-900/50 transition-all">
-                      <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-800 flex items-center justify-center text-lg shadow-sm dark:shadow-none border border-gray-100 dark:border-gray-700 group-hover:scale-110 transition-transform">
-                        {stop.icon}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-center mb-1">
-                           <span className="text-[10px] font-black text-gray-800 dark:text-gray-200 uppercase tracking-tight">{stop.typeName}</span>
-                           <span className="text-[10px] font-black text-orange-600 dark:text-orange-400 italic">{stop.count} fois</span>
-                        </div>
-                        <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                           <div 
-                             className="h-full bg-orange-500 rounded-full" 
-                             style={{ width: `${(stop.count / (analytics.frequentStops[0]?.count || 1)) * 100}%` }} 
-                           />
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center py-8 text-center bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-                    <CheckCircle2 size={24} className="text-green-300 dark:text-green-900/50 mb-2" />
-                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Aucun arrêt enregistré sur ce shift</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+            // Only skip rendering in normal view
+            if (isHidden && !isRestructuring) return null;
 
-            {/* TEAM PERFORMANCE (PILOT'S OPERATORS) */}
-            <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 shadow-sm dark:shadow-none">
-              <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <Users size={16} className="text-blue-500" /> Performance des Opérateurs
-              </h3>
-              <div className="space-y-3">
-                {analytics.teamPerformance.map(op => (
-                  <div key={op.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 group hover:bg-white dark:hover:bg-gray-800 transition-all">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase">
-                          {op.name?.charAt(0) || ''}
-                        </div>
-                        <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">{op.name}</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                       <div>
-                          <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Production</p>
-                          <p className="text-xs font-black text-gray-800 dark:text-gray-200">{op.pallets} <span className="opacity-50 text-[8px]">Pal.</span></p>
-                       </div>
-                       <div className="text-right">
-                          <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Temps d'Arrêt</p>
-                          <p className="text-xs font-black text-red-600 dark:text-red-400">{op.downtime} <span className="opacity-50 text-[8px]">min</span></p>
-                       </div>
-                    </div>
-                    <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                       <div 
-                        className="h-full bg-blue-600 rounded-full" 
-                        style={{ width: `${Math.min(100, (op.pallets / (analytics.totalPallets || 1)) * 100)}%` }} 
-                       />
-                    </div>
-                  </div>
-                ))}
-                {analytics.teamPerformance.length === 0 && (
-                  <p className="text-center py-6 text-[10px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest italic">Aucun opérateur actif</p>
-                )}
-              </div>
-            </motion.div>
-          </div>
+            const panelTitle = 
+              panelId === 'timeline_heatmap' ? '📊 ANALYSE TEMPORELLE (TIMELINE & HEATMAP)' :
+              panelId === 'kpis' ? '⚡ CLASSEMENT DES INDICATEURS KPI (MTBF & MTTR)' :
+              panelId === 'production_hours' ? '⏱️ JALONS DE PRODUCTION & HORAIRES DE SHIFT' :
+              panelId === 'frequent_team_stops' ? '📈 STATISTIQUES DES ARRÊTS & TEAM PERFORMANCE' :
+              '🛑 ALERTES EN TEMPS RÉEL (MONITOR LIVE)';
 
-          {/* REAL TIME STOPS / ACTIVE ALERTS (ONLY FOR THIS MACHINE) */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm dark:shadow-none mt-4">
-             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30">
-               <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
-                  <Activity size={16} className="text-red-500 animate-pulse" /> Arrêts en Temps Réel
-               </h3>
-               <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Live Monitor</span>
-               </div>
-             </div>
-             <div className="overflow-x-auto">
-               <table className="w-full text-left">
-                  <thead className="bg-white dark:bg-gray-900 text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] border-b border-gray-100 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-5 whitespace-nowrap">Ligne</th>
-                      <th className="px-6 py-5 whitespace-nowrap">Motif de l'arrêt</th>
-                      <th className="px-6 py-5 whitespace-nowrap">Début</th>
-                      <th className="px-6 py-5 whitespace-nowrap text-right">Action</th>
-                    </tr>
-                  </thead>
-                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                    {lines
-                      .filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId)
-                      .map(l => {
-                        const down = downLogs.find(d => d.id === l.activeDowntimeId);
-                        const type = downtimeTypes.find(t => t.id === down?.typeId);
-                        return (
-                          <tr key={l.id} className="text-sm hover:bg-red-50/30 dark:hover:bg-red-900/10 transition-all group/line animate-in slide-in-from-left duration-300">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center">
-                                  <AlertTriangle size={16} />
-                                </div>
-                                <p className="font-black text-gray-900 dark:text-white leading-none">{l.name}</p>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                               <div className="flex items-center gap-2">
-                                  <span className="text-lg">{type?.icon}</span>
-                                  <span className="font-black text-red-700 dark:text-red-400 uppercase italic text-[11px]">{type?.name}</span>
-                               </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-[10px] font-mono font-black text-gray-500 dark:text-gray-400 italic">
-                                {down ? format(parseISO(down.startTime), 'HH:mm:ss') : '—'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                               <button 
-                                onClick={() => handleStopSpecificDowntime(l.id)}
-                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg dark:shadow-none shadow-green-100 hover:scale-105 transition-all focus:outline-none"
-                               >
-                                 Relancer
-                               </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {lines.filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId).length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-10 text-center">
-                             <div className="flex flex-col items-center justify-center text-green-500/40">
-                               <CheckCircle2 size={32} className="mb-2" />
-                               <p className="text-[10px] font-black uppercase tracking-[0.2em] italic">Tout fonctionne normalement</p>
+            const restructureControls = isRestructuring && (
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-250 dark:border-slate-700/50 mb-2 animate-pulse">
+                <span className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 italic flex items-center gap-1.5">
+                  <LayoutDashboard size={12} className="text-blue-500" /> {panelTitle} {isHidden && <span className="text-[8px] bg-red-600 text-white px-2 py-0.5 rounded font-black uppercase tracking-widest not-italic ml-2">MASQUÉ</span>}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    disabled={index === 0} 
+                    onClick={() => handleMovePanel(index, 'up')}
+                    className="p-1.5 px-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-lg text-[9px] font-black uppercase text-slate-700 dark:text-slate-200 disabled:opacity-30 hover:bg-blue-600 hover:text-white transition-all cursor-pointer"
+                  >
+                    ↑ Monter
+                  </button>
+                  <button 
+                    disabled={index === panelsOrder.length - 1} 
+                    onClick={() => handleMovePanel(index, 'down')}
+                    className="p-1.5 px-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-lg text-[9px] font-black uppercase text-slate-700 dark:text-slate-200 disabled:opacity-30 hover:bg-blue-600 hover:text-white transition-all cursor-pointer"
+                  >
+                    ↓ Descendre
+                  </button>
+                  <button 
+                    onClick={() => handleTogglePanelVisibility(panelId)}
+                    className={cn(
+                      "p-1.5 px-3 border rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer",
+                      isHidden 
+                        ? "bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-700" 
+                        : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/30 text-red-600 hover:bg-rose-600 hover:text-white"
+                    )}
+                  >
+                    {isHidden ? "👁️ Afficher" : "👁️ Masquer"}
+                  </button>
+                </div>
+              </div>
+            );
+
+            return (
+              <div key={panelId} className={cn("transition-all duration-300 space-y-2", isHidden && "opacity-50 grayscale")}>
+                {restructureControls}
+
+                {/* Actual Panel Component Output */}
+                {(!isHidden || isRestructuring) && (
+                  <div className="w-full">
+                    {panelId === 'timeline_heatmap' && (
+                      <div className="space-y-6">
+                        <DowntimeTimeline 
+                          lines={lines.filter(l => l.machineId === selectedMachineId)} 
+                          events={downLogs.filter(log => log.machineId === selectedMachineId).map(log => ({
+                            ...log,
+                            typeName: downtimeTypes.find(t => t.id === log.typeId)?.name || 'Arrêt non qualifié',
+                            duration: getLogDurationSec(log)
+                          }))}
+                          className="mb-2"
+                        />
+
+                        {selectedMachineId && (
+                          <DowntimeHeatmap 
+                            lines={lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0)}
+                            downtimeLogs={downLogs.filter(log => log.machineId === selectedMachineId)}
+                            className="border border-neutral-100 dark:border-neutral-800"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {panelId === 'kpis' && (
+                      <motion.div 
+                        variants={container}
+                        initial="hidden"
+                        animate="show"
+                        className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4"
+                      >
+                         {[
+                           { label: 'MTBF', val: formatDowntimeDisplay(analytics.mtbfSec), sub: 'Temps moyen entre pannes (MTBF)', icon: Activity, color: 'blue', trend: 'Fiabilité' },
+                           { label: 'MTTR', val: formatDowntimeDisplay(analytics.mttrSec), sub: 'Temps moyen de dépannage (MTTR)', icon: Timer, color: 'orange', trend: 'Maintenance' },
+                           { label: 'Total Palettes', val: analytics.totalPallets, sub: 'Sur ce shift', icon: Box, color: 'green', trend: 'Production' },
+                           { label: 'Pannes Signalées', val: `${analytics.failuresCount} incident(s)`, sub: 'Sur votre shift', icon: AlertTriangle, color: 'red', trend: 'Diagnostic' },
+                         ].map(stat => (
+                           <motion.div 
+                            variants={item}
+                            key={stat.label} 
+                            className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-2 md:p-4 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden shadow-sm dark:shadow-none"
+                           >
+                             <div className={cn(
+                               "absolute -right-2 -top-2 w-16 h-16 opacity-5 transition-transform group-hover:scale-150 rotate-12",
+                               stat.color === 'blue' ? "text-blue-600" :
+                               stat.color === 'green' ? "text-green-600" :
+                               stat.color === 'orange' ? "text-orange-600" : "text-red-650"
+                             )}>
+                               <stat.icon className="w-full h-full" />
                              </div>
-                          </td>
-                        </tr>
-                      )}
-                 </tbody>
-               </table>
-             </div>
-          </div>
+                             <div className="flex justify-between items-start">
+                               <div className={cn(
+                                 "w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-white/20 shrink-0",
+                                 stat.color === 'blue' ? "bg-blue-600 text-white shadow-blue-200" :
+                                 stat.color === 'green' ? "bg-green-600 text-white shadow-green-200" :
+                                 stat.color === 'orange' ? "bg-orange-600 text-white shadow-orange-200" : "bg-red-600 text-white shadow-red-200"
+                               )}>
+                                 <stat.icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
+                               </div>
+                               <span className={cn(
+                                 "text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded italic",
+                                 stat.color === 'blue' ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" :
+                                 stat.color === 'green' ? "bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400" :
+                                 stat.color === 'orange' ? "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400" : "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                               )}>
+                                 {stat.trend}
+                               </span>
+                             </div>
+                             <div>
+                               <p className="text-[7px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 leading-none">{stat.label}</p>
+                               <p className="text-sm md:text-2xl font-black text-slate-900 dark:text-white leading-none mt-1 tabular-nums">{stat.val}</p>
+                               <p className="text-[7px] md:text-[9px] font-bold text-slate-400 dark:text-gray-500 mt-1">{stat.sub}</p>
+                             </div>
+                           </motion.div>
+                         ))}
+                      </motion.div>
+                    )}
+
+                    {panelId === 'production_hours' && selectedMachineId && (
+                      <motion.div 
+                        variants={item}
+                        className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white rounded-[2rem] p-6 border-4 border-gray-100 dark:border-slate-800 shadow-3xl dark:shadow-none relative overflow-hidden"
+                      >
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+                        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
+                          <div className="space-y-2 max-w-sm w-full">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
+                              <Clock size={10} className="animate-spin-slow" /> Horaires & Fiabilité
+                            </div>
+                            <h3 className="text-xl font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Durée de Production Réelle</h3>
+                            <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-relaxed uppercase">
+                              Définissez les jalons de production. Cette plage horaire sert de base temporelle pour calculer les indicateurs MTBF & MTTR.
+                            </p>
+                          </div>
+
+                          {/* Duration settings panel controls */}
+                          <div className="flex flex-wrap items-center gap-4 w-full flex-1 max-w-2xl justify-end overflow-visible">
+                            <div className="flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-slate-950 p-3 rounded-2xl border border-gray-100 dark:border-slate-800">
+                              
+                              {isProdRunning ? (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleStopProduction}
+                                    className="bg-gradient-to-r from-red-650 to-rose-500 hover:from-red-700 hover:to-rose-600 text-white shadow-md active:scale-95 transition-all py-2 px-3.5 rounded-xl font-black text-[9px] tracking-wider uppercase flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping mr-0.5" />
+                                    Arrêter Production
+                                  </button>
+                                  <div className="flex flex-col px-1.5 lead-none">
+                                    <span className="text-[7px] font-black text-rose-500 uppercase tracking-widest leading-none">En cours</span>
+                                    <span className="text-[9px] font-bold text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">Depuis {prodStartTime}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleStartProduction}
+                                    className="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white shadow-md active:scale-95 transition-all py-2 px-3.5 rounded-xl font-black text-[9px] tracking-wider uppercase flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-200 animate-pulse mr-0.5" />
+                                    Démarrer Production
+                                  </button>
+                                  <div className="flex flex-col px-1.5 leading-none">
+                                    <span className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none">À l'arrêt</span>
+                                    <span className="text-[9px] font-bold text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">Dernier shift</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Divider */}
+                              <div className="h-8 w-px bg-gray-200 dark:bg-slate-800 self-center mx-1" />
+
+                              <div className="flex flex-col">
+                                <span className="text-[8px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 leading-none">Début</span>
+                                <input 
+                                  type="time"
+                                  value={prodStartTime}
+                                  onChange={e => handleProdStartChange(e.target.value)}
+                                  className="p-1 px-2 text-xs font-black rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0 cursor-pointer"
+                                />
+                              </div>
+                              
+                              <div className="flex flex-col">
+                                <span className="text-[8px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 leading-none">Fin</span>
+                                <input 
+                                  type="time"
+                                  value={isProdRunning ? "" : prodEndTime}
+                                  onChange={e => handleProdEndChange(e.target.value)}
+                                  disabled={isProdRunning}
+                                  placeholder="--"
+                                  className="p-1 px-2 text-xs font-black rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0 cursor-pointer disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-900"
+                                />
+                              </div>
+
+                              {/* Reset button */}
+                              <button
+                                onClick={handleResetToShiftTimes}
+                                title="Réinitialiser avec les heures par défaut du shift"
+                                className="p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 active:scale-95 transition-all text-[8px] font-black uppercase shrink-0 cursor-pointer"
+                              >
+                                Reset
+                              </button>
+                            </div>
+
+                            {/* Calculated summary statistics */}
+                            <div className="flex items-stretch gap-2 font-mono">
+                              <div className="px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex flex-col items-center justify-center min-w-[100px]">
+                                <span className="text-[7.5px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1">Durée Allouée</span>
+                                <div className="text-sm font-black text-slate-800 dark:text-white">{formatDowntimeDisplay(analytics.durationSec)}</div>
+                              </div>
+                              
+                              <div className="px-4 py-3 rounded-xl border border-blue-500/10 bg-blue-500/5 flex flex-col items-center justify-center min-w-[100px]">
+                                <span className="text-[7.5px] font-black text-blue-500 uppercase tracking-widest block mb-1">MTBF</span>
+                                <div className="text-sm font-black text-blue-600 dark:text-blue-400">{formatDowntimeDisplay(analytics.mtbfSec)}</div>
+                              </div>
+
+                              <div className="px-4 py-3 rounded-xl border border-orange-500/10 bg-orange-500/5 flex flex-col items-center justify-center min-w-[100px]">
+                                <span className="text-[7.5px] font-black text-orange-500 uppercase tracking-widest block mb-1">MTTR</span>
+                                <div className="text-sm font-black text-orange-600 dark:text-orange-400">{formatDowntimeDisplay(analytics.mttrSec)}</div>
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {panelId === 'frequent_team_stops' && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* FREQUENT STOPS */}
+                        <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 flex flex-col shadow-sm dark:shadow-none">
+                          <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+                              <AlertTriangle size={16} className="text-orange-500" /> Arrêts Fréquents (Shift)
+                            </h3>
+                            <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">Top 5 récurrents</span>
+                          </div>
+                          
+                          <div className="space-y-2 flex-1">
+                            {analytics.frequentStops.length > 0 ? (
+                              analytics.frequentStops.map((stop, idx) => (
+                                <div key={stop.typeId} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 group hover:border-orange-200 dark:hover:border-orange-900/50 transition-all">
+                                  <div className="w-8 h-8 rounded-lg bg-white dark:bg-gray-800 flex items-center justify-center text-lg shadow-sm dark:shadow-none border border-gray-100 dark:border-gray-700 group-hover:scale-110 transition-transform">
+                                    {stop.icon}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-center mb-1">
+                                       <span className="text-[10px] font-black text-gray-800 dark:text-gray-200 uppercase tracking-tight">{stop.typeName}</span>
+                                       <span className="text-[10px] font-black text-orange-600 dark:text-orange-400 italic">{stop.count} fois</span>
+                                    </div>
+                                    <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                       <div 
+                                         className="h-full bg-orange-500 rounded-full" 
+                                         style={{ width: `${(stop.count / (analytics.frequentStops[0]?.count || 1)) * 100}%` }} 
+                                       />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="h-full flex flex-col items-center justify-center py-8 text-center bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                                <CheckCircle2 size={24} className="text-green-300 dark:text-green-900/50 mb-2" />
+                                <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Aucun arrêt enregistré sur ce shift</p>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+
+                        {/* TEAM PERFORMANCE (PILOT'S OPERATORS) */}
+                        <motion.div variants={item} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-4 shadow-sm dark:shadow-none">
+                          <h3 className="text-xs font-black uppercase tracking-widest text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Users size={16} className="text-blue-500" /> Performance des Opérateurs
+                          </h3>
+                          <div className="space-y-3">
+                            {analytics.teamPerformance.map(op => (
+                              <div key={op.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 group hover:bg-white dark:hover:bg-gray-800 transition-all">
+                                <div className="flex justify-between items-center mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase">
+                                      {op.name?.charAt(0) || ''}
+                                    </div>
+                                    <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase italic">{op.name}</span>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                   <div>
+                                      <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Production</p>
+                                      <p className="text-xs font-black text-gray-800 dark:text-gray-200">{op.pallets} <span className="opacity-50 text-[8px]">Pal.</span></p>
+                                   </div>
+                                   <div className="text-right">
+                                      <p className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Temps d'Arrêt</p>
+                                      <p className="text-xs font-black text-red-650 dark:text-red-400">{op.downtime} <span className="opacity-50 text-[8px]">min</span></p>
+                                   </div>
+                                </div>
+                                <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                   <div 
+                                    className="h-full bg-blue-600 rounded-full" 
+                                    style={{ width: `${Math.min(100, (op.pallets / (analytics.totalPallets || 1)) * 100)}%` }} 
+                                   />
+                                </div>
+                              </div>
+                            ))}
+                            {analytics.teamPerformance.length === 0 && (
+                              <p className="text-center py-6 text-[10px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest italic">Aucun opérateur actif</p>
+                            )}
+                          </div>
+                        </motion.div>
+                      </div>
+                    )}
+
+                    {panelId === 'live_stops' && (
+                      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm dark:shadow-none">
+                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30">
+                           <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white flex items-center gap-2">
+                              <Activity size={16} className="text-red-500 animate-pulse" /> Arrêts en Temps Réel
+                           </h3>
+                           <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Live Monitor</span>
+                           </div>
+                         </div>
+                         <div className="overflow-x-auto">
+                           <table className="w-full text-left">
+                              <thead className="bg-white dark:bg-gray-900 text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] border-b border-gray-100 dark:border-gray-800">
+                                <tr>
+                                  <th className="px-6 py-5 whitespace-nowrap">Ligne</th>
+                                  <th className="px-6 py-5 whitespace-nowrap">Motif de l'arrêt</th>
+                                  <th className="px-6 py-5 whitespace-nowrap">Début</th>
+                                  <th className="px-6 py-5 whitespace-nowrap text-right">Action</th>
+                                </tr>
+                              </thead>
+                             <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                {lines
+                                  .filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId)
+                                  .map(l => {
+                                    const down = downLogs.find(d => d.id === l.activeDowntimeId);
+                                    const type = downtimeTypes.find(t => t.id === down?.typeId);
+                                    return (
+                                      <tr key={l.id} className="text-sm hover:bg-rose-50/30 dark:hover:bg-red-900/10 transition-all group/line animate-in slide-in-from-left duration-300">
+                                        <td className="px-6 py-4">
+                                          <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center">
+                                              <AlertTriangle size={16} />
+                                            </div>
+                                            <p className="font-black text-gray-900 dark:text-white leading-none">{l.name}</p>
+                                          </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                           <div className="flex items-center gap-2">
+                                              <span className="text-lg">{type?.icon}</span>
+                                              <span className="font-black text-red-700 dark:text-red-400 uppercase italic text-[11px]">{type?.name}</span>
+                                           </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                          <span className="text-[10px] font-mono font-black text-gray-500 dark:text-gray-400 italic">
+                                            {down ? format(parseISO(down.startTime), 'HH:mm:ss') : '—'}
+                                          </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                           <button 
+                                            onClick={() => handleStopSpecificDowntime(l.id)}
+                                            className="px-3 py-1 bg-green-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg dark:shadow-none shadow-green-100 hover:scale-105 transition-all focus:outline-none cursor-pointer"
+                                           >
+                                             Relancer
+                                           </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                  {lines.filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId).length === 0 && (
+                                    <tr>
+                                      <td colSpan={4} className="px-6 py-10 text-center">
+                                         <div className="flex flex-col items-center justify-center text-green-500/40">
+                                           <CheckCircle2 size={32} className="mb-2" />
+                                           <p className="text-[10px] font-black uppercase tracking-[0.2em] italic">Tout fonctionne normalement</p>
+                                         </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                             </tbody>
+                           </table>
+                         </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : activeTab === 'monitor' ? (
         !selectedMachineId ? (

@@ -12,6 +12,9 @@ export interface Machine {
   id: string;
   name: string;
   currentPilotId?: string;
+  isProdRunning?: boolean | number;
+  prodStartTime?: string;
+  prodEndTime?: string;
 }
 
 export interface Line {
@@ -24,6 +27,9 @@ export interface Line {
   activeDowntimeId?: string;
   tracksProduction: boolean | number;
   isActive?: boolean | number;
+  progressionStartTime?: string;
+  progressionEndTime?: string;
+  lastProgressionDurationSec?: number;
 }
 
 export interface Programme {
