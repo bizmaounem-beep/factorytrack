@@ -83,6 +83,32 @@ export default function PilotScreen() {
   const [globalTimer, setGlobalTimer] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const [prodStartTimeStr, setProdStartTimeStr] = useState<string>(() => {
+    const saved = sessionStorage.getItem('dashboard_prod_start');
+    if (saved) return saved;
+    const d = new Date();
+    d.setHours(8, 0, 0, 0);
+    return format(d, "yyyy-MM-dd'T'HH:mm");
+  });
+
+  const [prodEndTimeStr, setProdEndTimeStr] = useState<string>(() => {
+    const saved = sessionStorage.getItem('dashboard_prod_end');
+    if (saved) return saved;
+    const d = new Date();
+    d.setHours(16, 0, 0, 0);
+    return format(d, "yyyy-MM-dd'T'HH:mm");
+  });
+
+  const handleProdStartChange = (val: string) => {
+    setProdStartTimeStr(val);
+    sessionStorage.setItem('dashboard_prod_start', val);
+  };
+
+  const handleProdEndChange = (val: string) => {
+    setProdEndTimeStr(val);
+    sessionStorage.setItem('dashboard_prod_end', val);
+  };
+
   // Show a manual session reset button if connection is slow/stuck
   const [showReset, setShowReset] = useState(false);
   useEffect(() => {
@@ -270,6 +296,58 @@ export default function PilotScreen() {
     };
   }, [prodLogs, downLogs, lines, currentShiftId, downtimeTypes, users, selectedMachineId]);
 
+  const mtbfMttrData = useMemo(() => {
+    if (!selectedMachineId) {
+      return {
+        totalProdSec: 0,
+        numFailures: 0,
+        totalDowntimeSec: 0,
+        totalUptimeSec: 0,
+        mttrSec: 0,
+        mtbfSec: 0
+      };
+    }
+    const prodStart = new Date(prodStartTimeStr).getTime();
+    const prodEnd = new Date(prodEndTimeStr).getTime();
+    
+    // Total production duration (T_prod) in seconds
+    const totalProdSec = Math.max(0, (prodEnd - prodStart) / 1000);
+    
+    // Filter downtime logs for the selected machine that start within specified interval
+    const matchingDownLogs = downLogs.filter(log => {
+      if (log.machineId !== selectedMachineId) return false;
+      const logStart = new Date(log.startTime).getTime();
+      return logStart >= prodStart && logStart <= prodEnd;
+    });
+    
+    const numFailures = matchingDownLogs.length;
+    
+    // Calculate total downtime duration in seconds within this specified period
+    const totalDowntimeSec = matchingDownLogs.reduce((acc, log) => {
+      const logStart = new Date(log.startTime).getTime();
+      const logEnd = log.endTime ? new Date(log.endTime).getTime() : Math.min(Date.now(), prodEnd);
+      const durationMs = Math.max(0, logEnd - logStart);
+      return acc + durationMs / 1000;
+    }, 0);
+    
+    const totalUptimeSec = Math.max(0, totalProdSec - totalDowntimeSec);
+    
+    // MTTR (Mean Time To Repair) = Total Downtime / Number of failures
+    const mttrSec = numFailures > 0 ? (totalDowntimeSec / numFailures) : 0;
+    
+    // MTBF (Mean Time Between Failures) = Total Uptime / Number of Failures
+    const mtbfSec = numFailures > 0 ? (totalUptimeSec / numFailures) : totalUptimeSec;
+    
+    return {
+      totalProdSec,
+      numFailures,
+      totalDowntimeSec,
+      totalUptimeSec,
+      mttrSec,
+      mtbfSec
+    };
+  }, [prodStartTimeStr, prodEndTimeStr, downLogs, selectedMachineId]);
+
   useEffect(() => {
     sessionStorage.setItem('pilot_active_tab', activeTab);
   }, [activeTab]);
@@ -296,6 +374,7 @@ export default function PilotScreen() {
   const [editModalData, setEditModalData] = useState<any>({});
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
+  const [confirmStopProductionOpen, setConfirmStopProductionOpen] = useState(false);
   const [showFeatureInfo, setShowFeatureInfo] = useState(false);
   const [declaringDowntimeLineId, setDeclaringDowntimeLineId] = useState<string | null>(null);
   const [selectedDowntimeTypeId, setSelectedDowntimeTypeId] = useState<string | null>(null);
@@ -592,6 +671,79 @@ export default function PilotScreen() {
     }
   };
 
+  const handleStartProduction = async (lineId: string) => {
+    try {
+      const line = lines.find(l => l.id === lineId);
+      if (!line) return;
+      if (!line.currentProgrammeId) {
+        alert("Veuillez d'abord assigner un programme à cette ligne.");
+        return;
+      }
+      await localApi.updateDoc('lines', lineId, {
+        status: 'RUNNING'
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors du démarrage de la production");
+    }
+  };
+
+  const handleStopProduction = async (lineId: string) => {
+    try {
+      await localApi.updateDoc('lines', lineId, {
+        status: 'IDLE'
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de l'arrêt de la production");
+    }
+  };
+
+  const confirmStopProduction = async () => {
+    setConfirmStopProductionOpen(false);
+    if (!selectedMachineId) return;
+    const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0);
+    try {
+      for (const line of machineLines) {
+        if (line.status === 'RUNNING') {
+          await localApi.updateDoc('lines', line.id, { status: 'IDLE' });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de l'arrêt de la production de la machine.");
+    }
+  };
+
+  const handleToggleMachineProduction = async () => {
+    if (!selectedMachineId) return;
+    const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0);
+    const isProducing = machineLines.some(l => l.status === 'RUNNING');
+
+    if (isProducing) {
+      setConfirmStopProductionOpen(true);
+    } else {
+      const startableLines = machineLines.filter(l => l.currentProgrammeId);
+      if (startableLines.length === 0) {
+        alert("Aucune ligne active n'a de programme assigné. Veuillez assigner un programme d'abord.");
+        return;
+      }
+      try {
+        for (const line of startableLines) {
+          if (line.status !== 'RUNNING') {
+            await localApi.updateDoc('lines', line.id, { status: 'RUNNING' });
+          }
+        }
+        if (startableLines.length < machineLines.length) {
+          alert(`Production démarrée sur ${startableLines.length} ligne(s). Certaines lignes actives n'ont pas de programme assigné et n'ont pas démarré.`);
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Erreur lors du démarrage de la production de la machine.");
+      }
+    }
+  };
+
   const handleStartDowntime = async (lineId: string | null | 'global', typeId: string, description?: string) => {
     if (!user || !selectedMachineId) return;
     try {
@@ -638,10 +790,11 @@ export default function PilotScreen() {
 
   const ALLOWED_MIME_TYPES = [
     'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+    'image/heic', 'image/heif', 'image/heic-sequence',
     'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg', 'video/3gpp', 'video/x-matroska', 'video/avi', 'video/msvideo', 'video/x-msvideo'
   ];
   const ALLOWED_EXTS = [
-    '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+    '.jpg', '.jpeg', '.png', '.webp', '.pdf', '.heic', '.heif',
     '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
   ];
 
@@ -1749,34 +1902,6 @@ export default function PilotScreen() {
                     <p className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{analytics.totalPallets}</p>
                  </div>
               </div>
-
-              <div className="flex items-center gap-2 w-full md:w-auto">
-                {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
-                  <button 
-                    onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
-                  >
-                    <Play size={14} fill="currentColor" />
-                    REDÉMARRAGE MACHINE
-                  </button>
-                ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).some(l => l.status === 'RUNNING') ? (
-                  <button 
-                    onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in focus:outline-none"
-                  >
-                    <Activity size={14} className="animate-pulse" />
-                    ARRÊT D'URGENCE GLOBAL
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
-                  >
-                    <Play size={14} fill="currentColor" />
-                    REPRISE DE LA MACHINE
-                  </button>
-                )}
-              </div>
             </div>
 
             {/* LIVE ALERTS SECTION */}
@@ -1868,25 +1993,6 @@ export default function PilotScreen() {
 
       {activeTab === 'dashboard' ? (
         <div className="p-2 sm:p-4 md:p-8 space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
-          {/* Timeline - NEW SCADA ELEMENT */}
-          <DowntimeTimeline 
-            lines={lines.filter(l => l.machineId === selectedMachineId)} 
-            events={downLogs.filter(log => log.machineId === selectedMachineId).map(log => ({
-              ...log,
-              typeName: downtimeTypes.find(t => t.id === log.typeId)?.name || 'Arrêt non qualifié',
-              duration: getLogDurationSec(log)
-            }))}
-            className="mb-8"
-          />
-
-          {selectedMachineId && (
-            <DowntimeHeatmap 
-              lines={lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0)}
-              downtimeLogs={downLogs.filter(log => log.machineId === selectedMachineId)}
-              className="mb-8 border border-neutral-100 dark:border-neutral-800"
-            />
-          )}
-
           <div className="flex justify-between items-end px-1">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -1916,9 +2022,9 @@ export default function PilotScreen() {
             className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4"
           >
              {[
-               { label: 'OEE Shift', val: `${analytics.availability.toFixed(1)}%`, sub: 'Dispo. de votre équipe', icon: TrendingUp, color: 'blue', trend: '+2.1%' },
+               { label: 'MTBF Global', val: mtbfMttrData.mtbfSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mtbfSec) : '—', sub: 'Calculé sur l\'intervalle', icon: TrendingUp, color: 'blue', trend: `${mtbfMttrData.numFailures} Arrêt(s)` },
                { label: 'Palettes Équipe', val: analytics.totalPallets, sub: 'Sur ce shift', icon: Box, color: 'green', trend: '+12' },
-               { label: 'Temps d\'Arrêt', val: formatDowntimeDisplay(analytics.totalDowntimeSec), sub: 'Total Shift', icon: Timer, color: 'orange', trend: '-5%' },
+               { label: 'MTTR Global', val: mtbfMttrData.mttrSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mttrSec) : '0 min', sub: 'Temps moyen rép.', icon: Timer, color: 'orange', trend: 'Moyen' },
                { label: 'Alertes Actives', val: lines.filter(l => l.machineId === selectedMachineId && !!l.activeDowntimeId).length, sub: 'Sur votre machine', icon: AlertTriangle, color: 'red', trend: 'Live' },
              ].map(stat => (
                <motion.div 
@@ -1961,49 +2067,91 @@ export default function PilotScreen() {
              ))}
           </motion.div>
 
-          {/* SCADA OEE METRIC DEEP-DIVE (BENTO BOX) */}
+          {/* MTBF AND MTTR DEEP-DIVE & PRODUCTION INTERVAL CONTROLS */}
           {selectedMachineId && (
             <motion.div 
               variants={item}
               className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white rounded-[2rem] p-6 border-4 border-gray-100 dark:border-slate-800 shadow-3xl dark:shadow-none relative overflow-hidden mb-6"
             >
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-              <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
-                <div className="space-y-2 max-w-sm w-full">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
-                    <Activity size={10} className="animate-pulse" /> Indicateurs OEE / TRG
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
+                
+                {/* Production Period Inputs */}
+                <div className="lg:col-span-5 space-y-4">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
+                      <Timer size={10} className="animate-pulse" /> Durée de Production
+                    </div>
+                    <h3 className="text-lg font-black italic uppercase tracking-tighter text-gray-900 dark:text-white mt-1">Période de Production</h3>
+                    <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-normal uppercase">
+                      Définissez l'intervalle de fonctionnement pour le calcul du MTBF & MTTR.
+                    </p>
                   </div>
-                  <h3 className="text-xl font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Analyse Globale de Rendement</h3>
-                  <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-relaxed uppercase">
-                    Calculé en temps réel selon les normes industrielles : Disponibilité x Performance x Qualité.
-                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Début Production</label>
+                      <input 
+                        type="datetime-local"
+                        value={prodStartTimeStr}
+                        onChange={(e) => handleProdStartChange(e.target.value)}
+                        className="w-full p-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fin Production</label>
+                      <input 
+                        type="datetime-local"
+                        value={prodEndTimeStr}
+                        onChange={(e) => handleProdEndChange(e.target.value)}
+                        className="w-full p-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-blue-50/50 dark:bg-slate-950/40 rounded-xl border border-blue-500/10 text-[10px] font-mono leading-none tracking-tight flex items-center justify-between text-gray-600 dark:text-slate-400">
+                    <span className="uppercase font-bold">Durée Définie :</span>
+                    <span className="font-extrabold text-blue-600 dark:text-blue-400">
+                      {mtbfMttrData.totalProdSec > 0 
+                        ? formatDowntimeDisplay(mtbfMttrData.totalProdSec) 
+                        : "Fin inférieure au début ⚠️"}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Gauges row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full flex-1 max-w-2xl font-mono">
-                  {(() => {
-                    const activeLinesCount = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).length;
-                    const targetPallets = Math.max(1, activeLinesCount * 40);
-                    const perfRate = Math.min(100, Math.max(70, (analytics.totalPallets / targetPallets) * 100));
-                    const qualityRate = 99.2;
-                    const trgVal = (analytics.availability * perfRate * qualityRate) / 10000;
-
-                    return [
-                      { label: "TRG (OEE)", val: `${trgVal.toFixed(1)}%`, desc: "Rendement Global", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-                      { label: "Disponibilité", val: `${analytics.availability.toFixed(1)}%`, desc: "Taux d'Uptime", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-                      { label: "Performance", val: `${perfRate.toFixed(1)}%`, desc: "Cadence Shift", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-                      { label: "Qualité", val: `${qualityRate.toFixed(1)}%`, desc: "Conformité", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
-                    ].map((metric, i) => (
-                      <div key={i} className={cn("p-4 rounded-2xl border flex flex-col items-center text-center justify-center bg-gray-50/50 dark:bg-slate-950/60", metric.border)}>
-                        <span className="text-[8px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1 font-sans">{metric.label}</span>
-                        <div className={cn("text-xl md:text-2xl font-black italic tracking-tighter tabular-nums", metric.color)}>
-                          {metric.val}
-                        </div>
-                        <span className="text-[8px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-tight mt-1 font-sans">{metric.desc}</span>
+                {/* MTBF / MTTR Indicators */}
+                <div className="lg:col-span-7 flex flex-col justify-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono w-full">
+                    
+                    {/* MTBF CARD */}
+                    <div className="p-5 rounded-[1.5rem] border border-blue-500/10 dark:border-blue-500/20 bg-gray-50/50 dark:bg-slate-950/60 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl pointer-events-none transition-transform group-hover:scale-150" />
+                      <span className="text-[9px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1 font-sans">MTBF</span>
+                      <div className="text-3xl font-black italic tracking-tighter text-blue-600 dark:text-blue-400">
+                        {mtbfMttrData.mtbfSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mtbfSec) : "—"}
                       </div>
-                    ));
-                  })()}
+                      <span className="text-[8px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-tight mt-2 block font-sans">Mean Time Between Failures</span>
+                      <p className="text-[7px] text-gray-400 dark:text-gray-500 leading-normal mt-1 uppercase font-sans">
+                        Temps moyen de bon fonctionnement entre deux arrêts ({mtbfMttrData.numFailures} arrêt(s) détecté(s)).
+                      </p>
+                    </div>
+
+                    {/* MTTR CARD */}
+                    <div className="p-5 rounded-[1.5rem] border border-orange-500/10 dark:border-orange-500/20 bg-gray-50/50 dark:bg-slate-950/60 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl pointer-events-none transition-transform group-hover:scale-150" />
+                      <span className="text-[9px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1 font-sans">MTTR</span>
+                      <div className="text-3xl font-black italic tracking-tighter text-orange-600 dark:text-orange-400">
+                        {mtbfMttrData.mttrSec > 0 ? formatDowntimeDisplay(mtbfMttrData.mttrSec) : "0 min"}
+                      </div>
+                      <span className="text-[8px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-tight mt-2 block font-sans">Mean Time To Repair</span>
+                      <p className="text-[7px] text-gray-400 dark:text-gray-500 leading-normal mt-1 uppercase font-sans">
+                        Temps moyen de résolution/réparation en cas de panne ({mtbfMttrData.numFailures} arrêt(s) de {formatDowntimeDisplay(mtbfMttrData.totalDowntimeSec)}).
+                      </p>
+                    </div>
+
+                  </div>
                 </div>
+
               </div>
             </motion.div>
           )}
@@ -2185,21 +2333,32 @@ export default function PilotScreen() {
                     <p className="text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Surveillance Temps Réel Active</p>
                   </div>
                </div>
-               
-               <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => handleResumeMachine()}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800 focus:outline-none"
-                  >
-                    Redémarrage Global
-                  </button>
-                  <button 
-                    onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-rose-800 flex items-center gap-2 focus:outline-none"
-                  >
-                    <Square size={14} fill="currentColor" />
-                    Arrêt Global Machine
-                  </button>
+
+               <div className="flex flex-wrap items-center gap-3">
+                 {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).some(l => l.status === 'RUNNING') ? (
+                    <button 
+                      onClick={handleToggleMachineProduction}
+                      className="px-6 py-3 bg-rose-700 hover:bg-rose-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-rose-950 focus:outline-none flex items-center gap-2 cursor-pointer"
+                    >
+                      <Square size={14} fill="currentColor" />
+                      Arrêter Production
+                    </button>
+                 ) : (
+                    <button 
+                      onClick={handleToggleMachineProduction}
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800 focus:outline-none flex items-center gap-2 cursor-pointer"
+                    >
+                      <Play size={14} fill="currentColor" />
+                      Démarrer Production
+                    </button>
+                 )}
+                 <button 
+                   onClick={() => setDeclaringDowntimeLineId('global')}
+                   className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-rose-800 flex items-center gap-2 focus:outline-none cursor-pointer"
+                 >
+                   <Square size={14} fill="currentColor" />
+                   Arrêt Global Machine
+                 </button>
                </div>
             </div>
 
@@ -2392,21 +2551,21 @@ export default function PilotScreen() {
 
                             {/* Operator Controls if IDLE */}
                             {isActive && !down && line.status !== 'STOPPED' && (
-                              <div className="grid grid-cols-2 gap-2 mt-auto">
-                                <button 
-                                  onClick={() => setDeclaringDowntimeLineId(line.id)}
-                                  className="py-3 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl flex flex-col items-center gap-1 border border-rose-100 dark:border-rose-900/20 hover:bg-rose-600 hover:text-white transition-all active:scale-95 focus:outline-none"
-                                >
-                                  <Square size={14} fill="currentColor" />
-                                  <span className="text-[8px] font-black uppercase">Arrêt</span>
-                                </button>
-                                <button 
-                                  onClick={() => setIsAssigning(line.id)}
-                                  className="py-3 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 rounded-2xl flex flex-col items-center gap-1 border border-blue-100 dark:border-blue-900/20 hover:bg-blue-600 hover:text-white transition-all active:scale-95 focus:outline-none"
-                                >
-                                  <Pencil size={14} />
-                                  <span className="text-[8px] font-black uppercase">Assigner</span>
-                                </button>
+                              <div className="space-y-2 mt-auto">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button 
+                                    onClick={() => setDeclaringDowntimeLineId(line.id)}
+                                    className="py-2.5 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl flex items-center justify-center gap-1.5 border border-rose-100 dark:border-rose-900/20 hover:bg-rose-600 hover:text-white transition-all active:scale-95 focus:outline-none font-black text-[9px] uppercase tracking-wider cursor-pointer"
+                                  >
+                                    <Square size={10} fill="currentColor" /> Arrêt
+                                  </button>
+                                  <button 
+                                    onClick={() => setIsAssigning(line.id)}
+                                    className="py-2.5 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center gap-1.5 border border-blue-100 dark:border-blue-900/20 hover:bg-blue-600 hover:text-white transition-all active:scale-95 focus:outline-none font-black text-[9px] uppercase tracking-wider cursor-pointer"
+                                  >
+                                    <Pencil size={10} /> Assigner
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -2670,6 +2829,27 @@ export default function PilotScreen() {
           </div>
         </div>
       ))}
+
+      {/* STOP PRODUCTION CONFIRMATION */}
+      {confirmStopProductionOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-[32px] p-6 max-w-xs w-full space-y-4 shadow-2xl dark:shadow-none border border-gray-100 dark:border-gray-800">
+             <div className="w-12 h-12 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center mx-auto">
+               <Square size={24} fill="currentColor" />
+             </div>
+             <div className="text-center space-y-1">
+               <h3 className="text-lg font-black text-gray-900 dark:text-white italic uppercase">Arrêter la Production ?</h3>
+               <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium leading-tight">
+                 Voulez-vous arrêter la production pour <span className="text-gray-900 dark:text-white font-black">TOUTES</span> les lignes actives de cette machine ?
+               </p>
+             </div>
+             <div className="flex gap-2.5 mt-2">
+                <button onClick={() => setConfirmStopProductionOpen(false)} className="flex-1 py-2.5 font-bold text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-all uppercase text-[9px] tracking-widest focus:outline-none">Annuler</button>
+                <button onClick={confirmStopProduction} className="flex-1 py-2.5 bg-rose-600 text-white font-black rounded-xl shadow-lg dark:shadow-none shadow-rose-50 active:scale-95 transition-all text-[9px] tracking-widest uppercase focus:outline-none">Confirmer</button>
+             </div>
+          </div>
+        </div>
+      )}
 
     {/* DELETE CONFIRMATION */}
       {confirmDelete && (
@@ -3363,7 +3543,8 @@ export default function PilotScreen() {
         type="file" 
         ref={mediaInputRef}
         onChange={handleFileChange}
-        className="hidden"
+        className="absolute w-0 h-0 opacity-0 pointer-events-none"
+        style={{ left: '-9999px', top: '-9999px' }}
       />
     </div>
   );

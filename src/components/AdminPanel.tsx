@@ -179,10 +179,11 @@ export default function AdminPanel() {
 
   const ALLOWED_MIME_TYPES = [
     'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+    'image/heic', 'image/heif', 'image/heic-sequence',
     'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg', 'video/3gpp', 'video/x-matroska', 'video/avi', 'video/msvideo', 'video/x-msvideo'
   ];
   const ALLOWED_EXTS = [
-    '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+    '.jpg', '.jpeg', '.png', '.webp', '.pdf', '.heic', '.heif',
     '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
   ];
 
@@ -1092,21 +1093,6 @@ export default function AdminPanel() {
                    </motion.div>
                  ))}
               </motion.div>
-
-              <div className="flex justify-end px-1">
-                <button 
-                  onClick={() => openModal('downtime_log', {
-                    startTime: new Date().toISOString(),
-                    operatorId: user?.id,
-                  })}
-                  className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-black shadow-sm dark:shadow-none active:scale-95 transition-all text-[10px] tracking-widest uppercase flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 group"
-                >
-                  <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-sm dark:shadow-none group-hover:scale-110 transition-transform">
-                    <Plus size={12} strokeWidth={3} />
-                  </div>
-                  {t('add_downtime_log')}
-                </button>
-              </div>
 
               {/* BOTTOM ROW: SHIFT PERF & LIVE MONITOR */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

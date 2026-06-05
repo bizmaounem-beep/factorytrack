@@ -418,10 +418,11 @@ export default function OperatorScreen() {
 
   const ALLOWED_MIME_TYPES = [
     'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+    'image/heic', 'image/heif', 'image/heic-sequence',
     'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg', 'video/3gpp', 'video/x-matroska', 'video/avi', 'video/msvideo', 'video/x-msvideo'
   ];
   const ALLOWED_EXTS = [
-    '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+    '.jpg', '.jpeg', '.png', '.webp', '.pdf', '.heic', '.heif',
     '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
   ];
 
@@ -1265,29 +1266,37 @@ export default function OperatorScreen() {
                     </div>
                   </div>
                 ) : (
-                  <Button 
-                    variant="danger" 
-                    size="lg"
-                    className="w-full max-w-sm h-16 shadow-lg shadow-rose-500/20"
-                    onClick={handleStartDowntime}
-                    disabled={activeLine?.isActive === false || activeLine?.isActive === 0}
-                  >
-                    <Square size={20} fill="currentColor" className="mr-2" /> DÉCLARER UN ARRÊT
-                  </Button>
+                  <div className="flex flex-col items-center w-full">
+                    <Button 
+                      variant="danger" 
+                      size="lg"
+                      className="w-full max-w-sm h-16 shadow-lg shadow-rose-500/20"
+                      onClick={handleStartDowntime}
+                      disabled={activeLine?.isActive === false || activeLine?.isActive === 0 || activeLine?.status !== 'RUNNING'}
+                    >
+                      <Square size={20} fill="currentColor" className="mr-2" /> DÉCLARER UN ARRÊT
+                    </Button>
+                    {activeLine?.status !== 'RUNNING' && (
+                      <p className="text-[10px] text-rose-500 font-black mt-3 uppercase tracking-wider bg-rose-50 dark:bg-rose-950/20 px-4 py-1.5 rounded-full border border-rose-100 dark:border-rose-900/10">
+                        ⚠️ En attente du démarrage de la production par le pilote
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </Card>
 
             {activeLine?.status === 'IDLE' && (
-              <div className="text-center p-8 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-[2rem] border border-emerald-100 dark:border-emerald-900/30">
-                 <Button 
-                   variant="success" 
-                   size="lg" 
-                   className="w-full h-16 shadow-xl"
-                   onClick={handleStartProduction}
-                 >
-                   <Play size={20} fill="currentColor" className="mr-2" /> DÉMARRER LA PRODUCTION
-                 </Button>
+              <div className="text-center p-8 bg-slate-50/50 dark:bg-slate-900/10 rounded-[2rem] border border-slate-100 dark:border-gray-800">
+                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Clock size={24} className="animate-pulse" />
+                </div>
+                <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider mb-1">
+                  Production en attente
+                </h4>
+                <p className="text-xs text-slate-400 dark:text-gray-400 font-medium max-w-xs mx-auto leading-normal">
+                  Le pilote doit démarrer la production sur cette ligne depuis son terminal pour que vous puissiez déclarer des arrêts ou saisir des palettes.
+                </p>
               </div>
             )}
           </div>
@@ -1381,20 +1390,16 @@ export default function OperatorScreen() {
                          <div className="p-6 bg-slate-50 dark:bg-slate-900/40 text-center flex flex-col items-center justify-center min-h-[160px] border-b border-slate-100 dark:border-gray-800">
                            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-3">
                              <Activity size={20} className="animate-pulse" />
-                           </div>
-                           <p className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider mb-1">Production en cours</p>
-                           <p className="text-[10px] text-slate-400 dark:text-gray-500 max-w-[200px] leading-normal font-bold">L'ajout manuel de palettes est désactivé pendant que l'enregistrement automatique est en cours.</p>
-                         </div>
-                       )
-                    )}
-
-                    <div className="p-3 flex gap-2">
-                       <Button variant="secondary" className="flex-1 h-12 text-[10px] tracking-widest uppercase italic font-bold" onClick={() => { if(window.confirm("Clôturer ?")) handleAddPallets(0); }}>FIN MISSION</Button>
-                       <Button variant="danger" className="flex-1 h-12 text-[10px] tracking-widest uppercase italic font-bold shadow-lg shadow-rose-500/20" onClick={() => setShowStopConfirmation(true)}>STOP LIGNE</Button>
-                    </div>
-                 </div>
-               )}
-            </Card>
+                            </div>
+                            <p className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider mb-1">Production en cours</p>
+                            <p className="text-[10px] text-slate-400 dark:text-gray-500 max-w-[200px] leading-normal font-bold">L'ajout manuel de palettes est désactivé pendant que l'enregistrement automatique est en cours.</p>
+                          </div>
+                        )
+                     )}
+                     <div className="pb-4" />
+                  </div>
+                )}
+             </Card>
 
             <Card variant="scada" padding="none" className="overflow-hidden">
                <div className="p-4 border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 flex justify-between items-center">
@@ -1931,7 +1936,8 @@ export default function OperatorScreen() {
         type="file" 
         ref={mediaInputRef}
         onChange={handleFileChange}
-        className="hidden"
+        className="absolute w-0 h-0 opacity-0 pointer-events-none"
+        style={{ left: '-9999px', top: '-9999px' }}
       />
     </div>
   );

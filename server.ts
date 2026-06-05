@@ -75,6 +75,9 @@ const ALLOWED_MIME_TYPES = [
   'image/png', 
   'image/webp', 
   'application/pdf',
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
   'video/mp4',
   'video/quicktime',
   'video/webm',
@@ -87,7 +90,7 @@ const ALLOWED_MIME_TYPES = [
 ];
 
 const ALLOWED_EXTENSIONS = [
-  '.jpg', '.jpeg', '.png', '.webp', '.pdf',
+  '.jpg', '.jpeg', '.png', '.webp', '.pdf', '.heic', '.heif',
   '.mp4', '.mov', '.webm', '.ogg', '.3gp', '.mkv', '.avi'
 ];
 
