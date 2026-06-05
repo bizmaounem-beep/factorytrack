@@ -126,34 +126,34 @@ export default function PilotScreen() {
   const [localProdStartTime, setLocalProdStartTime] = useState<string>('06:00');
   const [localProdEndTime, setLocalProdEndTime] = useState<string>('14:00');
   const [localIsProdRunning, setLocalIsProdRunning] = useState<boolean>(false);
+  const lastManualUpdateRef = useRef<number>(0);
 
   // Sync state reactively with selectedMachine
   useEffect(() => {
     if (selectedMachine) {
+      if (Date.now() - lastManualUpdateRef.current < 2000) {
+        return;
+      }
       const dbIsRunning = selectedMachine.isProdRunning === true || Number(selectedMachine.isProdRunning) === 1 || String(selectedMachine.isProdRunning) === '1' || String(selectedMachine.isProdRunning) === 'true';
       setLocalIsProdRunning(dbIsRunning);
       if (selectedMachine.prodStartTime) setLocalProdStartTime(selectedMachine.prodStartTime);
       if (selectedMachine.prodEndTime) setLocalProdEndTime(selectedMachine.prodEndTime);
     } else {
+      if (Date.now() - lastManualUpdateRef.current < 2000) {
+        return;
+      }
       setLocalIsProdRunning(localStorage.getItem('prod_is_running') === 'true');
       setLocalProdStartTime(localStorage.getItem('prod_start_time') || '06:00');
       setLocalProdEndTime(localStorage.getItem('prod_end_time') || '14:00');
     }
   }, [selectedMachine]);
 
-  const isProdRunning = selectedMachine 
-    ? (selectedMachine.isProdRunning === true || Number(selectedMachine.isProdRunning) === 1 || String(selectedMachine.isProdRunning) === '1' || String(selectedMachine.isProdRunning) === 'true')
-    : localIsProdRunning;
-
-  const prodStartTime = selectedMachine
-    ? (selectedMachine.prodStartTime || '06:00')
-    : localProdStartTime;
-
-  const prodEndTime = selectedMachine
-    ? (selectedMachine.prodEndTime || '14:00')
-    : localProdEndTime;
+  const isProdRunning = localIsProdRunning;
+  const prodStartTime = localProdStartTime;
+  const prodEndTime = localProdEndTime;
 
   const handleProdStartChange = async (val: string) => {
+    lastManualUpdateRef.current = Date.now();
     setLocalProdStartTime(val);
     localStorage.setItem('prod_start_time', val);
     if (selectedMachineId) {
@@ -169,6 +169,7 @@ export default function PilotScreen() {
   };
 
   const handleProdEndChange = async (val: string) => {
+    lastManualUpdateRef.current = Date.now();
     setLocalProdEndTime(val);
     localStorage.setItem('prod_end_time', val);
     if (selectedMachineId) {
@@ -187,6 +188,8 @@ export default function PilotScreen() {
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
     const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    
+    lastManualUpdateRef.current = Date.now();
     
     setLocalProdStartTime(timeStr);
     localStorage.setItem('prod_start_time', timeStr);
@@ -213,6 +216,8 @@ export default function PilotScreen() {
     const pad = (n: number) => n.toString().padStart(2, '0');
     const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     
+    lastManualUpdateRef.current = Date.now();
+    
     setLocalProdEndTime(timeStr);
     localStorage.setItem('prod_end_time', timeStr);
     
@@ -233,6 +238,8 @@ export default function PilotScreen() {
   };
 
   const handleResetToShiftTimes = async () => {
+    lastManualUpdateRef.current = Date.now();
+    
     localStorage.removeItem('prod_start_time');
     localStorage.removeItem('prod_end_time');
     localStorage.removeItem('prod_is_running');
