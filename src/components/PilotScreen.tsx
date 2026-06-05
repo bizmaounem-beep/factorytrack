@@ -149,6 +149,8 @@ export default function PilotScreen() {
   }, [selectedMachine]);
 
   const isProdRunning = localIsProdRunning;
+  const activeLineForMachine = lines.find(l => l.machineId === selectedMachineId);
+  const isLineProdActive = activeLineForMachine ? activeLineForMachine.status === 'PRODUCTION_ACTIVE' : isProdRunning;
   const prodStartTime = localProdStartTime;
   const prodEndTime = localProdEndTime;
 
@@ -197,7 +199,15 @@ export default function PilotScreen() {
     setLocalIsProdRunning(true);
     localStorage.setItem('prod_is_running', 'true');
     
-    if (selectedMachineId) {
+    // Find matching active line and update its status
+    const activeLine = lines.find(l => l.machineId === selectedMachineId);
+    if (activeLine) {
+      try {
+        await localApi.updateLineStatus(activeLine.id, 'PRODUCTION_ACTIVE');
+      } catch (e) {
+        console.error("Error starting production line in DB:", e);
+      }
+    } else if (selectedMachineId) {
       try {
         await localApi.updateDoc('machines', selectedMachineId, {
           isProdRunning: true,
@@ -224,7 +234,15 @@ export default function PilotScreen() {
     setLocalIsProdRunning(false);
     localStorage.setItem('prod_is_running', 'false');
     
-    if (selectedMachineId) {
+    // Find matching active line and update its status
+    const activeLine = lines.find(l => l.machineId === selectedMachineId);
+    if (activeLine) {
+      try {
+        await localApi.updateLineStatus(activeLine.id, 'NOT_STARTED');
+      } catch (e) {
+        console.error("Error stopping production line in DB:", e);
+      }
+    } else if (selectedMachineId) {
       try {
         await localApi.updateDoc('machines', selectedMachineId, {
           isProdRunning: false,
@@ -1962,7 +1980,7 @@ export default function PilotScreen() {
               </div>
 
               <div className="flex items-center gap-2 w-full md:w-auto">
-                {isProdRunning ? (
+                {isLineProdActive ? (
                   <button 
                     onClick={handleStopProduction}
                     className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all focus:outline-none"
@@ -2430,13 +2448,13 @@ export default function PilotScreen() {
                </div>
                
                <div className="flex items-center gap-3">
-                  {isProdRunning ? (
+                  {isLineProdActive ? (
                     <button 
                       onClick={handleStopProduction}
                       className="px-6 py-3 bg-gradient-to-r from-red-650 to-rose-500 hover:from-red-700 hover:to-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-red-850 focus:outline-none flex items-center gap-2"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                      Arrêter Production
+                      ARRÊTER LA PRODUCTION
                     </button>
                   ) : (
                     <button 
@@ -2444,7 +2462,7 @@ export default function PilotScreen() {
                       className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800 focus:outline-none flex items-center gap-2"
                     >
                       <Play size={14} fill="currentColor" />
-                      Démarrer Production
+                      DÉMARRER LA PRODUCTION
                     </button>
                   )}
                   <button 

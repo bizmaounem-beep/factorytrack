@@ -1,5 +1,5 @@
 export type UserRole = 'OPERATOR' | 'PILOT' | 'ADMIN';
-export type LineStatus = 'IDLE' | 'RUNNING' | 'STOPPED';
+export type LineStatus = 'IDLE' | 'RUNNING' | 'STOPPED' | 'NOT_STARTED' | 'PRODUCTION_ACTIVE';
 
 export interface User {
   id: string;

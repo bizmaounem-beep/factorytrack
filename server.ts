@@ -93,11 +93,11 @@ const ALLOWED_EXTENSIONS = [
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // Safe 100MB limit for mobiles, video captures, and SCADA attachments
+  limits: { fileSize: 20 * 1024 * 1024 }, // AgroSync: Strict 20MB limit for short video/photo attachments
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype) || !ALLOWED_EXTENSIONS.includes(ext)) {
-      cb(new Error('Format de fichier non autorisé. Uniquement Images (JPG/PNG/WEBP), PDF et Vidéos (MP4/MOV/WEBM/AVI) de max 100MB.'));
+      cb(new Error('Format de fichier non autorisé. Uniquement Images (JPG/PNG/WEBP) et Vidéos (MP4/MOV) de max 20MB.'));
     } else {
       cb(null, true);
     }
@@ -420,6 +420,13 @@ async function startServer() {
 
     console.log('Database migrations completed.');
 
+    // Ensure legacy statuses migrate safely to the new industrial workflow status: NOT_STARTED
+    try {
+      db.exec("UPDATE lines SET status = 'NOT_STARTED' WHERE status = 'IDLE' OR status IS NULL;");
+    } catch (e) {
+      console.warn('[Migration-Status] Failed to update lines to NOT_STARTED:', e);
+    }
+
     // Seed default data if empty
     const countRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
     if (countRow.count === 0) {
@@ -517,6 +524,20 @@ async function startServer() {
   // 2.5 DIRECT UPLOAD ROUTE (FOR HIGHEST PRIORITY)
   app.post(['/api/upload', '/api/upload/'], (req, res) => {
     console.log(`[SERVER-UPLOAD] Incoming request at ${req.url}`);
+
+    // Verify if line is UNLOCKED before doing actual file upload
+    const lineId = req.query.lineId || req.body.lineId || req.headers['x-line-id'];
+    if (lineId && db) {
+      try {
+        const line = db.prepare('SELECT status FROM lines WHERE id = ?').get(lineId) as { status: string } | undefined;
+        if (line && line.status === 'NOT_STARTED') {
+          return res.status(403).json({ error: 'La production sur cette ligne n\'est pas lancée (NOT_STARTED). Transfert d\'image interdit.' });
+        }
+      } catch (err) {
+        console.error('[SERVER-UPLOAD] Premature lock check failed:', err);
+      }
+    }
+
     upload.single('photo')(req, res, (err) => {
       if (err) {
         console.error('[SERVER-UPLOAD] Multer Error:', err);
@@ -526,12 +547,31 @@ async function startServer() {
         console.error('[SERVER-UPLOAD] No file found in "photo" field');
         return res.status(400).json({ error: 'Fichier absent du champ "photo"' });
       }
+
+      // Check after multer body parse is complete in case lineId was inside file body
+      const bodyLineId = req.body.lineId;
+      if (bodyLineId && db) {
+        try {
+          const line = db.prepare('SELECT status FROM lines WHERE id = ?').get(bodyLineId) as { status: string } | undefined;
+          if (line && line.status === 'NOT_STARTED') {
+            // Delete uploaded file
+            try {
+              const fs = require('fs');
+              fs.unlinkSync(req.file.path);
+            } catch (_) {}
+            return res.status(403).json({ error: 'La production sur cette ligne n\'est pas lancée (NOT_STARTED). Transfert d\'image interdit.' });
+          }
+        } catch (postUploadError) {
+          console.error('[SERVER-UPLOAD] Post-upload block error:', postUploadError);
+        }
+      }
+
       console.log('[SERVER-UPLOAD] Saved:', req.file.filename);
       res.status(200).json({ 
         success: true,
         url: `/uploads/${req.file.filename}`, 
         path: req.file.filename,
-        v: '50MB-v3' // Version tag
+        v: '20MB-AgroSync' // Corrected version tag
       });
     });
   });
@@ -706,6 +746,85 @@ async function startServer() {
     }
   });
 
+  apiRouter.post('/lines/:id/status', async (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { id: lineId } = req.params;
+      const { status } = req.body;
+
+      if (!['NOT_STARTED', 'PRODUCTION_ACTIVE'].includes(status)) {
+        return res.status(400).json({ error: 'Statut du flux invalide' });
+      }
+
+      // Update the status of this line in the database
+      db.prepare('UPDATE lines SET status = ? WHERE id = ?').run(status, lineId);
+
+      // Handle machine active indicators if needed to maintain legacy screen logic seamlessly
+      const line = db.prepare('SELECT machineId FROM lines WHERE id = ?').get(lineId) as { machineId: string } | undefined;
+      if (line) {
+        if (status === 'PRODUCTION_ACTIVE') {
+          db.prepare('UPDATE machines SET isProdRunning = 1 WHERE id = ?').run(line.machineId);
+        } else {
+          // If all active lines of this machine are now NOT_STARTED, turn off machine flag
+          const otherActive = db.prepare("SELECT id FROM lines WHERE machineId = ? AND status = 'PRODUCTION_ACTIVE' AND id != ?").all(line.machineId, lineId);
+          if (otherActive.length === 0) {
+            db.prepare('UPDATE machines SET isProdRunning = 0 WHERE id = ?').run(line.machineId);
+          }
+        }
+        io.emit('db_change', { collection: 'machines' });
+      }
+
+      // Live socket broadcast to instant-update tablets without refresh
+      io.emit('lineStatusUpdate', { lineId, status });
+      io.emit('db_change', { collection: 'lines' });
+
+      res.json({ success: true, lineId, status });
+    } catch (e) {
+      console.error('[AgroSync-LineStatus] Error:', e);
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // Dedicated Secured Downtime Endpoint for AgroSync operator crashes
+  apiRouter.post('/downtime', async (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const data = { ...req.body };
+      const { lineId } = data;
+
+      if (lineId) {
+        const line = db.prepare('SELECT status FROM lines WHERE id = ?').get(lineId) as { status: string } | undefined;
+        if (line && line.status === 'NOT_STARTED') {
+          return res.status(403).json({ error: 'La production doit être lancée pour déclarer un arrêt.' });
+        }
+      }
+
+      if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
+      data.shiftId = data.shiftId || getServerShiftId();
+
+      const pragma = db.prepare(`PRAGMA table_info(downtime_logs)`).all() as any[];
+      const validColumns = pragma.map(p => p.name);
+      const values: any[] = [];
+      const keys: string[] = [];
+      for (const col of validColumns) {
+        if (data[col] !== undefined) {
+          keys.push(col);
+          values.push(sanitizeValue(data[col]));
+        }
+      }
+      if (keys.length === 0) return res.status(400).json({ error: 'Aucun champ valide de pannes fourni' });
+      const placeholders = keys.map(() => '?').join(',');
+      db.prepare(`INSERT INTO downtime_logs (${keys.join(',')}) VALUES (${placeholders})`).run(...values);
+
+      // Trigger socket change notifications
+      io.emit('db_change', { collection: 'downtime_logs' });
+      res.json({ id: data.id });
+    } catch (e) {
+      console.error('[AgroSync-SecureDowntime] Error:', e);
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   // Sanitize helper (available in scope)
   const sanitizeValue = (val: any) => {
     if (val === null || val === undefined) return null;
@@ -773,6 +892,17 @@ async function startServer() {
       if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(403).json({ error: 'Accès non autorisé' });
       const data = { ...req.body };
       if (!data.id) data.id = Math.random().toString(36).substring(2, 11);
+      
+      // Prevent downtime registration if production is NOT_STARTED
+      if (collection === 'downtime_logs') {
+        const lineId = data.lineId;
+        if (lineId) {
+          const line = db.prepare('SELECT status FROM lines WHERE id = ?').get(lineId) as { status: string } | undefined;
+          if (line && line.status === 'NOT_STARTED') {
+            return res.status(403).json({ error: 'La production doit être lancée pour déclarer un arrêt.' });
+          }
+        }
+      }
       
       if (collection === 'users') {
         if (data.name) {

@@ -10,7 +10,7 @@ import {
   Play, Square, Settings, Timer, Package, AlertCircle, 
   CheckCircle, Factory, Monitor, Activity, Plus, Minus, 
   ArrowLeft, X, Clock, Check, Edit, Trash2, History,
-  ChevronRight, ChevronLeft, Info, Camera, Video, Image, Trash, Sun, Moon
+  ChevronRight, ChevronLeft, Info, Camera, Video, Image, Trash, Sun, Moon, Lock
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Card } from './ui/Card';
@@ -1245,7 +1245,23 @@ export default function OperatorScreen() {
 
 
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="relative">
+          {activeLine?.status === 'NOT_STARTED' && (
+            <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/60 backdrop-blur-md z-40 rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-300 pointer-events-auto border-4 border-dashed border-amber-500/20 min-h-[400px]">
+              <div className="w-16 h-16 bg-amber-500 rounded-3xl flex items-center justify-center shadow-lg shadow-amber-500/30 border border-amber-350 mb-5 animate-pulse">
+                <Lock className="text-white" size={32} />
+              </div>
+              <h3 className="text-white font-black text-xl italic uppercase tracking-tighter mb-2">PANNEAU VERROUILLÉ</h3>
+              <p className="text-amber-400 font-bold text-[11px] uppercase tracking-[0.15em] max-w-md leading-normal">
+                Attente du lancement de la production par le Pilote...
+              </p>
+            </div>
+          )}
+
+          <div className={cn(
+            "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start",
+            activeLine?.status === 'NOT_STARTED' && "pointer-events-none filter blur-sm opacity-40 select-none"
+          )}>
           {/* LEFT COLUMN: MAIN STATUS */}
           <div className="lg:col-span-7 space-y-6">
             <Card variant="scada" padding="lg" className={cn(
@@ -1517,6 +1533,7 @@ export default function OperatorScreen() {
                </div>
             </Card>
           </div>
+        </div>
         </div>
       </div>
     )}

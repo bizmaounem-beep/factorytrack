@@ -6,6 +6,16 @@ const currentHost = typeof window !== 'undefined' ? window.location.hostname : '
 
 const getApiBaseUrl = () => {
   if (typeof window === 'undefined') return 'http://localhost:3000';
+  
+  // Dynamic UDP discovery fallback for native Capacitor/Mobile environments
+  if (typeof localStorage !== 'undefined') {
+    const discoveredIp = localStorage.getItem('discovered_nuc_ip');
+    if (discoveredIp) {
+      console.log(`[AgroSync] Using sniffed UDP Auto-Discovered Server IP: ${discoveredIp}`);
+      return `http://${discoveredIp}:3000`;
+    }
+  }
+
   if (window.location.hostname.endsWith('.run.app') || window.location.protocol === 'https:') {
     return window.location.origin;
   }
@@ -167,6 +177,28 @@ export const localApi = {
     } catch (e) {
       console.error('API Error:', e);
       throw new Error('Erreur de connexion');
+    }
+  },
+
+  async updateLineStatus(lineId: string, status: 'NOT_STARTED' | 'PRODUCTION_ACTIVE') {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/lines/${lineId}/status`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) {
+        let errMsg = 'Impossible de mettre à jour le statut';
+        try {
+          const body = await res.json();
+          if (body && body.error) errMsg = body.error;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw e;
     }
   },
 
