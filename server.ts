@@ -752,7 +752,7 @@ async function startServer() {
       const { id: lineId } = req.params;
       const { status } = req.body;
 
-      if (!['NOT_STARTED', 'PRODUCTION_ACTIVE'].includes(status)) {
+      if (!['NOT_STARTED', 'PRODUCTION_ACTIVE', 'IDLE'].includes(status)) {
         return res.status(400).json({ error: 'Statut du flux invalide' });
       }
 
@@ -762,11 +762,11 @@ async function startServer() {
       // Handle machine active indicators if needed to maintain legacy screen logic seamlessly
       const line = db.prepare('SELECT machineId FROM lines WHERE id = ?').get(lineId) as { machineId: string } | undefined;
       if (line) {
-        if (status === 'PRODUCTION_ACTIVE') {
+        if (status === 'PRODUCTION_ACTIVE' || status === 'IDLE') {
           db.prepare('UPDATE machines SET isProdRunning = 1 WHERE id = ?').run(line.machineId);
         } else {
           // If all active lines of this machine are now NOT_STARTED, turn off machine flag
-          const otherActive = db.prepare("SELECT id FROM lines WHERE machineId = ? AND status = 'PRODUCTION_ACTIVE' AND id != ?").all(line.machineId, lineId);
+          const otherActive = db.prepare("SELECT id FROM lines WHERE machineId = ? AND status IN ('PRODUCTION_ACTIVE', 'IDLE', 'RUNNING', 'STOPPED') AND id != ?").all(line.machineId, lineId);
           if (otherActive.length === 0) {
             db.prepare('UPDATE machines SET isProdRunning = 0 WHERE id = ?').run(line.machineId);
           }

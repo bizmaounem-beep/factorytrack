@@ -180,7 +180,7 @@ export const localApi = {
     }
   },
 
-  async updateLineStatus(lineId: string, status: 'NOT_STARTED' | 'PRODUCTION_ACTIVE') {
+  async updateLineStatus(lineId: string, status: 'NOT_STARTED' | 'PRODUCTION_ACTIVE' | 'IDLE') {
     try {
       const res = await fetchWithAuth(`${API_BASE_URL}/api/lines/${lineId}/status`, {
         method: 'POST',

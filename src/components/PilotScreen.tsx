@@ -204,7 +204,7 @@ export default function PilotScreen() {
     if (targetLines.length > 0) {
       for (const line of targetLines) {
         try {
-          await localApi.updateLineStatus(line.id, 'PRODUCTION_ACTIVE');
+          await localApi.updateLineStatus(line.id, 'IDLE');
         } catch (e) {
           console.error(`Error starting production line ${line.id} in DB:`, e);
         }
