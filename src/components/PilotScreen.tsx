@@ -86,7 +86,7 @@ export default function PilotScreen() {
 
   const [panelsOrder, setPanelsOrder] = useState<string[]>(() => {
     const saved = localStorage.getItem('pilot_panels_order');
-    return saved ? JSON.parse(saved) : ['timeline_heatmap', 'kpis', 'production_hours', 'frequent_team_stops', 'live_stops'];
+    return saved ? JSON.parse(saved) : ['timeline_heatmap', 'kpis', 'frequent_team_stops', 'live_stops'];
   });
   const [hiddenPanels, setHiddenPanels] = useState<string[]>(() => {
     const saved = localStorage.getItem('pilot_hidden_panels');
@@ -114,7 +114,7 @@ export default function PilotScreen() {
   };
 
   const handleResetLayout = () => {
-    const defaultOrder = ['timeline_heatmap', 'kpis', 'production_hours', 'frequent_team_stops', 'live_stops'];
+    const defaultOrder = ['timeline_heatmap', 'kpis', 'frequent_team_stops', 'live_stops'];
     setPanelsOrder(defaultOrder);
     setHiddenPanels([]);
     localStorage.setItem('pilot_panels_order', JSON.stringify(defaultOrder));
@@ -1939,67 +1939,29 @@ export default function PilotScreen() {
                  <div className="bg-gray-50/50 dark:bg-gray-800/50 p-1.5 px-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-0.5 font-sans">Prod Total</p>
                     <p className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{analytics.totalPallets}</p>
-                 </div>
+                  </div>
               </div>
 
               <div className="flex items-center gap-2 w-full md:w-auto">
-                {lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).every(l => !!l.activeDowntimeId && downLogs.find(d => d.id === l.activeDowntimeId && d.lineId === 'MACHINE_LEVEL')) ? (
+                {isProdRunning ? (
                   <button 
-                    onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
+                    onClick={handleStopProduction}
+                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all focus:outline-none"
                   >
-                    <Play size={14} fill="currentColor" />
-                    REDÉMARRAGE MACHINE
-                  </button>
-                ) : lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0).some(l => l.status === 'RUNNING') ? (
-                  <button 
-                    onClick={() => setDeclaringDowntimeLineId('global')}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-rose-700 active:scale-95 transition-all animate-in zoom-in focus:outline-none"
-                  >
-                    <Activity size={14} className="animate-pulse" />
-                    ARRÊT D'URGENCE GLOBAL
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping mr-1" />
+                    ARRÊTER LA PRODUCTION
                   </button>
                 ) : (
                   <button 
-                    onClick={handleResumeMachine}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all focus:outline-none"
+                    onClick={handleStartProduction}
+                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider active:scale-95 transition-all focus:outline-none"
                   >
                     <Play size={14} fill="currentColor" />
-                    REPRISE DE LA MACHINE
+                    DÉMARRER LA PRODUCTION
                   </button>
                 )}
               </div>
             </div>
-
-            {/* LIVE ALERTS SECTION */}
-            {criticalAlerts.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-3">
-                {criticalAlerts.map(alert => (
-                  <motion.div 
-                    key={alert.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-2xl border flex-1 min-w-[280px] shadow-sm dark:shadow-none",
-                      alert.type === 'danger' ? "bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/20 text-rose-800 dark:text-rose-200" :
-                      alert.type === 'warning' ? "bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-900/20 text-orange-800 dark:text-orange-200" : "bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/20 text-blue-800 dark:text-blue-200"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center shadow-sm dark:shadow-none",
-                      alert.type === 'danger' ? "bg-rose-600 text-white" :
-                      alert.type === 'warning' ? "bg-orange-500 text-white" : "bg-blue-600 text-white"
-                    )}>
-                      <alert.icon size={20} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-tight leading-none mb-1">{alert.title}</p>
-                      <p className="text-[11px] font-bold opacity-80 leading-tight italic">{alert.desc}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -2262,114 +2224,7 @@ export default function PilotScreen() {
                       </motion.div>
                     )}
 
-                    {panelId === 'production_hours' && selectedMachineId && (
-                      <motion.div 
-                        variants={item}
-                        className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white rounded-[2rem] p-6 border-4 border-gray-100 dark:border-slate-800 shadow-3xl dark:shadow-none relative overflow-hidden"
-                      >
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-                        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
-                          <div className="space-y-2 max-w-sm w-full">
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
-                              <Clock size={10} className="animate-spin-slow" /> Horaires & Fiabilité
-                            </div>
-                            <h3 className="text-xl font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Durée de Production Réelle</h3>
-                            <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-relaxed uppercase">
-                              Définissez les jalons de production. Cette plage horaire sert de base temporelle pour calculer les indicateurs MTBF & MTTR.
-                            </p>
-                          </div>
 
-                          {/* Duration settings panel controls */}
-                          <div className="flex flex-wrap items-center gap-4 w-full flex-1 max-w-2xl justify-end overflow-visible">
-                            <div className="flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-slate-950 p-3 rounded-2xl border border-gray-100 dark:border-slate-800">
-                              
-                              {isProdRunning ? (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={handleStopProduction}
-                                    className="bg-gradient-to-r from-red-650 to-rose-500 hover:from-red-700 hover:to-rose-600 text-white shadow-md active:scale-95 transition-all py-2 px-3.5 rounded-xl font-black text-[9px] tracking-wider uppercase flex items-center gap-1.5 cursor-pointer"
-                                  >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping mr-0.5" />
-                                    Arrêter Production
-                                  </button>
-                                  <div className="flex flex-col px-1.5 lead-none">
-                                    <span className="text-[7px] font-black text-rose-500 uppercase tracking-widest leading-none">En cours</span>
-                                    <span className="text-[9px] font-bold text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">Depuis {prodStartTime}</span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={handleStartProduction}
-                                    className="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white shadow-md active:scale-95 transition-all py-2 px-3.5 rounded-xl font-black text-[9px] tracking-wider uppercase flex items-center gap-1.5 cursor-pointer"
-                                  >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-200 animate-pulse mr-0.5" />
-                                    Démarrer Production
-                                  </button>
-                                  <div className="flex flex-col px-1.5 leading-none">
-                                    <span className="text-[7px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none">À l'arrêt</span>
-                                    <span className="text-[9px] font-bold text-gray-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">Dernier shift</span>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Divider */}
-                              <div className="h-8 w-px bg-gray-200 dark:bg-slate-800 self-center mx-1" />
-
-                              <div className="flex flex-col">
-                                <span className="text-[8px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 leading-none">Début</span>
-                                <input 
-                                  type="time"
-                                  value={prodStartTime}
-                                  onChange={e => handleProdStartChange(e.target.value)}
-                                  className="p-1 px-2 text-xs font-black rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0 cursor-pointer"
-                                />
-                              </div>
-                              
-                              <div className="flex flex-col">
-                                <span className="text-[8px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 leading-none">Fin</span>
-                                <input 
-                                  type="time"
-                                  value={isProdRunning ? "" : prodEndTime}
-                                  onChange={e => handleProdEndChange(e.target.value)}
-                                  disabled={isProdRunning}
-                                  placeholder="--"
-                                  className="p-1 px-2 text-xs font-black rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0 cursor-pointer disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-900"
-                                />
-                              </div>
-
-                              {/* Reset button */}
-                              <button
-                                onClick={handleResetToShiftTimes}
-                                title="Réinitialiser avec les heures par défaut du shift"
-                                className="p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 active:scale-95 transition-all text-[8px] font-black uppercase shrink-0 cursor-pointer"
-                              >
-                                Reset
-                              </button>
-                            </div>
-
-                            {/* Calculated summary statistics */}
-                            <div className="flex items-stretch gap-2 font-mono">
-                              <div className="px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex flex-col items-center justify-center min-w-[100px]">
-                                <span className="text-[7.5px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1">Durée Allouée</span>
-                                <div className="text-sm font-black text-slate-800 dark:text-white">{formatDowntimeDisplay(analytics.durationSec)}</div>
-                              </div>
-                              
-                              <div className="px-4 py-3 rounded-xl border border-blue-500/10 bg-blue-500/5 flex flex-col items-center justify-center min-w-[100px]">
-                                <span className="text-[7.5px] font-black text-blue-500 uppercase tracking-widest block mb-1">MTBF</span>
-                                <div className="text-sm font-black text-blue-600 dark:text-blue-400">{formatDowntimeDisplay(analytics.mtbfSec)}</div>
-                              </div>
-
-                              <div className="px-4 py-3 rounded-xl border border-orange-500/10 bg-orange-500/5 flex flex-col items-center justify-center min-w-[100px]">
-                                <span className="text-[7.5px] font-black text-orange-500 uppercase tracking-widest block mb-1">MTTR</span>
-                                <div className="text-sm font-black text-orange-600 dark:text-orange-400">{formatDowntimeDisplay(analytics.mttrSec)}</div>
-                              </div>
-                            </div>
-
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
 
                     {panelId === 'frequent_team_stops' && (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -2556,12 +2411,23 @@ export default function PilotScreen() {
                </div>
                
                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => handleResumeMachine()}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800 focus:outline-none"
-                  >
-                    Redémarrage Global
-                  </button>
+                  {isProdRunning ? (
+                    <button 
+                      onClick={handleStopProduction}
+                      className="px-6 py-3 bg-gradient-to-r from-red-650 to-rose-500 hover:from-red-700 hover:to-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-red-850 focus:outline-none flex items-center gap-2"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                      Arrêter Production
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={handleStartProduction}
+                      className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-emerald-800 focus:outline-none flex items-center gap-2"
+                    >
+                      <Play size={14} fill="currentColor" />
+                      Démarrer Production
+                    </button>
+                  )}
                   <button 
                     onClick={() => setDeclaringDowntimeLineId('global')}
                     className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 border-b-4 border-rose-800 flex items-center gap-2 focus:outline-none"
