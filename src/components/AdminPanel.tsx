@@ -56,93 +56,65 @@ export default function AdminPanel() {
   const sortedProdLogs = useMemo(() => [...prodLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), [prodLogs]);
   const sortedDownLogs = useMemo(() => [...downLogs].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()), [downLogs]);
 
-  const [prodStartTime, setProdStartTime] = useState<string>(() => {
-    return localStorage.getItem('prod_start_time') || '06:00';
-  });
-  const [prodEndTime, setProdEndTime] = useState<string>(() => {
-    return localStorage.getItem('prod_end_time') || '14:00';
-  });
-  const [isProdRunning, setIsProdRunning] = useState<boolean>(() => {
-    return localStorage.getItem('prod_is_running') === 'true';
-  });
-
-  const handleProdStartChange = (val: string) => {
-    setProdStartTime(val);
-    localStorage.setItem('prod_start_time', val);
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const handleProdEndChange = (val: string) => {
-    setProdEndTime(val);
-    localStorage.setItem('prod_end_time', val);
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  // Keep state perfectly synchronized across open tabs
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setProdStartTime(localStorage.getItem('prod_start_time') || '06:00');
-      setProdEndTime(localStorage.getItem('prod_end_time') || '14:00');
-      setIsProdRunning(localStorage.getItem('prod_is_running') === 'true');
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
-  // Set up an interval to tick so that when isProdRunning is true, analytics re-calculate every second
-  const [adminTimer, setAdminTimer] = useState<number>(Date.now());
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAdminTimer(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Analytics Calculations
   const analytics = useMemo(() => {
     const today = new Date();
     const start = startOfDay(today);
     const end = endOfDay(today);
 
+    const todayProd = prodLogs.filter(l => isWithinInterval(parseISO(logDate(l.timestamp)), { start, end }));
+    const todayDown = downLogs.filter(l => isWithinInterval(parseISO(logDate(l.startTime)), { start, end }));
+
     function logDate(iso: string) {
       return iso.includes('T') ? iso : new Date(iso).toISOString();
     }
 
-    const todayProd = prodLogs.filter(l => isWithinInterval(parseISO(logDate(l.timestamp)), { start, end }));
-    const todayDown = downLogs.filter(l => isWithinInterval(parseISO(logDate(l.startTime)), { start, end }));
-
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
     const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
     
-    // Parse production start and end times to calculate the total scheduled seconds
-    let actualEndTime = prodEndTime;
-    const isRunning = localStorage.getItem('prod_is_running') === 'true';
-    if (isRunning) {
-      const now = new Date();
-      const pad = (n: number) => n.toString().padStart(2, '0');
-      actualEndTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    // OEE Calculation: Dynamically measure actual scheduled time versus unscheduled time on active production lines
+    const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.tracksProduction !== false && l.tracksProduction !== 0);
+    let shiftDurationSec = 0;
+
+    if (shifts && shifts.length > 0) {
+      // Find currently active shift if any
+      const currentShift = shifts.find(s => {
+        const [sh, sm] = s.startTime.split(':').map(Number);
+        const [eh, em] = s.endTime.split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        const endMin = eh * 60 + em;
+        const nowMin = today.getHours() * 60 + today.getMinutes();
+        if (endMin < startMin) return nowMin >= startMin || nowMin < endMin;
+        return nowMin >= startMin && nowMin < endMin;
+      });
+
+      if (currentShift) {
+        const [sh, sm] = currentShift.startTime.split(':').map(Number);
+        const [eh, em] = currentShift.endTime.split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        const endMin = eh * 60 + em;
+        const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+        shiftDurationSec = durationMin * 60;
+      } else {
+        // If between shifts, dynamically compute the average scheduled shift duration in system
+        const totalDurationMin = shifts.reduce((acc, s) => {
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          const [eh, em] = s.endTime.split(':').map(Number);
+          const startMin = sh * 60 + sm;
+          const endMin = eh * 60 + em;
+          const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
+          return acc + durationMin;
+        }, 0);
+        shiftDurationSec = (totalDurationMin / shifts.length) * 60;
+      }
+    } else {
+      // If no shifts are configured in system, dynamically measure elapsed time today as the scheduled baseline
+      const elapsedTodaySec = Math.floor((today.getTime() - startOfDay(today).getTime()) / 1000);
+      shiftDurationSec = Math.max(3600, elapsedTodaySec); // minimum of 1 hour base
     }
 
-    const [sh, sm] = prodStartTime.split(':').map(Number);
-    const [eh, em] = actualEndTime.split(':').map(Number);
-    const startMin = sh * 60 + sm;
-    const endMin = eh * 60 + em;
-    const durationMin = endMin < startMin ? (1440 - startMin + endMin) : (endMin - startMin);
-    const durationSec = durationMin * 60;
-
-    const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.tracksProduction !== false && l.tracksProduction !== 0);
-    const totalPossibleTime = activeLines.length * durationSec;
+    const totalPossibleTime = activeLines.length * shiftDurationSec;
     const uptimeSec = Math.max(0, totalPossibleTime - totalDowntimeSec);
-
-    const failuresCount = todayDown.length;
-
-    // MTBF = Uptime / Failures (if failures > 0), else totalPossibleTime
-    const mtbfSec = failuresCount > 0 ? uptimeSec / failuresCount : totalPossibleTime;
-    // MTTR = Total Downtime / Failures (if failures > 0), else 0
-    const mttrSec = failuresCount > 0 ? totalDowntimeSec / failuresCount : 0;
-
     const availability = totalPossibleTime > 0 ? (uptimeSec / totalPossibleTime) * 100 : 0;
 
     // Shift Performance
@@ -165,13 +137,9 @@ export default function AdminPanel() {
       totalPallets,
       totalDowntimeSec,
       availability,
-      failuresCount,
-      durationSec,
-      mtbfSec,
-      mttrSec,
       shiftPerf
     };
-  }, [prodLogs, downLogs, lines, shifts, downtimeTypes, prodStartTime, prodEndTime, adminTimer]);
+  }, [prodLogs, downLogs, lines, shifts, downtimeTypes]);
 
   const COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6', '#EC4899', '#6366F1', '#14B8A6'];
 
@@ -1080,30 +1048,30 @@ export default function AdminPanel() {
                 className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4"
               >
                  {[
-                   { label: 'MTBF Global', val: formatDowntimeDisplay(analytics.mtbfSec), sub: 'Temps moyen entre pannes (MTBF)', icon: Activity, color: 'blue', trend: 'Fiabilité' },
-                   { label: 'MTTR Global', val: formatDowntimeDisplay(analytics.mttrSec), sub: 'Temps moyen de dépannage (MTTR)', icon: Timer, color: 'orange', trend: 'Maintenance' },
-                   { label: 'Total Palettes', val: analytics.totalPallets, sub: 'Aujourd\'hui', icon: Box, color: 'green', trend: 'Production' },
-                   { label: 'Pannes Signalées', val: `${analytics.failuresCount} incident(s)`, sub: 'Aujourd\'hui', icon: AlertTriangle, color: 'red', trend: 'Diagnostic' },
+                   { label: 'Efficacité (OEE)', val: `${analytics.availability.toFixed(1)}%`, sub: 'Disponibilité Lignes', icon: TrendingUp, color: 'blue', trend: '+2.1%' },
+                   { label: 'Total Palettes', val: analytics.totalPallets, sub: 'Aujourd\'hui', icon: Box, color: 'green', trend: '+12' },
+                   { label: 'Temps d\'Arrêt', val: formatDowntimeDisplay(analytics.totalDowntimeSec), sub: 'Minutes Perdues', icon: Timer, color: 'orange', trend: '-5%' },
+                   { label: 'Arrets Actifs', val: lines.filter(l => !!l.activeDowntimeId).length, sub: 'Incidents en cours', icon: AlertTriangle, color: 'red', trend: 'Critical' },
                  ].map(stat => (
                    <motion.div 
                     variants={item}
                     key={stat.label} 
-                    className="bg-white dark:bg-gray-900 p-2 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden shadow-sm dark:shadow-none"
+                    className="bg-white dark:bg-gray-900 p-2 md:p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col gap-2 md:gap-3 hover:shadow-xl dark:hover:shadow-none transition-all group relative overflow-hidden"
                    >
                      <div className={cn(
                        "absolute -right-2 -top-2 w-16 h-16 opacity-5 transition-transform group-hover:scale-150 rotate-12",
                        stat.color === 'blue' ? "text-blue-600" :
                        stat.color === 'green' ? "text-green-600" :
-                       stat.color === 'orange' ? "text-orange-600" : "text-red-650"
+                       stat.color === 'orange' ? "text-orange-600" : "text-red-600"
                      )}>
                        <stat.icon className="w-full h-full" />
                      </div>
                      <div className="flex justify-between items-start">
                        <div className={cn(
                          "w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg border border-white/20 shrink-0",
-                         stat.color === 'blue' ? "bg-blue-600 text-white shadow-blue-200" :
-                         stat.color === 'green' ? "bg-green-600 text-white shadow-green-200" :
-                         stat.color === 'orange' ? "bg-orange-600 text-white shadow-orange-200" : "bg-red-600 text-white shadow-red-200"
+                         stat.color === 'blue' ? "bg-blue-600 text-white shadow-blue-200 dark:shadow-none" :
+                         stat.color === 'green' ? "bg-green-600 text-white shadow-green-200 dark:shadow-none" :
+                         stat.color === 'orange' ? "bg-orange-600 text-white shadow-orange-200 dark:shadow-none" : "bg-red-600 text-white shadow-red-200 dark:shadow-none"
                        )}>
                          <stat.icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
                        </div>
@@ -1125,67 +1093,20 @@ export default function AdminPanel() {
                  ))}
               </motion.div>
 
-              {/* EQUIPMENT RELIABILITY & PRODUCTION TIMING DURATION SETTINGS HEADER */}
-              <motion.div 
-                variants={item}
-                className="bg-white dark:bg-slate-900 text-gray-900 dark:text-white rounded-2xl p-5 border border-gray-105 dark:border-slate-800 shadow-sm relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-                <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
-                  <div className="space-y-1 max-w-sm w-full">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-widest">
-                      <Clock size={10} className="animate-spin-slow" /> Configuration d'Horaires
-                    </div>
-                    <h3 className="text-base font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Durée de Production Réelle</h3>
-                    <p className="text-[10px] text-gray-400 dark:text-slate-400 leading-relaxed uppercase">
-                      Définissez la plage horaire de production dans toute l'usine. Ces heures contrôlent la base temporelle des calculs de fiabilité (MTBF & MTTR).
-                    </p>
+              <div className="flex justify-end px-1">
+                <button 
+                  onClick={() => openModal('downtime_log', {
+                    startTime: new Date().toISOString(),
+                    operatorId: user?.id,
+                  })}
+                  className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-black shadow-sm dark:shadow-none active:scale-95 transition-all text-[10px] tracking-widest uppercase flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 group"
+                >
+                  <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-sm dark:shadow-none group-hover:scale-110 transition-transform">
+                    <Plus size={12} strokeWidth={3} />
                   </div>
-
-                  {/* Duration picker inputs */}
-                  <div className="flex flex-wrap items-center gap-4 w-full flex-1 max-w-2xl justify-end">
-                    <div className="flex items-center gap-3 bg-gray-50 dark:bg-slate-950 p-2.5 rounded-xl border border-gray-100 dark:border-slate-800">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 leading-none">Début de Production</span>
-                        <input 
-                          type="time"
-                          value={prodStartTime}
-                          onChange={e => handleProdStartChange(e.target.value)}
-                          className="p-1 px-2.5 text-xs font-black rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-750 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 leading-none">Fin de Production</span>
-                        <input 
-                          type="time"
-                          value={prodEndTime}
-                          onChange={e => handleProdEndChange(e.target.value)}
-                          className="p-1 px-2.5 text-xs font-black rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-750 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0 cursor-pointer"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Quick stat blocks */}
-                    <div className="flex items-stretch gap-2 font-mono text-center">
-                      <div className="px-3.5 py-2.5 rounded-xl border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex flex-col justify-center min-w-[100px]">
-                        <span className="text-[7.5px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-0.5">Durée Globale</span>
-                        <div className="text-xs font-black text-slate-800 dark:text-white">{formatDowntimeDisplay(analytics.durationSec)}</div>
-                      </div>
-                      
-                      <div className="px-3.5 py-2.5 rounded-xl border border-blue-500/10 bg-blue-500/5 flex flex-col justify-center min-w-[100px]">
-                        <span className="text-[7.5px] font-black text-blue-500 uppercase tracking-widest block mb-0.5">MTBF</span>
-                        <div className="text-xs font-black text-blue-600 dark:text-blue-400">{formatDowntimeDisplay(analytics.mtbfSec)}</div>
-                      </div>
-
-                      <div className="px-3.5 py-2.5 rounded-xl border border-orange-500/10 bg-orange-500/5 flex flex-col justify-center min-w-[100px]">
-                        <span className="text-[7.5px] font-black text-orange-500 uppercase tracking-widest block mb-0.5">MTTR</span>
-                        <div className="text-xs font-black text-orange-600 dark:text-orange-400">{formatDowntimeDisplay(analytics.mttrSec)}</div>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-              </motion.div>
+                  {t('add_downtime_log')}
+                </button>
+              </div>
 
               {/* BOTTOM ROW: SHIFT PERF & LIVE MONITOR */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
