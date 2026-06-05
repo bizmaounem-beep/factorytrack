@@ -130,7 +130,7 @@ export default function PilotScreen() {
   // Sync state reactively with selectedMachine
   useEffect(() => {
     if (selectedMachine) {
-      const dbIsRunning = selectedMachine.isProdRunning === true || selectedMachine.isProdRunning === 1;
+      const dbIsRunning = selectedMachine.isProdRunning === true || Number(selectedMachine.isProdRunning) === 1 || String(selectedMachine.isProdRunning) === '1' || String(selectedMachine.isProdRunning) === 'true';
       setLocalIsProdRunning(dbIsRunning);
       if (selectedMachine.prodStartTime) setLocalProdStartTime(selectedMachine.prodStartTime);
       if (selectedMachine.prodEndTime) setLocalProdEndTime(selectedMachine.prodEndTime);

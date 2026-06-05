@@ -217,9 +217,13 @@ export const localApi = {
 
     socket.on('db_change', handler);
     
+    // Polling fallback to keep clients in sync even if sockets are blockaded
+    const intervalId = setInterval(fetchAndCallback, 3000);
+    
     // Return unsubscribe function
     return () => {
       if (timeout) clearTimeout(timeout);
+      clearInterval(intervalId);
       socket.off('db_change', handler);
     };
   }

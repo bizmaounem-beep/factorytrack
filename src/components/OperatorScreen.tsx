@@ -95,7 +95,9 @@ export default function OperatorScreen() {
 
   const activeLine = lines.find(l => l.id === selectedLineId) || null;
   const selectedMachine = machines.find(m => m.id === selectedMachineId) || null;
-  const isMachineProdRunning = selectedMachine?.isProdRunning === true || selectedMachine?.isProdRunning === 1;
+  const isMachineProdRunning = selectedMachine 
+    ? (selectedMachine.isProdRunning === true || Number(selectedMachine.isProdRunning) === 1 || String(selectedMachine.isProdRunning) === '1' || String(selectedMachine.isProdRunning) === 'true') 
+    : false;
   const activeProgramme = activeLine ? availableProgrammes.find(p => p.id === activeLine.currentProgrammeId) || null : null;
   const activeDowntime = activeLine?.activeDowntimeId ? downtimeLogs.find(d => d.id === activeLine.activeDowntimeId) || null : null;
 
