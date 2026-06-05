@@ -149,8 +149,8 @@ export default function PilotScreen() {
   }, [selectedMachine]);
 
   const isProdRunning = localIsProdRunning;
-  const activeLineForMachine = lines.find(l => l.machineId === selectedMachineId);
-  const isLineProdActive = activeLineForMachine ? activeLineForMachine.status === 'PRODUCTION_ACTIVE' : isProdRunning;
+  const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0);
+  const isLineProdActive = machineLines.length > 0 ? machineLines.some(l => l.status !== 'NOT_STARTED') : isProdRunning;
   const prodStartTime = localProdStartTime;
   const prodEndTime = localProdEndTime;
 
@@ -199,15 +199,19 @@ export default function PilotScreen() {
     setLocalIsProdRunning(true);
     localStorage.setItem('prod_is_running', 'true');
     
-    // Find matching active line and update its status
-    const activeLine = lines.find(l => l.machineId === selectedMachineId);
-    if (activeLine) {
-      try {
-        await localApi.updateLineStatus(activeLine.id, 'PRODUCTION_ACTIVE');
-      } catch (e) {
-        console.error("Error starting production line in DB:", e);
+    // Find matching lines and update their statuses
+    const targetLines = lines.filter(l => l.machineId === selectedMachineId);
+    if (targetLines.length > 0) {
+      for (const line of targetLines) {
+        try {
+          await localApi.updateLineStatus(line.id, 'PRODUCTION_ACTIVE');
+        } catch (e) {
+          console.error(`Error starting production line ${line.id} in DB:`, e);
+        }
       }
-    } else if (selectedMachineId) {
+    }
+    
+    if (selectedMachineId) {
       try {
         await localApi.updateDoc('machines', selectedMachineId, {
           isProdRunning: true,
@@ -234,15 +238,19 @@ export default function PilotScreen() {
     setLocalIsProdRunning(false);
     localStorage.setItem('prod_is_running', 'false');
     
-    // Find matching active line and update its status
-    const activeLine = lines.find(l => l.machineId === selectedMachineId);
-    if (activeLine) {
-      try {
-        await localApi.updateLineStatus(activeLine.id, 'NOT_STARTED');
-      } catch (e) {
-        console.error("Error stopping production line in DB:", e);
+    // Find matching lines and update their statuses
+    const targetLines = lines.filter(l => l.machineId === selectedMachineId);
+    if (targetLines.length > 0) {
+      for (const line of targetLines) {
+        try {
+          await localApi.updateLineStatus(line.id, 'NOT_STARTED');
+        } catch (e) {
+          console.error(`Error stopping production line ${line.id} in DB:`, e);
+        }
       }
-    } else if (selectedMachineId) {
+    }
+    
+    if (selectedMachineId) {
       try {
         await localApi.updateDoc('machines', selectedMachineId, {
           isProdRunning: false,
