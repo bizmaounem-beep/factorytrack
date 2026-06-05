@@ -932,7 +932,7 @@ export default function OperatorScreen() {
             <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px]">
               A
             </div>
-            <span className="text-[14px] font-black uppercase tracking-widest italic tracking-tighter">FACTORY<span className="text-blue-600">CLOUD</span></span>
+            <span className="text-[14px] font-black uppercase tracking-widest italic tracking-tighter">TEAM <span className="text-blue-600">MAINTENANCE</span></span>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -1088,8 +1088,8 @@ export default function OperatorScreen() {
               <Factory size={22} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tighter italic leading-none text-gray-900 dark:text-white">
-                PILOT<span className="text-blue-500">CLOUD</span>
+              <h1 className="text-lg font-black tracking-tighter italic leading-none text-gray-900 dark:text-white uppercase">
+                TEAM <span className="text-blue-500">MAINTENANCE</span>
               </h1>
               <p className="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-[0.2em] mt-1">Operator Hub</p>
             </div>

@@ -53,7 +53,7 @@ export default function Login() {
           <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 mb-2">
             <Lock size={24} />
           </div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase">FACTORY<span className="text-blue-600">CLOUD</span></h1>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase text-indigo-600 dark:text-indigo-400">TEAM <span className="text-blue-600">MAINTENANCE</span></h1>
           <p className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 tracking-widest">Connectez-vous à votre session</p>
         </div>
 
@@ -130,7 +130,7 @@ export default function Login() {
         </form>
       </motion.div>
       <p className="mt-8 text-[9px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-widest">
-        &copy; {new Date().getFullYear()} FACTORYCLOUD System
+        &copy; {new Date().getFullYear()} TEAM MAINTENANCE System
       </p>
     </div>
   );

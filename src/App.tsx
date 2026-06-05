@@ -102,7 +102,7 @@ export default function App() {
                   <Download size={20} className="text-white" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold leading-tight">Installer Factorycloud</h4>
+                  <h4 className="text-sm font-bold leading-tight font-sans">Installer Team Maintenance</h4>
                   <p className="text-[10px] text-gray-500 font-medium">Pour un accès rapide et hors-ligne</p>
                 </div>
               </div>
