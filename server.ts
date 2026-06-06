@@ -268,7 +268,9 @@ async function startServer() {
       CREATE TABLE IF NOT EXISTS machines (
         id TEXT PRIMARY KEY,
         name TEXT,
-        currentPilotId TEXT
+        currentPilotId TEXT,
+        productionStart TEXT,
+        productionEnd TEXT
       );
 
       CREATE TABLE IF NOT EXISTS lines (
@@ -383,6 +385,22 @@ async function startServer() {
       }
     } catch (err) {
       console.error(`Migration failed for downtime_types:`, err);
+    }
+
+    // Migration for machines
+    try {
+      const pragma = db.prepare(`PRAGMA table_info(machines)`).all() as any[];
+      const columns = pragma.map(p => p.name);
+      if (!columns.includes('productionStart')) {
+        console.log(`Migration: Adding productionStart column to machines...`);
+        db.exec(`ALTER TABLE machines ADD COLUMN productionStart TEXT;`);
+      }
+      if (!columns.includes('productionEnd')) {
+        console.log(`Migration: Adding productionEnd column to machines...`);
+        db.exec(`ALTER TABLE machines ADD COLUMN productionEnd TEXT;`);
+      }
+    } catch (err) {
+      console.error(`Migration failed for machines:`, err);
     }
 
     console.log('Database migrations completed.');

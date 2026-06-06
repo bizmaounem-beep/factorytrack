@@ -46,6 +46,44 @@ import { cn, formatDuration, formatDowntimeDisplay, getLogDurationSec } from '..
 import { getCurrentShiftId } from '../lib/shiftUtils';
 import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 
+// Helper to merge duplicate/overlapping downtime logs on a machine within a 4-minute start/end range
+function mergeDowntimeLogs(logs: DowntimeLog[], rangeMin = 4): { start: number; end: number; logs: DowntimeLog[] }[] {
+  const GAP_LIMIT = rangeMin * 60 * 1000;
+  
+  let intervals = logs.map(log => {
+    const start = new Date(log.startTime).getTime();
+    const end = log.endTime ? new Date(log.endTime).getTime() : Date.now();
+    return { start, end, logs: [log] };
+  });
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < intervals.length; i++) {
+      for (let j = i + 1; j < intervals.length; j++) {
+        const a = intervals[i];
+        const b = intervals[j];
+        
+        const overlap = (a.start <= b.end && b.start <= a.end);
+        const closeStart = Math.abs(a.start - b.start) <= GAP_LIMIT;
+        const closeEnd = Math.abs(a.end - b.end) <= GAP_LIMIT;
+        const closeStartEnd = Math.abs(a.start - b.end) <= GAP_LIMIT || Math.abs(b.start - a.end) <= GAP_LIMIT;
+
+        if (overlap || closeStart || closeEnd || closeStartEnd) {
+          a.start = Math.min(a.start, b.start);
+          a.end = Math.max(a.end, b.end);
+          a.logs = [...a.logs, ...b.logs];
+          intervals.splice(j, 1);
+          changed = true;
+          break;
+        }
+      }
+      if (changed) break;
+    }
+  }
+  return intervals;
+}
+
 export default function PilotScreen() {
   const { user, logout } = useAuth();
   const userRole = user && user.role ? user.role.toUpperCase() : '';
@@ -83,6 +121,14 @@ export default function PilotScreen() {
   const [globalTimer, setGlobalTimer] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const selectedMachine = useMemo(() => machines.find(m => m.id === selectedMachineId), [machines, selectedMachineId]);
+
+  const isCurrentlyProducing = useMemo(() => {
+    if (!selectedMachineId) return false;
+    const machineLines = lines.filter(l => l.machineId === selectedMachineId && l.isActive !== false && l.isActive !== 0);
+    return machineLines.some(l => l.status === 'RUNNING');
+  }, [lines, selectedMachineId]);
+
   const [prodStartTimeStr, setProdStartTimeStr] = useState<string>(() => {
     const saved = sessionStorage.getItem('dashboard_prod_start');
     if (saved) return saved;
@@ -98,6 +144,29 @@ export default function PilotScreen() {
     d.setHours(16, 0, 0, 0);
     return format(d, "yyyy-MM-dd'T'HH:mm");
   });
+
+  // Automatically synchronize production periods with live or stopped production
+  useEffect(() => {
+    if (selectedMachine) {
+      if (selectedMachine.productionStart) {
+        setProdStartTimeStr(format(parseISO(selectedMachine.productionStart), "yyyy-MM-dd'T'HH:mm"));
+      } else {
+        const d = new Date();
+        d.setHours(8, 0, 0, 0);
+        setProdStartTimeStr(format(d, "yyyy-MM-dd'T'HH:mm"));
+      }
+
+      if (isCurrentlyProducing) {
+        setProdEndTimeStr(format(new Date(globalTimer), "yyyy-MM-dd'T'HH:mm"));
+      } else if (selectedMachine.productionEnd) {
+        setProdEndTimeStr(format(parseISO(selectedMachine.productionEnd), "yyyy-MM-dd'T'HH:mm"));
+      } else {
+        const d = new Date();
+        d.setHours(16, 0, 0, 0);
+        setProdEndTimeStr(format(d, "yyyy-MM-dd'T'HH:mm"));
+      }
+    }
+  }, [selectedMachine, isCurrentlyProducing, globalTimer]);
 
   const handleProdStartChange = (val: string) => {
     setProdStartTimeStr(val);
@@ -189,19 +258,25 @@ export default function PilotScreen() {
       return iso.includes('T') ? iso : new Date(iso).toISOString();
     }
 
-    // Filter logs for TODAY AND the CURRENT SHIFT
-    const todayProd = prodLogs.filter(l => 
-      l.shiftId === currentShiftId && 
-      isWithinInterval(parseISO(logDate(l.timestamp)), { start, end })
-    );
+    // Filter logs for TODAY AND the CURRENT SHIFT and current machine
+    const todayProd = prodLogs.filter(l => {
+      const matchMachine = !selectedMachineId || l.machineId === selectedMachineId;
+      return matchMachine && l.shiftId === currentShiftId && 
+        isWithinInterval(parseISO(logDate(l.timestamp)), { start, end });
+    });
 
-    const todayDown = downLogs.filter(l => 
-      l.shiftId === currentShiftId && 
-      isWithinInterval(parseISO(logDate(l.startTime)), { start, end })
-    );
+    const todayDown = downLogs.filter(l => {
+      const matchMachine = !selectedMachineId || l.machineId === selectedMachineId;
+      return matchMachine && l.shiftId === currentShiftId && 
+        isWithinInterval(parseISO(logDate(l.startTime)), { start, end });
+    });
+
+    const mergedTodayDown = mergeDowntimeLogs(todayDown, 4);
 
     const totalPallets = todayProd.reduce((acc, l) => acc + l.count, 0);
-    const totalDowntimeSec = todayDown.reduce((acc, l) => acc + getLogDurationSec(l), 0);
+    const totalDowntimeSec = mergedTodayDown.reduce((acc, slot) => {
+      return acc + Math.max(0, slot.end - slot.start) / 1000;
+    }, 0);
     
     const activeLines = lines.filter(l => l.isActive !== false && l.isActive !== 0 && l.machineId === selectedMachineId);
     
@@ -310,13 +385,14 @@ export default function PilotScreen() {
       return logStart >= prodStart && logStart <= prodEnd;
     });
     
-    const numFailures = matchingDownLogs.length;
+    const mergedDownTimeSlots = mergeDowntimeLogs(matchingDownLogs, 4);
+    const numFailures = mergedDownTimeSlots.length;
     
     // Calculate total downtime duration in seconds within this specified period
-    const totalDowntimeSec = matchingDownLogs.reduce((acc, log) => {
-      const logStart = new Date(log.startTime).getTime();
-      const logEnd = log.endTime ? new Date(log.endTime).getTime() : Math.min(Date.now(), prodEnd);
-      const durationMs = Math.max(0, logEnd - logStart);
+    const totalDowntimeSec = mergedDownTimeSlots.reduce((acc, slot) => {
+      const start = slot.start;
+      const end = Math.min(slot.end, prodEnd);
+      const durationMs = Math.max(0, end - start);
       return acc + durationMs / 1000;
     }, 0);
     
@@ -669,6 +745,16 @@ export default function PilotScreen() {
         alert("Veuillez d'abord assigner un programme à cette ligne.");
         return;
       }
+      
+      const machineLines = lines.filter(l => l.machineId === line.machineId && l.isActive !== false && l.isActive !== 0);
+      const alreadyProducing = machineLines.some(l => l.status === 'RUNNING');
+      if (!alreadyProducing) {
+        await localApi.updateDoc('machines', line.machineId, {
+          productionStart: new Date().toISOString(),
+          productionEnd: null
+        });
+      }
+
       await localApi.updateDoc('lines', lineId, {
         status: 'RUNNING'
       });
@@ -680,6 +766,17 @@ export default function PilotScreen() {
 
   const handleStopProduction = async (lineId: string) => {
     try {
+      const line = lines.find(l => l.id === lineId);
+      if (line) {
+        const machineLines = lines.filter(l => l.machineId === line.machineId && l.isActive !== false && l.isActive !== 0);
+        const runningLinesCount = machineLines.filter(l => l.status === 'RUNNING').length;
+        if (runningLinesCount === 1 && line.status === 'RUNNING') {
+          await localApi.updateDoc('machines', line.machineId, {
+            productionEnd: new Date().toISOString()
+          });
+        }
+      }
+
       await localApi.updateDoc('lines', lineId, {
         status: 'IDLE'
       });
@@ -699,6 +796,9 @@ export default function PilotScreen() {
           await localApi.updateDoc('lines', line.id, { status: 'IDLE' });
         }
       }
+      await localApi.updateDoc('machines', selectedMachineId, {
+        productionEnd: new Date().toISOString()
+      });
     } catch (e) {
       console.error(e);
       alert("Erreur lors de l'arrêt de la production de la machine.");
@@ -719,6 +819,11 @@ export default function PilotScreen() {
         return;
       }
       try {
+        await localApi.updateDoc('machines', selectedMachineId, {
+          productionStart: new Date().toISOString(),
+          productionEnd: null
+        });
+
         for (const line of startableLines) {
           if (line.status !== 'RUNNING') {
             await localApi.updateDoc('lines', line.id, { status: 'RUNNING' });
@@ -2001,22 +2106,18 @@ export default function PilotScreen() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                     <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Début Production</label>
-                      <input 
-                        type="datetime-local"
-                        value={prodStartTimeStr}
-                        onChange={(e) => handleProdStartChange(e.target.value)}
-                        className="w-full p-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 dark:text-white"
-                      />
+                      <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Début Production (Auto)</label>
+                      <div className="w-full p-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold text-gray-900 dark:text-gray-100 flex items-center justify-between">
+                        <span>{prodStartTimeStr ? format(parseISO(prodStartTimeStr), "dd/MM/yyyy HH:mm") : "Non démarré"}</span>
+                        {isCurrentlyProducing && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
+                      </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fin Production</label>
-                      <input 
-                        type="datetime-local"
-                        value={prodEndTimeStr}
-                        onChange={(e) => handleProdEndChange(e.target.value)}
-                        className="w-full p-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 dark:text-white"
-                      />
+                      <label className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Fin Production (Auto)</label>
+                      <div className="w-full p-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold text-gray-900 dark:text-gray-100 flex items-center justify-between">
+                        <span>{isCurrentlyProducing ? "En cours..." : (prodEndTimeStr ? format(parseISO(prodEndTimeStr), "dd/MM/yyyy HH:mm") : "—")}</span>
+                        <span className={`w-2 h-2 rounded-full ${isCurrentlyProducing ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                      </div>
                     </div>
                   </div>
 

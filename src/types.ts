@@ -12,6 +12,8 @@ export interface Machine {
   id: string;
   name: string;
   currentPilotId?: string;
+  productionStart?: string;
+  productionEnd?: string;
 }
 
 export interface Line {
