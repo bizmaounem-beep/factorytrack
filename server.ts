@@ -426,7 +426,7 @@ async function startServer() {
         // Look if there are already existing logs from their previous usage
         const logCountRow = db.prepare('SELECT COUNT(*) as count FROM downtime_logs').get() as { count: number };
         if (logCountRow.count > 0) {
-          console.log('Detected existing data from a previous season. Creating Archived "Saison Précédente" and a clean active "Saison Initiale"');
+          console.log('[AgroSync] Detected existing data from a previous season. Creating Archived "Saison Précédente" and a clean active "Saison Initiale"');
           
           // 1. Create a previous archived season for historical logs
           const archResult = db.prepare("INSERT INTO seasons (name, status, started_at, ended_at) VALUES ('Saison Précédente', 'ARCHIVED', ?, ?)").run(
@@ -441,7 +441,7 @@ async function startServer() {
           // 2. Create the new fresh active season
           db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
         } else {
-          console.log('Seeding initial active season...');
+          console.log('[AgroSync] Seeding initial active season...');
           db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
         }
       } else {
@@ -452,27 +452,47 @@ async function startServer() {
         }
       }
 
-      // Safeguard: If the active season "Saison Initiale" exists but has adopted logs that are older
-      // than the season's creation time by more than 5 minutes, archive it to "Saison Précédente"
-      // and give them a brand-new clean active "Saison Initiale" immediately.
-      const currentActive = db.prepare("SELECT * FROM seasons WHERE status = 'ACTIVE' LIMIT 1").get() as any;
-      if (currentActive && currentActive.name === 'Saison Initiale') {
-        const oldestLog = db.prepare("SELECT startTime FROM downtime_logs WHERE season_id = ? ORDER BY startTime ASC LIMIT 1").get(currentActive.id) as any;
-        if (oldestLog) {
-          const oldestLogTime = new Date(oldestLog.startTime).getTime();
-          const seasonStartTime = new Date(currentActive.started_at).getTime();
-          if (seasonStartTime - oldestLogTime > 5 * 60 * 1000) {
-            console.log("Migration: Active 'Saison Initiale' contains historical logs. Archiving it to 'Saison Précédente' and starting a fresh active season.");
-            
-            // Archive the current one with name 'Saison Précédente'
-            db.prepare(`
-              UPDATE seasons 
-              SET name = 'Saison Précédente', status = 'ARCHIVED', ended_at = ? 
-              WHERE id = ?
-            `).run(new Date().toISOString(), currentActive.id);
-            
-            // Create a brand new active one
-            db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
+      // Robust Self-Healing Pass:
+      // If there are downtime_logs that are older than the earliest active/real season,
+      // surgically move ONLY those older logs to 'Saison Précédente' so they are kept separated as history.
+      const earliestRealSeason = db.prepare("SELECT * FROM seasons WHERE name != 'Saison Précédente' ORDER BY started_at ASC LIMIT 1").get() as any;
+      if (earliestRealSeason) {
+        const oldestSeasonTime = new Date(earliestRealSeason.started_at).getTime();
+        
+        // Find all downtime logs currently stored in database
+        const allLogs = db.prepare("SELECT id, startTime, season_id FROM downtime_logs").all() as any[];
+        const oldLogsToMove = allLogs.filter(log => {
+          const logTime = new Date(log.startTime).getTime();
+          // Filter logs that are older than the creation of the first real season by at least 1 minute
+          return logTime < (oldestSeasonTime - 60000);
+        });
+
+        if (oldLogsToMove.length > 0) {
+          // Check if 'Saison Précédente' already exists
+          let prevSeason = db.prepare("SELECT * FROM seasons WHERE name = 'Saison Précédente' LIMIT 1").get() as any;
+          if (!prevSeason) {
+            console.log('[AgroSync] Creating "Saison Précédente" for historical logs...');
+            const res = db.prepare("INSERT INTO seasons (name, status, started_at, ended_at) VALUES ('Saison Précédente', 'ARCHIVED', ?, ?)").run(
+              new Date(oldestSeasonTime - 365*24*60*60*1000).toISOString(),
+              earliestRealSeason.started_at
+            );
+            prevSeason = { id: res.lastInsertRowid };
+          }
+
+          // Move ONLY those parsed historical logs to 'Saison Précédente'
+          const updateStmt = db.prepare("UPDATE downtime_logs SET season_id = ? WHERE id = ?");
+          let movedCount = 0;
+          const transaction = db.transaction((logs) => {
+            for (const log of logs) {
+              if (String(log.season_id) !== String(prevSeason.id)) {
+                updateStmt.run(prevSeason.id, log.id);
+                movedCount++;
+              }
+            }
+          });
+          transaction(oldLogsToMove);
+          if (movedCount > 0) {
+            console.log(`[AgroSync Migration] Surgically moved ${movedCount} old historical logs to "Saison Précédente" (ID: ${prevSeason.id}).`);
           }
         }
       }
