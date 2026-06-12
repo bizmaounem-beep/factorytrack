@@ -109,7 +109,7 @@ const upload = multer({
 
 const ALLOWED_COLLECTIONS = [
   'users', 'machines', 'lines', 'programmes', 
-  'downtime_types', 'production_logs', 'downtime_logs', 'shifts'
+  'downtime_types', 'production_logs', 'downtime_logs', 'shifts', 'seasons'
 ];
 
 let db: Database.Database;
@@ -327,7 +327,16 @@ async function startServer() {
         duration INTEGER,
         description TEXT,
         images TEXT,
-        image_path TEXT
+        image_path TEXT,
+        season_id INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS seasons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        status TEXT,
+        started_at TEXT,
+        ended_at TEXT
       );
 
       CREATE TABLE IF NOT EXISTS shifts (
@@ -364,6 +373,11 @@ async function startServer() {
         if (table === 'downtime_logs' && !columns.includes('images')) {
           console.log(`Migration: Adding images column to downtime_logs...`);
           db.exec(`ALTER TABLE downtime_logs ADD COLUMN images TEXT;`);
+        }
+
+        if (table === 'downtime_logs' && !columns.includes('season_id')) {
+          console.log(`Migration: Adding season_id column to downtime_logs...`);
+          db.exec(`ALTER TABLE downtime_logs ADD COLUMN season_id INTEGER;`);
         }
 
         if (table === 'lines' && !columns.includes('isActive')) {
@@ -404,6 +418,26 @@ async function startServer() {
     }
 
     console.log('Database migrations completed.');
+
+    // Seed dynamic seasons if empty
+    try {
+      const seasonCount = db.prepare('SELECT COUNT(*) as count FROM seasons').get() as { count: number };
+      if (seasonCount.count === 0) {
+        console.log('Seeding initial active season...');
+        db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
+      }
+
+      // Link any existing downtime logs without a season_id to the currently active season
+      const activeSeason = db.prepare("SELECT id FROM seasons WHERE status = 'ACTIVE' LIMIT 1").get() as any;
+      if (activeSeason) {
+        const updated = db.prepare("UPDATE downtime_logs SET season_id = ? WHERE season_id IS NULL").run(activeSeason.id);
+        if (updated.changes > 0) {
+          console.log(`Associated ${updated.changes} previously recorded downtime logs with active season ID: ${activeSeason.id}`);
+        }
+      }
+    } catch (e) {
+      console.error('Error seeding/migrating seasons:', e);
+    }
 
     // Seed default data if empty
     const countRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
@@ -625,10 +659,91 @@ async function startServer() {
   // Apply Auth Middleware to all subsequent routes
   apiRouter.use(requireAuth);
 
+  // --- SEASONS ENDPOINTS ---
+  apiRouter.get('/seasons', (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const rows = db.prepare(`SELECT * FROM seasons ORDER BY id DESC`).all();
+      res.json(rows);
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  apiRouter.post('/seasons/start', (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: 'Le nom de la saison est requis' });
+
+      if ((req as any).user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
+      }
+
+      const now = new Date().toISOString();
+
+      // 1. Archive current active season
+      db.prepare(`
+        UPDATE seasons 
+        SET status = 'ARCHIVED', ended_at = ? 
+        WHERE status = 'ACTIVE'
+      `).run(now);
+
+      // 2. Open new season
+      const info = db.prepare(`
+        INSERT INTO seasons (name, status, started_at) 
+        VALUES (?, 'ACTIVE', ?)
+      `).run(sanitizeValue(name), now);
+
+      const newSeasonId = info.lastInsertRowid;
+      const newSeason = db.prepare(`SELECT * FROM seasons WHERE id = ?`).get(newSeasonId) as any;
+
+      io.emit('seasonChanged', newSeason);
+      io.emit('db_change', { collection: 'seasons' });
+      io.emit('db_change', { collection: 'downtime_logs' });
+
+      res.json(newSeason);
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  apiRouter.post('/seasons/end', (req, res) => {
+    try {
+      if (!db) throw new Error('Database not initialized');
+      if ((req as any).user?.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
+      }
+
+      const now = new Date().toISOString();
+
+      // Archive current active season
+      db.prepare(`
+        UPDATE seasons 
+        SET status = 'ARCHIVED', ended_at = ? 
+        WHERE status = 'ACTIVE'
+      `).run(now);
+
+      io.emit('seasonChanged', null);
+      io.emit('db_change', { collection: 'seasons' });
+      io.emit('db_change', { collection: 'downtime_logs' });
+
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   // --- SCADA GLOBAL ENDPOINTS ---
   apiRouter.post('/machine/:id/global-stop', async (req, res) => {
     try {
       if (!db) throw new Error('Database not initialized');
+      
+      const activeSeason = db.prepare(`SELECT * FROM seasons WHERE status = 'ACTIVE' LIMIT 1`).get() as any;
+      if (!activeSeason) {
+        return res.status(400).json({ error: "Aucune saison de production n'est active. L'enregistrement des arrêts est impossible sans saison active." });
+      }
+
       const { id: machineId } = req.params;
       const { typeId, operatorId, description, images } = req.body;
       const shiftId = getServerShiftId();
@@ -637,9 +752,9 @@ async function startServer() {
 
       // 1. Create a single log entry for the global stop
       db.prepare(`
-        INSERT INTO downtime_logs (id, machineId, lineId, typeId, operatorId, shiftId, startTime, description, images)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(logId, machineId, 'MACHINE_LEVEL', typeId, operatorId, shiftId, startTime, description || '', sanitizeValue(images));
+        INSERT INTO downtime_logs (id, machineId, lineId, typeId, operatorId, shiftId, startTime, description, images, season_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(logId, machineId, 'MACHINE_LEVEL', typeId, operatorId, shiftId, startTime, description || '', sanitizeValue(images), activeSeason.id);
 
       // 2. Update all active lines for this machine
       db.prepare(`
@@ -769,6 +884,14 @@ async function startServer() {
         if (data.pin) {
           data.pin = await bcrypt.hash(String(data.pin), SALT_ROUNDS);
         }
+      }
+
+      if (collection === 'downtime_logs') {
+        const activeSeason = db.prepare(`SELECT * FROM seasons WHERE status = 'ACTIVE' LIMIT 1`).get() as any;
+        if (!activeSeason) {
+          return res.status(400).json({ error: "Aucune saison de production n'est active. L'enregistrement des arrêts est impossible sans saison active." });
+        }
+        data.season_id = activeSeason.id;
       }
       
       const logCollections = ['production_logs', 'downtime_logs', 'programmes'];

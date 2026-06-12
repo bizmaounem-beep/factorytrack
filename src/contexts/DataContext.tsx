@@ -3,7 +3,7 @@ import { localApi } from '../lib/localApi';
 import { useAuth } from './AuthContext';
 import { 
   Machine, Line, Programme, User, DowntimeType, 
-  ProductionLog, DowntimeLog, Shift 
+  ProductionLog, DowntimeLog, Shift, Season 
 } from '../types';
 
 interface DataContextType {
@@ -15,6 +15,7 @@ interface DataContextType {
   shifts: Shift[];
   productionLogs: ProductionLog[];
   downtimeLogs: DowntimeLog[];
+  seasons: Season[];
   loading: boolean;
 }
 
@@ -30,6 +31,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([]);
   const [downtimeLogs, setDowntimeLogs] = useState<DowntimeLog[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const unsubShifts = localApi.onSnapshot('shifts', setShifts);
     const unsubProd = localApi.onSnapshot('production_logs', setProductionLogs);
     const unsubDown = localApi.onSnapshot('downtime_logs', setDowntimeLogs);
+    const unsubSeasons = localApi.onSnapshot('seasons', setSeasons);
 
     return () => {
       unsubMachines();
@@ -62,6 +65,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       unsubShifts();
       unsubProd();
       unsubDown();
+      unsubSeasons();
     };
   }, [user]);
 
@@ -74,8 +78,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     shifts,
     productionLogs,
     downtimeLogs,
+    seasons,
     loading
-  }), [machines, lines, users, downtimeTypes, programmes, shifts, productionLogs, downtimeLogs, loading]);
+  }), [machines, lines, users, downtimeTypes, programmes, shifts, productionLogs, downtimeLogs, seasons, loading]);
 
   return (
     <DataContext.Provider value={value}>

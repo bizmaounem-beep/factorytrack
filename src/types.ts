@@ -76,4 +76,13 @@ export interface DowntimeLog {
   duration?: number;
   description?: string;
   images?: string[];
+  season_id?: number;
+}
+
+export interface Season {
+  id: number;
+  name: string;
+  status: 'ACTIVE' | 'ARCHIVED';
+  started_at: string;
+  ended_at?: string;
 }

@@ -11,7 +11,7 @@ import {
   Download, Plus, Trash2, LayoutDashboard,
   Box, Terminal, Activity, Pencil, Menu, X, Clock,
   TrendingUp, AlertTriangle, CheckCircle2,
-  Camera, Eye, Sun, Moon
+  Camera, Eye, Sun, Moon, Calendar
 } from 'lucide-react';
 import { cn, formatDuration, formatMinutes, formatDowntimeDisplay, getLogDurationSec } from '../lib/utils';
 import ExcelJS from 'exceljs';
@@ -89,7 +89,8 @@ export default function AdminPanel() {
     shifts,
     downtimeTypes, 
     productionLogs: prodLogs, 
-    downtimeLogs: downLogs 
+    downtimeLogs: downLogs,
+    seasons
   } = useData();
 
   const sortedProdLogs = useMemo(() => [...prodLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), [prodLogs]);
@@ -359,6 +360,7 @@ export default function AdminPanel() {
   const [historyOperatorFilter, setHistoryOperatorFilter] = useState<string>(() => sessionStorage.getItem('admin_history_operator') || '');
   const [historyDateFilter, setHistoryDateFilter] = useState<string>(() => sessionStorage.getItem('admin_history_date') || '');
   const [historyEndDateFilter, setHistoryEndDateFilter] = useState<string>(() => sessionStorage.getItem('admin_history_end_date') || '');
+  const [historySeasonFilter, setHistorySeasonFilter] = useState<string>(() => sessionStorage.getItem('admin_history_season') || '');
   const [historyLogType, setHistoryLogType] = useState<'production' | 'downtime'>(() => (sessionStorage.getItem('admin_history_type') as any) || 'production');
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('admin_active_tab') || 'dashboard');
 
@@ -373,8 +375,9 @@ export default function AdminPanel() {
     sessionStorage.setItem('admin_history_operator', historyOperatorFilter);
     sessionStorage.setItem('admin_history_date', historyDateFilter);
     sessionStorage.setItem('admin_history_end_date', historyEndDateFilter);
+    sessionStorage.setItem('admin_history_season', historySeasonFilter);
     sessionStorage.setItem('admin_history_type', historyLogType);
-  }, [historyMachineFilter, historyLineFilter, historyShiftFilter, historyOperatorFilter, historyDateFilter, historyEndDateFilter, historyLogType]);
+  }, [historyMachineFilter, historyLineFilter, historyShiftFilter, historyOperatorFilter, historyDateFilter, historyEndDateFilter, historySeasonFilter, historyLogType]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -385,7 +388,43 @@ export default function AdminPanel() {
   const [confirmDelete, setConfirmDelete] = useState<{col: string, id: string, name: string} | null>(null);
   const [selectedFullImage, setSelectedFullImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isNewSeasonModalOpen, setIsNewSeasonModalOpen] = useState(false);
+  const [isConfirmEndSeasonOpen, setIsConfirmEndSeasonOpen] = useState(false);
+  const [newSeasonName, setNewSeasonName] = useState('');
+  const [seasonError, setSeasonError] = useState('');
+  const [seasonSuccess, setSeasonSuccess] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleEndSeason = async () => {
+    try {
+      await localApi.endCurrentSeason();
+      setSeasonSuccess("La saison actuelle a été clôturée avec succès.");
+      setIsConfirmEndSeasonOpen(false);
+      setTimeout(() => setSeasonSuccess(''), 5000);
+    } catch (err: any) {
+      setSeasonError(err.message || "Erreur lors de la clôture de la saison.");
+      setIsConfirmEndSeasonOpen(false);
+      setTimeout(() => setSeasonError(''), 5000);
+    }
+  };
+
+  const handleStartSeason = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSeasonName.trim()) {
+      setSeasonError("Le nom de la saison est requis.");
+      return;
+    }
+    try {
+      setSeasonError('');
+      await localApi.startSeason(newSeasonName.trim());
+      setSeasonSuccess(`La nouvelle saison "${newSeasonName.trim()}" a été lancée.`);
+      setIsNewSeasonModalOpen(false);
+      setNewSeasonName('');
+      setTimeout(() => setSeasonSuccess(''), 5000);
+    } catch (err: any) {
+      setSeasonError(err.message || "Erreur lors du lancement de la saison.");
+    }
+  };
 
   const ALLOWED_MIME_TYPES = [
     'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
@@ -818,7 +857,15 @@ export default function AdminPanel() {
       const logDateOnly = log.timestamp.split('T')[0];
       const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
                         (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
-      return matchMachine && matchLine && matchShift && matchOperator && matchDate;
+      const matchSeason = !historySeasonFilter || (() => {
+        const chosenSeason = seasons.find(s => String(s.id) === String(historySeasonFilter));
+        if (!chosenSeason) return true;
+        const start = new Date(chosenSeason.started_at).getTime();
+        const end = chosenSeason.ended_at ? new Date(chosenSeason.ended_at).getTime() : Date.now();
+        const logTime = new Date(log.timestamp).getTime();
+        return logTime >= start && logTime <= end;
+      })();
+      return matchMachine && matchLine && matchShift && matchOperator && matchDate && matchSeason;
     });
 
     const filteredDownLogs = downLogs.filter(log => {
@@ -829,7 +876,18 @@ export default function AdminPanel() {
       const logDateOnly = log.startTime.split('T')[0];
       const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
                         (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
-      return matchMachine && matchLine && matchShift && matchOperator && matchDate;
+      const matchSeason = !historySeasonFilter || (() => {
+        if (log.season_id !== undefined && log.season_id !== null) {
+          return String(log.season_id) === String(historySeasonFilter);
+        }
+        const chosenSeason = seasons.find(s => String(s.id) === String(historySeasonFilter));
+        if (!chosenSeason) return true;
+        const start = new Date(chosenSeason.started_at).getTime();
+        const end = chosenSeason.ended_at ? new Date(chosenSeason.ended_at).getTime() : Date.now();
+        const logTime = new Date(log.startTime).getTime();
+        return logTime >= start && logTime <= end;
+      })();
+      return matchMachine && matchLine && matchShift && matchOperator && matchDate && matchSeason;
     });
 
     if (type === 'production') {
@@ -1080,6 +1138,7 @@ export default function AdminPanel() {
 
   const tabs = [
     { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { id: 'seasons', label: 'Saisons', icon: Calendar },
     { id: 'users', label: t('users'), icon: Users },
     { id: 'machines', label: t('machines'), icon: Factory },
     { id: 'programmes', label: t('programmes'), icon: Package },
@@ -1964,7 +2023,21 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+                   <div className="space-y-1">
+                     <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Saison</p>
+                     <select 
+                      value={historySeasonFilter}
+                      onChange={e => setHistorySeasonFilter(e.target.value)}
+                      className="w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm dark:shadow-none text-gray-900 dark:text-white"
+                     >
+                       <option value="">Toutes les Saisons</option>
+                       {seasons.map(s => (
+                         <option key={s.id} value={s.id}>{s.name} ({s.status})</option>
+                       ))}
+                     </select>
+                   </div>
+
                    <div className="space-y-1">
                      <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">{t('machine')}</p>
                      <select 
@@ -2080,7 +2153,15 @@ export default function AdminPanel() {
                                 const logDateOnly = log.timestamp.split('T')[0];
                                 const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
                                                   (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
-                                return matchMachine && matchLine && matchShift && matchOperator && matchDate;
+                                const matchSeason = !historySeasonFilter || (() => {
+                                  const chosenSeason = seasons.find(s => String(s.id) === String(historySeasonFilter));
+                                  if (!chosenSeason) return true;
+                                  const start = new Date(chosenSeason.started_at).getTime();
+                                  const end = chosenSeason.ended_at ? new Date(chosenSeason.ended_at).getTime() : Date.now();
+                                  const logTime = new Date(log.timestamp).getTime();
+                                  return logTime >= start && logTime <= end;
+                                })();
+                                return matchMachine && matchLine && matchShift && matchOperator && matchDate && matchSeason;
                               })
                               .slice(0, 100).map(log => (
                                 <motion.tr 
@@ -2157,7 +2238,18 @@ export default function AdminPanel() {
                                 const logDateOnly = log.startTime.split('T')[0];
                                 const matchDate = (!historyDateFilter || logDateOnly >= historyDateFilter) && 
                                                   (!historyEndDateFilter || logDateOnly <= historyEndDateFilter);
-                                return matchMachine && matchLine && matchShift && matchOperator && matchDate;
+                                const matchSeason = !historySeasonFilter || (() => {
+                                  if (log.season_id !== undefined && log.season_id !== null) {
+                                    return String(log.season_id) === String(historySeasonFilter);
+                                  }
+                                  const chosenSeason = seasons.find(s => String(s.id) === String(historySeasonFilter));
+                                  if (!chosenSeason) return true;
+                                  const start = new Date(chosenSeason.started_at).getTime();
+                                  const end = chosenSeason.ended_at ? new Date(chosenSeason.ended_at).getTime() : Date.now();
+                                  const logTime = new Date(log.startTime).getTime();
+                                  return logTime >= start && logTime <= end;
+                                })();
+                                return matchMachine && matchLine && matchShift && matchOperator && matchDate && matchSeason;
                               })
                               .slice(0, 100).map(log => (
                                 <motion.tr 
@@ -2314,8 +2406,292 @@ export default function AdminPanel() {
               </div>
             </div>
           )}
+
+          {activeTab === 'seasons' && (
+            <div className="space-y-4 md:space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-1">
+                <div>
+                  <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest block w-max mb-1">
+                    Gestion des Campagnes
+                  </span>
+                  <h2 className="text-xl md:text-2xl font-black tracking-tight text-gray-900 dark:text-white leading-none">
+                    GESTION DES SAISONS
+                  </h2>
+                </div>
+                <button
+                  onClick={() => {
+                    setSeasonError('');
+                    setIsNewSeasonModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black tracking-wider uppercase rounded-xl shadow-lg shadow-blue-100 dark:shadow-none flex items-center gap-2 transition-all active:scale-95"
+                >
+                  <Plus size={14} strokeWidth={2.5} />
+                  Lancer une Nouvelle Saison
+                </button>
+              </div>
+
+              {/* SUCCESS / ERROR BANNERS */}
+              {seasonSuccess && (
+                <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30 text-green-700 dark:text-green-400 rounded-2xl flex items-center gap-3 text-xs font-bold leading-tight shadow-sm animate-flash">
+                  <CheckCircle2 size={16} strokeWidth={2.5} className="text-green-600 dark:text-green-500 shrink-0" />
+                  <span>{seasonSuccess}</span>
+                </div>
+              )}
+              {seasonError && (
+                <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400 rounded-2xl flex items-center gap-3 text-xs font-bold leading-tight shadow-sm animate-flash">
+                  <AlertTriangle size={16} strokeWidth={2.5} className="text-red-600 dark:text-red-500 shrink-0" />
+                  <span>{seasonError}</span>
+                </div>
+              )}
+
+              {/* CURRENT ACTIVE SEASON BLOCK */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="col-span-1 md:col-span-2 bg-white dark:bg-gray-900 p-4 md:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-col justify-between relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 text-blue-50/20 dark:text-blue-950/10 rotate-12">
+                     <Calendar size={120} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
+                      Statut Saison Actuelle
+                    </h3>
+                    {seasons.some(s => s.status === 'ACTIVE') ? (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                          <h4 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                            {seasons.find(s => s.status === 'ACTIVE')?.name}
+                          </h4>
+                        </div>
+                        <p className="text-gray-500 dark:text-gray-400 text-[10px] md:text-xs">
+                          Lancée le {new Date(seasons.find(s => s.status === 'ACTIVE')?.started_at || '').toLocaleString()}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                          <h4 className="text-md font-bold text-gray-500 dark:text-gray-400">
+                            Aucune Saison Active
+                          </h4>
+                        </div>
+                        <p className="text-red-500 text-[10px] md:text-xs leading-snug">
+                          Attention : Sans saison active, tout enregistrement ou déclaration d'arrêt machine par les opérateurs est bloqué.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {seasons.some(s => s.status === 'ACTIVE') && (
+                    <div className="mt-6 relative z-10">
+                      <button
+                        onClick={() => setIsConfirmEndSeasonOpen(true)}
+                        className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-red-100 dark:shadow-none transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        <Trash2 size={14} />
+                        Clôturer la Saison Actuelle
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* SEASON STATISTICS */}
+                <div className="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">
+                      Statistiques Globales
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Saisons Archives</span>
+                        <span className="text-sm font-black text-gray-900 dark:text-white">
+                          {seasons.filter(s => s.status === 'ARCHIVED').length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Arrêts de Production</span>
+                        <span className="text-sm font-black text-gray-900 dark:text-white">
+                          {downLogs.length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pb-2">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Logs Saison Active</span>
+                        <span className="text-sm font-black text-blue-600 dark:text-blue-400">
+                          {seasons.some(s => s.status === 'ACTIVE') 
+                            ? downLogs.filter(l => l.season_id === seasons.find(s => s.status === 'ACTIVE')?.id).length
+                            : 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* LIST OF PAST SEASONS */}
+              <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+                  <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                    Historique des Saisons / Campagnes
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/70 dark:bg-gray-950/20 text-[8px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100 dark:border-gray-800">
+                        <th className="px-6 py-4">Nom de la Saison</th>
+                        <th className="px-6 py-4">Statut</th>
+                        <th className="px-6 py-4">Date de Début</th>
+                        <th className="px-6 py-4">Date de Fin</th>
+                        <th className="px-6 py-4 text-right">Logs Liés</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-bold text-gray-700 dark:text-gray-300">
+                      {seasons.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-8 text-center text-gray-400 uppercase tracking-widest text-[10px] font-black">
+                            Aucune saison enregistrée
+                          </td>
+                        </tr>
+                      ) : (
+                        seasons.map(s => {
+                          const logCount = downLogs.filter(l => l.season_id === s.id).length;
+                          return (
+                            <tr key={s.id} className="hover:bg-gray-50/40 dark:hover:bg-slate-900/40 transition-colors">
+                              <td className="px-6 py-4 font-black text-gray-900 dark:text-white">
+                                {s.name}
+                              </td>
+                              <td className="px-6 py-4">
+                                {s.status === 'ACTIVE' ? (
+                                  <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 rounded-full text-[9px] font-black tracking-widest uppercase">
+                                    Active
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-0.5 bg-slate-500/10 text-gray-500 dark:text-gray-400 rounded-full text-[9px] font-black tracking-widest uppercase">
+                                    Archivée
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-mono text-[10px]">
+                                {new Date(s.started_at).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 font-mono text-[10px]">
+                                {s.ended_at ? new Date(s.ended_at).toLocaleString() : '—'}
+                              </td>
+                              <td className="px-6 py-4 text-right text-[10px] font-black text-gray-900 dark:text-white">
+                                {logCount} logs d'arrêts
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
+
+      {/* NEW SEASONS & END SEASONS MODALS */}
+      <AnimatePresence>
+        {isNewSeasonModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[24px] p-6 space-y-4 shadow-2xl border border-gray-100 dark:border-gray-800"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-800">
+                <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <Calendar size={18} className="text-blue-600" />
+                  Lancer une Nouvelle Saison
+                </h3>
+                <button 
+                  onClick={() => setIsNewSeasonModalOpen(false)}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleStartSeason} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">
+                    Nom de la Campagne / Saison
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ex: Saison 2026/2027"
+                    value={newSeasonName}
+                    onChange={(e) => setNewSeasonName(e.target.value)}
+                    className="w-full p-3 bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-[10px] text-gray-400 font-medium leading-normal italic">
+                    Remarque : Lancer une nouvelle saison va automatiquement clôturer et archiver la saison actuellement active s'il y en a une.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewSeasonModalOpen(false)}
+                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[10px] font-black uppercase tracking-wider rounded-xl transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-colors"
+                  >
+                    Démarrer la Saison
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isConfirmEndSeasonOpen && (
+          <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[24px] p-6 space-y-4 shadow-2xl border border-gray-100 dark:border-gray-800"
+            >
+              <div className="flex items-center gap-3 text-red-600">
+                <AlertTriangle size={32} />
+                <h3 className="text-sm font-black uppercase tracking-wider">
+                  Clôturer la campagne ?
+                </h3>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-300 font-bold leading-relaxed">
+                Êtes-vous absolument sûr de vouloir CLÔTURER la saison actuelle ? Tout enregistrement de pannes machine future par les opérateurs sera BLOQUÉ jusqu'au lancement d'une nouvelle saison active.
+              </p>
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmEndSeasonOpen(false)}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[10px] font-black uppercase tracking-wider rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEndSeason}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-colors"
+                >
+                  Confirmer la Clôture
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* IMAGE PREVIEW MODAL */}
       <AnimatePresence>

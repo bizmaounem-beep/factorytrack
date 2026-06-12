@@ -37,6 +37,7 @@ export default function OperatorScreen() {
     programmes: availableProgrammes, 
     downtimeLogs,
     shifts,
+    seasons,
     loading: isDataLoading
   } = useData();
   
@@ -232,6 +233,35 @@ export default function OperatorScreen() {
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  const hasActiveSeason = seasons && seasons.some(s => s.status === 'ACTIVE');
+
+  if (!hasActiveSeason) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-slate-950 space-y-6 animate-fade-in" id="operator-season-lock">
+        <div className="p-8 bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 rounded-3xl shadow-xl max-w-md text-center space-y-5">
+          <div className="w-16 h-16 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+            <AlertCircle size={32} strokeWidth={2.5} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Pilotage Stoppé</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-bold leading-relaxed">
+              Le pilotage est actuellement stoppé car aucune Saison/Campagne n'est active.
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 font-semibold italic">
+              Veuillez contacter un administrateur pour démarrer une nouvelle saison de production.
+            </p>
+          </div>
+          <button
+            onClick={() => logout()}
+            className="w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200 text-xs font-black uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
+          >
+            Déconnexion
+          </button>
+        </div>
       </div>
     );
   }

@@ -170,6 +170,49 @@ export const localApi = {
     }
   },
 
+  async startSeason(name: string) {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/seasons/start`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) {
+        let errMsg = 'Échec de la création de la saison';
+        try {
+          const body = await res.json();
+          if (body && body.error) errMsg = body.error;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw e;
+    }
+  },
+
+  async endCurrentSeason() {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/seasons/end`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      if (!res.ok) {
+        let errMsg = 'Échec de la clôture de la saison';
+        try {
+          const body = await res.json();
+          if (body && body.error) errMsg = body.error;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+      return res.json();
+    } catch (e) {
+      console.error('API Error:', e);
+      throw e;
+    }
+  },
+
   // Real-time updates with Socket.io
   onSnapshot(collection: string, callback: (docs: any[]) => void) {
     let timeout: any = null;
