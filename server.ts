@@ -423,16 +423,57 @@ async function startServer() {
     try {
       const seasonCount = db.prepare('SELECT COUNT(*) as count FROM seasons').get() as { count: number };
       if (seasonCount.count === 0) {
-        console.log('Seeding initial active season...');
-        db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
+        // Look if there are already existing logs from their previous usage
+        const logCountRow = db.prepare('SELECT COUNT(*) as count FROM downtime_logs').get() as { count: number };
+        if (logCountRow.count > 0) {
+          console.log('Detected existing data from a previous season. Creating Archived "Saison Précédente" and a clean active "Saison Initiale"');
+          
+          // 1. Create a previous archived season for historical logs
+          const archResult = db.prepare("INSERT INTO seasons (name, status, started_at, ended_at) VALUES ('Saison Précédente', 'ARCHIVED', ?, ?)").run(
+            new Date(Date.now() - 365*24*60*60*1000).toISOString(),
+            new Date().toISOString()
+          );
+          const archSeasonId = archResult.lastInsertRowid;
+          
+          // Link all current logs to this archived season
+          db.prepare("UPDATE downtime_logs SET season_id = ? WHERE season_id IS NULL").run(archSeasonId);
+          
+          // 2. Create the new fresh active season
+          db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
+        } else {
+          console.log('Seeding initial active season...');
+          db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
+        }
+      } else {
+        // Link any remaining null season_id to the active season if any
+        const activeSeason = db.prepare("SELECT id FROM seasons WHERE status = 'ACTIVE' LIMIT 1").get() as any;
+        if (activeSeason) {
+          db.prepare("UPDATE downtime_logs SET season_id = ? WHERE season_id IS NULL").run(activeSeason.id);
+        }
       }
 
-      // Link any existing downtime logs without a season_id to the currently active season
-      const activeSeason = db.prepare("SELECT id FROM seasons WHERE status = 'ACTIVE' LIMIT 1").get() as any;
-      if (activeSeason) {
-        const updated = db.prepare("UPDATE downtime_logs SET season_id = ? WHERE season_id IS NULL").run(activeSeason.id);
-        if (updated.changes > 0) {
-          console.log(`Associated ${updated.changes} previously recorded downtime logs with active season ID: ${activeSeason.id}`);
+      // Safeguard: If the active season "Saison Initiale" exists but has adopted logs that are older
+      // than the season's creation time by more than 5 minutes, archive it to "Saison Précédente"
+      // and give them a brand-new clean active "Saison Initiale" immediately.
+      const currentActive = db.prepare("SELECT * FROM seasons WHERE status = 'ACTIVE' LIMIT 1").get() as any;
+      if (currentActive && currentActive.name === 'Saison Initiale') {
+        const oldestLog = db.prepare("SELECT startTime FROM downtime_logs WHERE season_id = ? ORDER BY startTime ASC LIMIT 1").get(currentActive.id) as any;
+        if (oldestLog) {
+          const oldestLogTime = new Date(oldestLog.startTime).getTime();
+          const seasonStartTime = new Date(currentActive.started_at).getTime();
+          if (seasonStartTime - oldestLogTime > 5 * 60 * 1000) {
+            console.log("Migration: Active 'Saison Initiale' contains historical logs. Archiving it to 'Saison Précédente' and starting a fresh active season.");
+            
+            // Archive the current one with name 'Saison Précédente'
+            db.prepare(`
+              UPDATE seasons 
+              SET name = 'Saison Précédente', status = 'ARCHIVED', ended_at = ? 
+              WHERE id = ?
+            `).run(new Date().toISOString(), currentActive.id);
+            
+            // Create a brand new active one
+            db.prepare("INSERT INTO seasons (name, status, started_at) VALUES ('Saison Initiale', 'ACTIVE', ?)").run(new Date().toISOString());
+          }
         }
       }
     } catch (e) {
